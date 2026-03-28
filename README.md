@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏠 Koko — Family Hub
+
+[한국어](README.ko.md) | [日本語](README.ja.md) | **[English]**
+
+A real-time family collaboration app that brings together your calendar, shopping list, and memos in one place.
+Accessible from any device — iOS, Android, and web — with instant sync across all family members.
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| Calendar | Create and manage family events, set reminders with push notifications |
+| Shopping List | Add items, check them off in real time, strike through completed items |
+| Memo | Shared family notes, accessible by everyone instantly |
+| Event Voting | Poll family members on availability before scheduling |
+| Real-time Sync | All changes reflected instantly across every device |
+| PWA Support | Install on iPhone / Android home screen — works like a native app |
+
+---
+
+## How It Works
+
+```
+Family Member Action
+(Add event · Check item · Write memo · Cast vote)
+    │
+    ▼
+Supabase Realtime
+    Change detected via PostgreSQL logical replication
+    → WebSocket broadcast to all connected devices
+    │
+    ▼
+All Devices Updated
+    Calendar / Shopping List / Memo refreshed instantly
+    │
+    ▼
+Push Notification (if applicable)
+    Firebase Cloud Messaging → iOS & Android
+```
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Frontend | Next.js 16 (TypeScript, Tailwind CSS, App Router) |
+| Backend / DB | Supabase (PostgreSQL, Realtime, Auth) |
+| Push Notifications | PWA Web Push (iOS 16.4+, Android) |
+| CI/CD | GitHub Actions |
+| Hosting | Vercel |
+
+---
+
+## Project Structure
+
+```
+koko/
+├── src/
+│   ├── app/                # Next.js App Router pages
+│   ├── components/         # Shared UI components
+│   ├── lib/                # Supabase client, utilities
+│   └── types/              # TypeScript type definitions
+├── public/                 # Static assets, PWA manifest
+├── .github/workflows/      # GitHub Actions CI
+└── CLAUDE.md               # AI coding agent instructions
+```
+
+---
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file in the project root:
 
-## Learn More
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development Rules
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- All work is done on `feature/*` branches → PR → merge to main
+- Direct push to `main` is prohibited
+- All code changes must be accompanied by unit tests
+- GitHub Actions CI must pass before merging
