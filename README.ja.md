@@ -88,11 +88,3 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
----
-
-## 開発ルール
-
-- すべての作業は `feature/*` ブランチ → PR → main マージ
-- main ブランチへの直接 push 禁止
-- コード作成・修正時は必ずユニットテストも作成
-- GitHub Actions CI 通過後にマージ

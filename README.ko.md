@@ -88,11 +88,3 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
----
-
-## 개발 규칙
-
-- 모든 작업은 `feature/*` 브랜치 → PR → main 머지
-- main 브랜치 다이렉트 push 금지
-- 코드 작성/수정 시 반드시 유닛 테스트 함께 작성
-- GitHub Actions CI 통과 후 머지
