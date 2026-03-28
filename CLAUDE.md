@@ -16,3 +16,4 @@
 6. Whenever code is written or modified, unit tests must also be written or modified
 7. Use GitHub Actions CI — tests must pass before merging
 8. Items requiring manual visual verification by the user must be listed as checkboxes in the PR (exclude automated test items)
+9. After a PR is merged, delete the feature branch immediately
