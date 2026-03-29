@@ -6,6 +6,7 @@ import { LogOut, Share2, Check, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { supabase } from '@/lib/supabase'
+import { BottomNav } from '@/components/BottomNav'
 
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth()
@@ -84,7 +85,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 min-h-screen">
+    <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
       <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-6">설정</h1>
 
       {/* 계정 정보 */}
@@ -145,6 +146,7 @@ export default function SettingsPage() {
         <LogOut size={16} />
         로그아웃
       </button>
+      <BottomNav />
     </div>
   )
 }
