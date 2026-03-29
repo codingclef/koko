@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { isEmailAllowed } from '@/lib/auth'
+import { parseInviteCodeFromNext } from '@/lib/auth'
 
 function AuthCallbackInner() {
   const router = useRouter()
@@ -24,13 +24,22 @@ function AuthCallbackInner() {
       }
 
       const email = data.user?.email ?? ''
-      if (!isEmailAllowed(email)) {
+      const next = searchParams.get('next') ?? '/shopping'
+      const inviteCode = parseInviteCodeFromNext(next)
+
+      const res = await fetch('/api/auth/check-allowed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, inviteCode }),
+      })
+      const { allowed } = await res.json()
+
+      if (!allowed) {
         await supabase.auth.signOut()
         router.replace('/login?error=unauthorized')
         return
       }
 
-      const next = searchParams.get('next') ?? '/shopping'
       router.replace(next)
     })
   }, [router, searchParams])
