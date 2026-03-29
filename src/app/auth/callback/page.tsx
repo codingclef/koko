@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { isEmailAllowed } from '@/lib/auth'
 
 function AuthCallbackInner() {
   const router = useRouter()
@@ -15,14 +16,22 @@ function AuthCallbackInner() {
       return
     }
 
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+    supabase.auth.exchangeCodeForSession(code).then(async ({ data, error }) => {
       if (error) {
         console.error('[auth/callback] error:', error)
         router.replace('/login')
-      } else {
-        const next = searchParams.get('next') ?? '/shopping'
-        router.replace(next)
+        return
       }
+
+      const email = data.user?.email ?? ''
+      if (!isEmailAllowed(email)) {
+        await supabase.auth.signOut()
+        router.replace('/login?error=unauthorized')
+        return
+      }
+
+      const next = searchParams.get('next') ?? '/shopping'
+      router.replace(next)
     })
   }, [router, searchParams])
 
