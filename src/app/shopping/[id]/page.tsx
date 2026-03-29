@@ -48,6 +48,9 @@ export default function ShoppingDetailPage() {
       })
       .subscribe((status) => {
         channelReadyRef.current = status === 'SUBSCRIBED'
+        if (status === 'SUBSCRIBED') {
+          getShoppingItems(id).then(setItems)
+        }
       })
 
     channelRef.current = channel
