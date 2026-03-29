@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
@@ -15,6 +15,7 @@ export default function ShoppingPage() {
   const { familyId, loading: familyLoading } = useFamily(user)
   const [lists, setLists] = useState<ShoppingList[]>([])
   const [showModal, setShowModal] = useState(false)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const loading = authLoading || familyLoading
 
@@ -30,8 +31,13 @@ export default function ShoppingPage() {
       })
       .subscribe()
 
+    channelRef.current = channel
     return () => { supabase.removeChannel(channel) }
   }, [familyId])
+
+  const broadcast = () => {
+    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+  }
 
   const handleCreate = async (name: string, type: ListType) => {
     if (!familyId || !user) return
@@ -48,11 +54,13 @@ export default function ShoppingPage() {
     setShowModal(false)
 
     await createShoppingList(familyId, user.id, name, type)
+    broadcast()
   }
 
   const handleDelete = async (listId: string) => {
     setLists((prev) => prev.filter((l) => l.id !== listId))
-    await deleteShoppingList(listId, familyId!)
+    await deleteShoppingList(listId)
+    broadcast()
   }
 
   if (loading) {

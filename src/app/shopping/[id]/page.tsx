@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -22,6 +22,7 @@ export default function ShoppingDetailPage() {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [loading, setLoading] = useState(true)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -31,7 +32,7 @@ export default function ShoppingDetailPage() {
         .from('shopping_lists')
         .select('*')
         .eq('id', id)
-        .maybeSingle()   // single() → maybeSingle() (0행 에러 방지)
+        .maybeSingle()
       setList(data)
       const fetchedItems = await getShoppingItems(id)
       setItems(fetchedItems)
@@ -46,8 +47,13 @@ export default function ShoppingDetailPage() {
       })
       .subscribe()
 
+    channelRef.current = channel
     return () => { supabase.removeChannel(channel) }
   }, [id])
+
+  const broadcast = () => {
+    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+  }
 
   const handleAdd = async (name: string) => {
     if (!user) return
@@ -65,6 +71,7 @@ export default function ShoppingDetailPage() {
     }
     setItems((prev) => [...prev, optimisticItem])
     await addShoppingItem(id, user.id, name)
+    broadcast()
   }
 
   const handleCheck = async (itemId: string, checked: boolean) => {
@@ -72,7 +79,7 @@ export default function ShoppingDetailPage() {
 
     if (list?.type === 'delete' && checked) {
       setItems((prev) => prev.filter((i) => i.id !== itemId))
-      await deleteShoppingItem(itemId, id)
+      await deleteShoppingItem(itemId)
     } else {
       setItems((prev) =>
         prev.map((i) =>
@@ -81,13 +88,15 @@ export default function ShoppingDetailPage() {
             : i
         )
       )
-      await checkShoppingItem(itemId, user.id, checked, id)
+      await checkShoppingItem(itemId, user.id, checked)
     }
+    broadcast()
   }
 
   const handleDelete = async (itemId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== itemId))
-    await deleteShoppingItem(itemId, id)
+    await deleteShoppingItem(itemId)
+    broadcast()
   }
 
   const uncheckedItems = items.filter((i) => !i.is_checked)
