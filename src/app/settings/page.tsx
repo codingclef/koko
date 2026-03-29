@@ -134,7 +134,7 @@ export default function SettingsPage() {
           </button>
         </div>
         {joinError && <p className="text-xs text-red-400 mt-2">{joinError}</p>}
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">합류하면 기존 내 가족 데이터는 초기화됩니다</p>
+        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">합류하면 현재 내 가족에서 나가고 새 가족으로 이동합니다</p>
       </div>
 
       {/* 로그아웃 */}
