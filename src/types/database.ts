@@ -297,6 +297,7 @@ export type Database = {
           family_id: string
           id: string
           name: string
+          type: string
         }
         Insert: {
           created_at?: string
@@ -304,6 +305,7 @@ export type Database = {
           family_id: string
           id?: string
           name: string
+          type?: string
         }
         Update: {
           created_at?: string
@@ -311,6 +313,7 @@ export type Database = {
           family_id?: string
           id?: string
           name?: string
+          type?: string
         }
         Relationships: [
           {
