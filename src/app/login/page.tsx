@@ -10,6 +10,7 @@ function LoginInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/shopping'
+  const error = searchParams.get('error')
 
   useEffect(() => {
     if (!loading && user) {
@@ -42,6 +43,12 @@ function LoginInner() {
           <h1 className="text-3xl font-bold text-stone-800 dark:text-stone-100">Koko</h1>
           <p className="text-stone-400 dark:text-stone-500 mt-2 text-sm">가족과 함께하는 패밀리 허브</p>
         </div>
+
+        {error === 'unauthorized' && (
+          <div className="w-full px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-sm text-center">
+            이 서비스는 초대된 가족만 이용할 수 있어요
+          </div>
+        )}
 
         <button
           onClick={handleGoogleLogin}

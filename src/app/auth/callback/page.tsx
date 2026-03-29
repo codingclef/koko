@@ -1,29 +1,62 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { parseInviteCodeFromNext } from '@/lib/auth'
 
 function AuthCallbackInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const handledRef = useRef(false)
 
   useEffect(() => {
-    const code = searchParams.get('code')
-    if (!code) {
-      router.replace('/login')
-      return
-    }
+    const handleSession = async (email: string) => {
+      // 중복 실행 방지 (getSession + onAuthStateChange 둘 다 트리거될 수 있음)
+      if (handledRef.current) return
+      handledRef.current = true
 
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) {
-        console.error('[auth/callback] error:', error)
-        router.replace('/login')
+      const next = searchParams.get('next') ?? '/shopping'
+      const inviteCode = parseInviteCodeFromNext(next)
+
+      let allowed = false
+      try {
+        const res = await fetch('/api/auth/check-allowed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, inviteCode }),
+        })
+        if (res.ok) {
+          const body = await res.json()
+          allowed = body.allowed === true
+        }
+      } catch (e) {
+        console.error('[auth/callback] check-allowed failed:', e)
+      }
+
+      if (!allowed) {
+        await supabase.auth.signOut()
+        router.replace('/login?error=unauthorized')
       } else {
-        const next = searchParams.get('next') ?? '/shopping'
         router.replace(next)
       }
+    }
+
+    // Supabase가 이미 세션을 처리한 경우 (effect 실행 전 자동 교환 완료)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) {
+        handleSession(session.user.email)
+      }
     })
+
+    // Supabase가 effect 실행 후 세션을 처리하는 경우
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user?.email) {
+        handleSession(session.user.email)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [router, searchParams])
 
   return (
