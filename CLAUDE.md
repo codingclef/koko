@@ -8,7 +8,7 @@
 ## Git Rules
 1. Always work on a `feature/*` branch → PR → merge to main
 2. Commit at each unit of work (do NOT batch commits)
-3. Commit messages must be written in English
+3. Commit messages and PR titles must be written in English
 4. Direct push to main is prohibited (branch protection enabled)
 
 ## Development Rules
