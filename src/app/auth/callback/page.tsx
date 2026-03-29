@@ -18,7 +18,7 @@ function AuthCallbackInner() {
 
     supabase.auth.exchangeCodeForSession(code).then(async ({ data, error }) => {
       if (error) {
-        console.error('[auth/callback] error:', error)
+        console.error('[auth/callback] session error:', error)
         router.replace('/login')
         return
       }
@@ -27,16 +27,21 @@ function AuthCallbackInner() {
       const next = searchParams.get('next') ?? '/shopping'
       const inviteCode = parseInviteCodeFromNext(next)
 
-      const res = await fetch('/api/auth/check-allowed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, inviteCode }),
-      })
-
       let allowed = false
-      if (res.ok) {
-        const body = await res.json()
-        allowed = body.allowed === true
+      try {
+        const res = await fetch('/api/auth/check-allowed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, inviteCode }),
+        })
+        console.log('[auth/callback] check-allowed status:', res.status)
+        if (res.ok) {
+          const body = await res.json()
+          console.log('[auth/callback] check-allowed body:', body)
+          allowed = body.allowed === true
+        }
+      } catch (e) {
+        console.error('[auth/callback] check-allowed failed:', e)
       }
 
       if (!allowed) {

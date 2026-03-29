@@ -16,11 +16,16 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = email.toLowerCase()
 
   // 1. allowed_emails 테이블에 있으면 바로 허용
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: dbError } = await supabaseAdmin
     .from('allowed_emails')
     .select('email')
     .eq('email', normalizedEmail)
     .maybeSingle()
+
+  if (dbError) {
+    console.error('[check-allowed] DB error:', dbError)
+    return NextResponse.json({ error: 'DB error', allowed: false }, { status: 500 })
+  }
 
   if (existing) {
     return NextResponse.json({ allowed: true })
