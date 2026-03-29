@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
-export default function LoginPage() {
+function LoginInner() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -57,5 +57,17 @@ export default function LoginPage() {
         </button>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 rounded-full border-2 border-orange-300 border-t-orange-500 animate-spin" />
+      </div>
+    }>
+      <LoginInner />
+    </Suspense>
   )
 }
