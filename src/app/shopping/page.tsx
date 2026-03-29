@@ -16,6 +16,7 @@ export default function ShoppingPage() {
   const [lists, setLists] = useState<ShoppingList[]>([])
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const channelReadyRef = useRef(false)
 
   const loading = authLoading || familyLoading
 
@@ -29,14 +30,21 @@ export default function ShoppingPage() {
       .on('broadcast', { event: 'refresh' }, () => {
         getShoppingLists(familyId).then(setLists)
       })
-      .subscribe()
+      .subscribe((status) => {
+        channelReadyRef.current = status === 'SUBSCRIBED'
+      })
 
     channelRef.current = channel
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      channelReadyRef.current = false
+      supabase.removeChannel(channel)
+    }
   }, [familyId])
 
   const broadcast = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+    if (channelRef.current && channelReadyRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'refresh', payload: {} })
+    }
   }
 
   const handleCreate = async (name: string, type: ListType) => {
@@ -53,9 +61,8 @@ export default function ShoppingPage() {
     setLists((prev) => [optimisticList, ...prev])
     setShowModal(false)
 
-    await createShoppingList(familyId, user.id, name, type)
-    // 실제 DB의 UUID로 교체 (가짜 UUID로 삭제 시도하는 버그 방지)
-    getShoppingLists(familyId).then(setLists)
+    const realList = await createShoppingList(familyId, user.id, name, type)
+    setLists((prev) => prev.map((l) => l.id === optimisticList.id ? realList : l))
     broadcast()
   }
 

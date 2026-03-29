@@ -23,6 +23,7 @@ export default function ShoppingDetailPage() {
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [loading, setLoading] = useState(true)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const channelReadyRef = useRef(false)
 
   useEffect(() => {
     if (!id) return
@@ -45,14 +46,21 @@ export default function ShoppingDetailPage() {
       .on('broadcast', { event: 'refresh' }, () => {
         getShoppingItems(id).then(setItems)
       })
-      .subscribe()
+      .subscribe((status) => {
+        channelReadyRef.current = status === 'SUBSCRIBED'
+      })
 
     channelRef.current = channel
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      channelReadyRef.current = false
+      supabase.removeChannel(channel)
+    }
   }, [id])
 
   const broadcast = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+    if (channelRef.current && channelReadyRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'refresh', payload: {} })
+    }
   }
 
   const handleAdd = async (name: string) => {
@@ -70,9 +78,8 @@ export default function ShoppingDetailPage() {
       created_at: new Date().toISOString(),
     }
     setItems((prev) => [...prev, optimisticItem])
-    await addShoppingItem(id, user.id, name)
-    // 실제 DB의 UUID로 교체 (가짜 UUID로 삭제 시도하는 버그 방지)
-    getShoppingItems(id).then(setItems)
+    const realItem = await addShoppingItem(id, user.id, name)
+    setItems((prev) => prev.map((i) => i.id === optimisticItem.id ? realItem : i))
     broadcast()
   }
 
