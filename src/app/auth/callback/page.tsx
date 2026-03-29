@@ -24,7 +24,7 @@ export default function AuthCallbackPage() {
         router.replace(next)
       }
     })
-  }, [])
+  }, [router, searchParams])
 
   return (
     <div className="flex items-center justify-center min-h-screen">

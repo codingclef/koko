@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Copy, Check, Users } from 'lucide-react'
+import { LogOut, Share2, Check, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { supabase } from '@/lib/supabase'
@@ -33,11 +33,21 @@ export default function SettingsPage() {
       .then(({ data }) => setInviteCode(data?.invite_code ?? null))
   }, [familyId])
 
-  const handleCopy = () => {
+  const handleShare = async () => {
     if (!inviteCode) return
-    navigator.clipboard.writeText(inviteCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    const url = `${window.location.origin}/join?code=${inviteCode}`
+    const shareData = {
+      title: 'Koko 가족 초대',
+      text: `Koko 앱에서 우리 가족에 합류하세요! 초대 코드: ${inviteCode}`,
+      url,
+    }
+    if (navigator.share) {
+      await navigator.share(shareData)
+    } else {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   const handleJoin = async () => {
@@ -91,14 +101,14 @@ export default function SettingsPage() {
             {inviteCode ?? '------'}
           </span>
           <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-500 text-sm font-semibold transition-colors hover:bg-orange-100"
+            onClick={handleShare}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 text-white text-sm font-semibold transition-colors shadow-sm"
           >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? '복사됨' : '복사'}
+            {copied ? <Check size={14} /> : <Share2 size={14} />}
+            {copied ? '복사됨' : '초대하기'}
           </button>
         </div>
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">이 코드를 가족에게 공유하세요</p>
+        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">버튼을 눌러 카카오톡, 문자 등으로 공유하세요</p>
       </div>
 
       {/* 가족 합류 */}
