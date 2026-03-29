@@ -90,3 +90,48 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
+
+---
+
+## 5. 모달 하단 버튼이 네비게이션 바에 가려지는 문제
+
+### 과제
+PWA로 설치한 스마트폰에서 "새 장바구니" 모달을 열면 "만들기" 버튼이 잘려서 보이지 않았다. `max-h-[90vh]`와 `overflow-y-auto`로 스크롤을 추가하는 방식으로 한 번 수정했으나 문제가 재현됐다.
+
+### 원인
+모달 컨테이너(`fixed inset-0 flex items-end`)와 하단 네비게이션 바(`fixed bottom-0`)가 동일한 `z-50`를 사용하고 있었다. `items-end`는 모달 시트를 화면 최하단에 붙이는데, 네비게이션 바(약 64px)가 그 위를 덮어 버튼이 보이지 않는 구조였다. `max-h`로 높이를 제한해도 모달이 네비게이션 바 뒤에서 시작하기 때문에 근본 해결이 안 됐다.
+
+### 해결
+모달 외부 컨테이너에 `pb-16 sm:pb-0`을 추가했다. `flex items-end`는 패딩을 존중하므로, 모바일에서 모달 시트가 네비게이션 바 높이만큼 위로 올라가 버튼이 온전히 노출된다. 태블릿/데스크탑(`sm` 이상)에서는 패딩 없이 중앙 정렬이 유지된다.
+
+```tsx
+// 수정 전
+<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+
+// 수정 후
+<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pb-16 sm:pb-0">
+```
+
+---
+
+## 6. Supabase OAuth 자동 세션 교환으로 이메일 허용 목록 우회
+
+### 과제
+가족 전용 앱이므로 허용된 이메일만 로그인할 수 있도록 제한하는 기능을 구현했다. OAuth 콜백 페이지에서 `exchangeCodeForSession`으로 코드를 교환한 뒤 이메일을 검사하고, 허용 목록에 없으면 즉시 로그아웃하는 방식이었다. 그러나 실제 테스트에서 허용 목록에 없는 이메일도 로그인이 가능했다.
+
+### 원인
+`@supabase/supabase-js` v2는 기본적으로 `detectSessionInUrl: true`가 설정되어 있다. OAuth 콜백 URL(`?code=xxx`)이 로드되는 순간 Supabase 클라이언트가 **React 렌더링보다 먼저** 코드 교환을 자동 완료하고 세션을 저장한다. 이후 `useEffect`에서 수동으로 `exchangeCodeForSession`을 호출하면 코드가 이미 소진된 상태라 에러가 발생하고, 에러 핸들러가 `/login`으로 리다이렉트한다. 그런데 Supabase가 이미 세션을 설정해둔 상태이므로 로그인 페이지가 자동으로 `/shopping`으로 튕겨버려 이메일 체크가 완전히 우회됐다.
+
+`detectSessionInUrl: false`로 자동 교환을 비활성화하면 이번엔 PKCE 코드 검증자(code verifier) 처리에 문제가 생겨 `exchangeCodeForSession` 자체가 실패했다.
+
+### 해결
+`exchangeCodeForSession`을 버리고 `onAuthStateChange`로 전략을 바꿨다. Supabase가 알아서 코드를 교환한 직후 `SIGNED_IN` 이벤트가 발생하는데, 이 시점에 이메일 허용 목록 체크를 수행한다. `getSession`과 `onAuthStateChange`를 함께 사용해 이벤트가 `useEffect` 등록 전에 발생하는 레이스 컨디션도 방지했다.
+
+```
+기존: 코드 교환(수동) → 이메일 체크 → 리다이렉트
+       ↑ Supabase가 먼저 교환해버려 우회됨
+
+변경: Supabase 자동 교환 → SIGNED_IN 이벤트 → 이메일 체크 → 허용/차단
+```
+
+허용 목록은 Supabase `allowed_emails` 테이블로 관리하며, 유효한 초대 코드를 통해 처음 로그인하는 사용자는 자동으로 테이블에 추가된다. 환경변수 방식은 Vercel 재배포 없이 멤버를 추가/제거할 수 없어 DB 방식으로 전환했다.
