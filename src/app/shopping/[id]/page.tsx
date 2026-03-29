@@ -27,7 +27,11 @@ export default function ShoppingDetailPage() {
     if (!id) return
 
     const init = async () => {
-      const { data } = await supabase.from('shopping_lists').select('*').eq('id', id).single()
+      const { data } = await supabase
+        .from('shopping_lists')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()   // single() → maybeSingle() (0행 에러 방지)
       setList(data)
       const fetchedItems = await getShoppingItems(id)
       setItems(fetchedItems)
@@ -36,8 +40,8 @@ export default function ShoppingDetailPage() {
     init()
 
     const channel = supabase
-      .channel(`shopping_items_${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items', filter: `list_id=eq.${id}` }, () => {
+      .channel(`list_items_${id}`)
+      .on('broadcast', { event: 'refresh' }, () => {
         getShoppingItems(id).then(setItems)
       })
       .subscribe()
@@ -47,20 +51,43 @@ export default function ShoppingDetailPage() {
 
   const handleAdd = async (name: string) => {
     if (!user) return
+
+    const optimisticItem: ShoppingItemType = {
+      id: crypto.randomUUID(),
+      list_id: id,
+      created_by: user.id,
+      name,
+      is_checked: false,
+      checked_by: null,
+      checked_at: null,
+      sort_order: items.length,
+      created_at: new Date().toISOString(),
+    }
+    setItems((prev) => [...prev, optimisticItem])
     await addShoppingItem(id, user.id, name)
   }
 
   const handleCheck = async (itemId: string, checked: boolean) => {
     if (!user) return
+
     if (list?.type === 'delete' && checked) {
-      await deleteShoppingItem(itemId)
+      setItems((prev) => prev.filter((i) => i.id !== itemId))
+      await deleteShoppingItem(itemId, id)
     } else {
-      await checkShoppingItem(itemId, user.id, checked)
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === itemId
+            ? { ...i, is_checked: checked, checked_by: checked ? user.id : null, checked_at: checked ? new Date().toISOString() : null }
+            : i
+        )
+      )
+      await checkShoppingItem(itemId, user.id, checked, id)
     }
   }
 
   const handleDelete = async (itemId: string) => {
-    await deleteShoppingItem(itemId)
+    setItems((prev) => prev.filter((i) => i.id !== itemId))
+    await deleteShoppingItem(itemId, id)
   }
 
   const uncheckedItems = items.filter((i) => !i.is_checked)
@@ -76,7 +103,6 @@ export default function ShoppingDetailPage() {
 
   return (
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
-      {/* 헤더 */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
         <button
           onClick={() => router.back()}
@@ -99,7 +125,6 @@ export default function ShoppingDetailPage() {
         </div>
       </div>
 
-      {/* 아이템 목록 */}
       <div className="flex-1 overflow-y-auto py-2">
         {uncheckedItems.length === 0 && checkedItems.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -139,7 +164,6 @@ export default function ShoppingDetailPage() {
         )}
       </div>
 
-      {/* 하단 입력창 */}
       <div className="border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe">
         <AddItemInput onAdd={handleAdd} />
       </div>

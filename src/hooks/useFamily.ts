@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
 export function useFamily(user: User | null) {
@@ -12,40 +11,25 @@ export function useFamily(user: User | null) {
     if (!user) return
 
     const initFamily = async () => {
-      // 이미 가족에 속해 있는지 확인
-      const { data: membership } = await supabase
-        .from('family_members')
-        .select('family_id')
-        .eq('user_id', user.id)
-        .maybeSingle()
+      try {
+        const res = await fetch('/api/family', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        })
 
-      if (membership) {
-        setFamilyId(membership.family_id)
+        if (!res.ok) {
+          console.error('[useFamily] API error:', await res.text())
+          return
+        }
+
+        const { familyId } = await res.json()
+        setFamilyId(familyId)
+      } catch (e) {
+        console.error('[useFamily] unexpected error:', e)
+      } finally {
         setLoading(false)
-        return
       }
-
-      // 없으면 새 가족 생성
-      const { data: family, error: familyError } = await supabase
-        .from('families')
-        .insert({ name: 'Our Family' })
-        .select('id')
-        .single()
-
-      if (familyError || !family) {
-        setLoading(false)
-        return
-      }
-
-      await supabase.from('family_members').insert({
-        family_id: family.id,
-        user_id: user.id,
-        display_name: 'Me',
-        role: 'admin',
-      })
-
-      setFamilyId(family.id)
-      setLoading(false)
     }
 
     initFamily()

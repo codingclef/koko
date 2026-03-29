@@ -5,6 +5,23 @@ export type ShoppingList = Database['public']['Tables']['shopping_lists']['Row']
 export type ShoppingItem = Database['public']['Tables']['shopping_items']['Row']
 export type ListType = 'strikethrough' | 'delete'
 
+// Broadcast helpers — fire-and-forget, no await needed at call site
+function broadcastListChange(familyId: string) {
+  supabase.channel(`family_lists_${familyId}`).send({
+    type: 'broadcast',
+    event: 'refresh',
+    payload: {},
+  })
+}
+
+function broadcastItemChange(listId: string) {
+  supabase.channel(`list_items_${listId}`).send({
+    type: 'broadcast',
+    event: 'refresh',
+    payload: {},
+  })
+}
+
 export async function getShoppingLists(familyId: string): Promise<ShoppingList[]> {
   const { data, error } = await supabase
     .from('shopping_lists')
@@ -29,12 +46,14 @@ export async function createShoppingList(
     .single()
 
   if (error) throw error
+  broadcastListChange(familyId)
   return data
 }
 
-export async function deleteShoppingList(listId: string): Promise<void> {
+export async function deleteShoppingList(listId: string, familyId: string): Promise<void> {
   const { error } = await supabase.from('shopping_lists').delete().eq('id', listId)
   if (error) throw error
+  broadcastListChange(familyId)
 }
 
 export async function getShoppingItems(listId: string): Promise<ShoppingItem[]> {
@@ -61,13 +80,15 @@ export async function addShoppingItem(
     .single()
 
   if (error) throw error
+  broadcastItemChange(listId)
   return data
 }
 
 export async function checkShoppingItem(
   itemId: string,
   userId: string,
-  checked: boolean
+  checked: boolean,
+  listId: string
 ): Promise<void> {
   const { error } = await supabase
     .from('shopping_items')
@@ -79,9 +100,11 @@ export async function checkShoppingItem(
     .eq('id', itemId)
 
   if (error) throw error
+  broadcastItemChange(listId)
 }
 
-export async function deleteShoppingItem(itemId: string): Promise<void> {
+export async function deleteShoppingItem(itemId: string, listId: string): Promise<void> {
   const { error } = await supabase.from('shopping_items').delete().eq('id', itemId)
   if (error) throw error
+  broadcastItemChange(listId)
 }

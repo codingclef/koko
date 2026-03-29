@@ -24,8 +24,8 @@ export default function ShoppingPage() {
     getShoppingLists(familyId).then(setLists)
 
     const channel = supabase
-      .channel('shopping_lists')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_lists', filter: `family_id=eq.${familyId}` }, () => {
+      .channel(`family_lists_${familyId}`)
+      .on('broadcast', { event: 'refresh' }, () => {
         getShoppingLists(familyId).then(setLists)
       })
       .subscribe()
@@ -35,12 +35,24 @@ export default function ShoppingPage() {
 
   const handleCreate = async (name: string, type: ListType) => {
     if (!familyId || !user) return
-    await createShoppingList(familyId, user.id, name, type)
+
+    const optimisticList: ShoppingList = {
+      id: crypto.randomUUID(),
+      family_id: familyId,
+      created_by: user.id,
+      name,
+      type,
+      created_at: new Date().toISOString(),
+    }
+    setLists((prev) => [optimisticList, ...prev])
     setShowModal(false)
+
+    await createShoppingList(familyId, user.id, name, type)
   }
 
   const handleDelete = async (listId: string) => {
-    await deleteShoppingList(listId)
+    setLists((prev) => prev.filter((l) => l.id !== listId))
+    await deleteShoppingList(listId, familyId!)
   }
 
   if (loading) {
