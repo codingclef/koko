@@ -32,7 +32,12 @@ function AuthCallbackInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, inviteCode }),
       })
-      const { allowed } = await res.json()
+
+      let allowed = false
+      if (res.ok) {
+        const body = await res.json()
+        allowed = body.allowed === true
+      }
 
       if (!allowed) {
         await supabase.auth.signOut()
