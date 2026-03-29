@@ -17,34 +17,41 @@ export default function ShoppingPage() {
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const channelReadyRef = useRef(false)
+  const bcRef = useRef<BroadcastChannel | null>(null)
 
   const loading = authLoading || familyLoading
 
   useEffect(() => {
     if (!familyId) return
 
-    getShoppingLists(familyId).then(setLists)
+    const refresh = () => getShoppingLists(familyId).then(setLists)
+    refresh()
 
+    // 같은 브라우저 내 탭 간 즉시 동기화 (WebSocket 연결 불필요)
+    const bc = new BroadcastChannel(`koko-lists-${familyId}`)
+    bc.onmessage = refresh
+    bcRef.current = bc
+
+    // 다른 기기 간 동기화 (Supabase Realtime)
     const channel = supabase
       .channel(`family_lists_${familyId}`)
-      .on('broadcast', { event: 'refresh' }, () => {
-        getShoppingLists(familyId).then(setLists)
-      })
+      .on('broadcast', { event: 'refresh' }, refresh)
       .subscribe((status) => {
         channelReadyRef.current = status === 'SUBSCRIBED'
-        if (status === 'SUBSCRIBED') {
-          getShoppingLists(familyId).then(setLists)
-        }
+        if (status === 'SUBSCRIBED') refresh()
       })
 
     channelRef.current = channel
+
     return () => {
+      bc.close()
       channelReadyRef.current = false
       supabase.removeChannel(channel)
     }
   }, [familyId])
 
   const broadcast = () => {
+    bcRef.current?.postMessage('refresh')
     if (channelRef.current && channelReadyRef.current) {
       channelRef.current.send({ type: 'broadcast', event: 'refresh', payload: {} })
     }

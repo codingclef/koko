@@ -24,9 +24,12 @@ export default function ShoppingDetailPage() {
   const [loading, setLoading] = useState(true)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const channelReadyRef = useRef(false)
+  const bcRef = useRef<BroadcastChannel | null>(null)
 
   useEffect(() => {
     if (!id) return
+
+    const refreshItems = () => getShoppingItems(id).then(setItems)
 
     const init = async () => {
       const { data } = await supabase
@@ -41,26 +44,30 @@ export default function ShoppingDetailPage() {
     }
     init()
 
+    // 같은 브라우저 내 탭 간 즉시 동기화
+    const bc = new BroadcastChannel(`koko-items-${id}`)
+    bc.onmessage = refreshItems
+    bcRef.current = bc
+
+    // 다른 기기 간 동기화
     const channel = supabase
       .channel(`list_items_${id}`)
-      .on('broadcast', { event: 'refresh' }, () => {
-        getShoppingItems(id).then(setItems)
-      })
+      .on('broadcast', { event: 'refresh' }, refreshItems)
       .subscribe((status) => {
         channelReadyRef.current = status === 'SUBSCRIBED'
-        if (status === 'SUBSCRIBED') {
-          getShoppingItems(id).then(setItems)
-        }
+        if (status === 'SUBSCRIBED') refreshItems()
       })
 
     channelRef.current = channel
     return () => {
+      bc.close()
       channelReadyRef.current = false
       supabase.removeChannel(channel)
     }
   }, [id])
 
   const broadcast = () => {
+    bcRef.current?.postMessage('refresh')
     if (channelRef.current && channelReadyRef.current) {
       channelRef.current.send({ type: 'broadcast', event: 'refresh', payload: {} })
     }
