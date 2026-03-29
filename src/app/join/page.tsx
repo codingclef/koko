@@ -10,7 +10,7 @@ export default function JoinPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { familyId, loading: familyLoading } = useFamily(user)
+  const { loading: familyLoading } = useFamily(user)
 
   const codeFromUrl = searchParams.get('code')?.toUpperCase() ?? ''
   const [joinCode, setJoinCode] = useState(codeFromUrl)
@@ -19,9 +19,10 @@ export default function JoinPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace(`/login?next=/join${codeFromUrl ? `?code=${codeFromUrl}` : ''}`)
+      const code = searchParams.get('code')?.toUpperCase() ?? ''
+      router.replace(`/login?next=/join${code ? `?code=${code}` : ''}`)
     }
-  }, [user, authLoading, router, codeFromUrl])
+  }, [user, authLoading, router, searchParams])
 
   const handleJoin = async () => {
     if (!joinCode.trim() || !user) return
