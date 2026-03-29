@@ -15,7 +15,17 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Koko',
-  description: 'Family Hub — Calendar, Shopping, Memo',
+  description: '가족과 함께하는 패밀리 허브',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Koko',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'theme-color': '#fb923c',
+  },
 }
 
 export default function RootLayout({
