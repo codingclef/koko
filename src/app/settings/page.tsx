@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Share2, Copy, Check, Users } from 'lucide-react'
+import { LogOut, Share2, Check, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { supabase } from '@/lib/supabase'
