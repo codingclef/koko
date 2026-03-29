@@ -71,6 +71,8 @@ export default function ShoppingDetailPage() {
     }
     setItems((prev) => [...prev, optimisticItem])
     await addShoppingItem(id, user.id, name)
+    // 실제 DB의 UUID로 교체 (가짜 UUID로 삭제 시도하는 버그 방지)
+    getShoppingItems(id).then(setItems)
     broadcast()
   }
 

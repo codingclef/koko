@@ -54,6 +54,8 @@ export default function ShoppingPage() {
     setShowModal(false)
 
     await createShoppingList(familyId, user.id, name, type)
+    // 실제 DB의 UUID로 교체 (가짜 UUID로 삭제 시도하는 버그 방지)
+    getShoppingLists(familyId).then(setLists)
     broadcast()
   }
 
