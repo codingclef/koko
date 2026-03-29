@@ -25,8 +25,8 @@ export function CreateListModal({ onClose, onCreate }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-sm bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-5">
+      <div className="relative w-full sm:max-w-sm bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
           <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100">새 장바구니</h2>
           <button
             onClick={onClose}
@@ -36,7 +36,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col overflow-y-auto px-6 pb-6 gap-4">
           <div>
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1.5">
               이름
