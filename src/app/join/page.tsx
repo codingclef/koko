@@ -83,7 +83,7 @@ export default function JoinPage() {
             {joining ? '합류 중...' : '가족에 합류하기'}
           </button>
           <p className="text-xs text-stone-400 dark:text-stone-500 text-center mt-3">
-            합류하면 기존 내 가족 데이터는 초기화됩니다
+            합류하면 현재 내 가족에서 나가고 새 가족으로 이동합니다
           </p>
         </div>
       </div>
