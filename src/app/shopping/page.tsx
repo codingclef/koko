@@ -1,18 +1,25 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { getShoppingLists, createShoppingList, deleteShoppingList } from '@/lib/shopping'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
+import { BottomNav } from '@/components/BottomNav'
 import { supabase } from '@/lib/supabase'
 import type { ShoppingList, ListType } from '@/lib/shopping'
 
 export default function ShoppingPage() {
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading && !user) router.replace('/login')
+  }, [user, authLoading, router])
   const [lists, setLists] = useState<ShoppingList[]>([])
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -91,7 +98,7 @@ export default function ShoppingPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 min-h-screen">
+    <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">🛒 장바구니</h1>
@@ -125,6 +132,7 @@ export default function ShoppingPage() {
       {showModal && (
         <CreateListModal onClose={() => setShowModal(false)} onCreate={handleCreate} />
       )}
+      <BottomNav />
     </div>
   )
 }
