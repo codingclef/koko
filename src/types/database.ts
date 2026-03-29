@@ -297,6 +297,7 @@ export type Database = {
           family_id: string
           id: string
           name: string
+          type: string
         }
         Insert: {
           created_at?: string
@@ -304,6 +305,7 @@ export type Database = {
           family_id: string
           id?: string
           name: string
+          type?: string
         }
         Update: {
           created_at?: string
@@ -311,6 +313,7 @@ export type Database = {
           family_id?: string
           id?: string
           name?: string
+          type?: string
         }
         Relationships: [
           {
@@ -327,7 +330,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_or_create_family: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
+      get_my_family_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      get_my_list_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
     }
     Enums: {
       [_ in never]: never
