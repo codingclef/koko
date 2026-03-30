@@ -5,8 +5,8 @@ import type { Calendar } from '@/lib/calendar'
 jest.useFakeTimers()
 
 const calendars: Calendar[] = [
-  { id: 'cal-1', family_id: 'fam-1', created_by: 'user-1', name: '테스트1', color: '#3b82f6', created_at: '' },
-  { id: 'cal-2', family_id: 'fam-1', created_by: 'user-1', name: '테스트2', color: '#22c55e', created_at: '' },
+  { id: 'cal-1', family_id: 'fam-1', created_by: 'user-1', name: '테스트1', color: '#3b82f6', created_at: '', updated_at: '' },
+  { id: 'cal-2', family_id: 'fam-1', created_by: 'user-1', name: '테스트2', color: '#22c55e', created_at: '', updated_at: '' },
 ]
 
 const defaultProps = {
