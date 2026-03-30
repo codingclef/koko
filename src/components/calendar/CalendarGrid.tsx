@@ -56,8 +56,9 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
 
   const calendarMap = new Map(calendars.map((c) => [c.id, c]))
 
+  // activeIds가 빈 Set이면 전체 표시
   const visibleEvents = events.filter(
-    (e) => !e.calendar_id || activeIds.has(e.calendar_id)
+    (e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)
   )
 
   const getEventColor = (event: CalendarEvent): string => {

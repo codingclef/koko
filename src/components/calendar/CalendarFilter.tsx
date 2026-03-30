@@ -15,7 +15,7 @@ export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
       {calendars.map((cal) => {
-        const active = activeIds.has(cal.id)
+        const active = activeIds.size === 0 || activeIds.has(cal.id)
         return (
           <button
             key={cal.id}

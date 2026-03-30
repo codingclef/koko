@@ -51,21 +51,13 @@ export default function CalendarPage() {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
 
-  // 캘린더 목록이 로드되면 전체 활성화
-  useEffect(() => {
-    if (calendars.length > 0 && activeIds.size === 0) {
-      setActiveIds(new Set(calendars.map((c) => c.id)))
-    }
-  }, [calendars])
+  // activeIds가 빈 Set이면 전체 캘린더 표시 (useEffect 없이 처리)
 
-  const loadEvents = async () => {
+  const loadEvents = () => {
     if (!familyId) return
-    try {
-      const data = await getEventsByMonth(familyId, year, month)
-      setEvents(data)
-    } catch (e) {
-      console.error('[CalendarPage] loadEvents failed:', e)
-    }
+    getEventsByMonth(familyId, year, month)
+      .then(setEvents)
+      .catch((e) => console.error('[CalendarPage] loadEvents failed:', e))
   }
 
   useEffect(() => {
@@ -97,11 +89,21 @@ export default function CalendarPage() {
     setSelectedDate(null)
   }
 
+  // 빈 Set = 전체 활성. 하나를 끄면 나머지 전부를 Set에 담음
   const toggleCalendar = (id: string) => {
     setActiveIds((prev) => {
+      if (prev.size === 0) {
+        // 전체 활성 상태에서 하나를 비활성화
+        return new Set(calendars.map((c) => c.id).filter((cid) => cid !== id))
+      }
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+        if (next.size === calendars.length) return new Set() // 다시 전체 활성
+      } else {
+        next.add(id)
+        if (next.size === calendars.length) return new Set() // 다시 전체 활성
+      }
       return next
     })
   }
@@ -113,8 +115,7 @@ export default function CalendarPage() {
     if (calendarForm?.calendar) {
       await updateCalendar(calendarForm.calendar.id, { name, color })
     } else {
-      const newCal = await createCalendar(familyId, user.id, name, color)
-      setActiveIds((prev) => new Set([...prev, newCal.id]))
+      await createCalendar(familyId, user.id, name, color)
     }
     reloadCalendars()
   }
@@ -317,16 +318,14 @@ function EventFormModalWithReminders({
     reminderMinutes: number[]
   }) => Promise<void>
 }) {
-  const [reminderMinutes, setReminderMinutes] = useState<number[] | null>(null)
+  // 새 일정이면 즉시 [] 로 초기화, 편집이면 로드 완료 후 설정
+  const [reminderMinutes, setReminderMinutes] = useState<number[] | null>(event ? null : [])
 
   useEffect(() => {
-    if (event) {
-      getReminders(event.id)
-        .then((r) => setReminderMinutes(r.map((x) => x.remind_minutes_before)))
-        .catch(() => setReminderMinutes([]))
-    } else {
-      setReminderMinutes([])
-    }
+    if (!event) return
+    getReminders(event.id)
+      .then((r) => setReminderMinutes(r.map((x) => x.remind_minutes_before)))
+      .catch(() => setReminderMinutes([]))
   }, [event?.id])
 
   if (reminderMinutes === null) return null
