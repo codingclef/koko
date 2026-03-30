@@ -46,10 +46,27 @@ export function CalendarTab() {
   const [calendarForm, setCalendarForm] = useState<{ calendar?: Calendar } | null>(null)
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const [slideKey, setSlideKey] = useState(0)
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
+
+  const isModalOpen = selectedDate !== null || selectedEvent !== null || editingEvent !== null || calendarForm !== null
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
+
+  // 모달이 닫혀 있을 때만 touchmove를 막아 캘린더 스크롤을 완전히 고정
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const handler = (e: TouchEvent) => {
+      if (!isModalOpen) e.preventDefault()
+    }
+    el.addEventListener('touchmove', handler, { passive: false })
+    return () => el.removeEventListener('touchmove', handler)
+  }, [isModalOpen])
 
   const loadEvents = useCallback(() => {
     if (!familyId) return
@@ -76,12 +93,16 @@ export function CalendarTab() {
   }
 
   const prevMonth = () => {
+    setSlideDir('right')
+    setSlideKey((k) => k + 1)
     if (month === 0) { setYear((y) => y - 1); setMonth(11) }
     else setMonth((m) => m - 1)
     setSelectedDate(null)
   }
 
   const nextMonth = () => {
+    setSlideDir('left')
+    setSlideKey((k) => k + 1)
     if (month === 11) { setYear((y) => y + 1); setMonth(0) }
     else setMonth((m) => m + 1)
     setSelectedDate(null)
@@ -195,6 +216,7 @@ export function CalendarTab() {
 
   return (
     <div
+      ref={containerRef}
       className="w-full flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
       style={{ height: '100dvh' }}
       onTouchStart={onTouchStart}
@@ -223,21 +245,26 @@ export function CalendarTab() {
         />
       </div>
 
-      <CalendarGrid
-        year={year}
-        month={month}
-        events={events}
-        calendars={calendars}
-        activeIds={activeIds}
-        selectedDate={selectedDate}
-        onSelectDate={(date) => {
-          setSelectedDate((prev) =>
-            prev?.toDateString() === date.toDateString() ? null : date
-          )
-        }}
-        onSelectEvent={setSelectedEvent}
-        className="flex-1 overflow-hidden pb-16"
-      />
+      <div
+        key={slideKey}
+        className={`flex-1 overflow-hidden${slideDir === 'left' ? ' calendar-slide-from-right' : slideDir === 'right' ? ' calendar-slide-from-left' : ''}`}
+      >
+        <CalendarGrid
+          year={year}
+          month={month}
+          events={events}
+          calendars={calendars}
+          activeIds={activeIds}
+          selectedDate={selectedDate}
+          onSelectDate={(date) => {
+            setSelectedDate((prev) =>
+              prev?.toDateString() === date.toDateString() ? null : date
+            )
+          }}
+          onSelectEvent={setSelectedEvent}
+          className="h-full pb-16"
+        />
+      </div>
 
       <button
         onClick={() => setEditingEvent({ date: selectedDate ?? today })}
