@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
-import { getShoppingLists, createShoppingList, deleteShoppingList } from '@/lib/shopping'
+import { getShoppingLists, createShoppingList, deleteShoppingList, renameShoppingList } from '@/lib/shopping'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { BottomNav } from '@/components/BottomNav'
@@ -89,6 +89,12 @@ export default function ShoppingPage() {
     broadcast()
   }
 
+  const handleRename = async (listId: string, name: string) => {
+    setLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
+    await renameShoppingList(listId, name)
+    broadcast()
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -124,7 +130,7 @@ export default function ShoppingPage() {
       ) : (
         <div className="space-y-2">
           {lists.map((list) => (
-            <ShoppingListCard key={list.id} list={list} onDelete={handleDelete} />
+            <ShoppingListCard key={list.id} list={list} onDelete={handleDelete} onRename={handleRename} />
           ))}
         </div>
       )}

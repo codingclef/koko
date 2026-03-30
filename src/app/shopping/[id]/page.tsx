@@ -9,6 +9,7 @@ import {
   addShoppingItem,
   checkShoppingItem,
   deleteShoppingItem,
+  renameShoppingItem,
 } from '@/lib/shopping'
 import { ShoppingItem } from '@/components/shopping/ShoppingItem'
 import { AddItemInput } from '@/components/shopping/AddItemInput'
@@ -123,6 +124,12 @@ export default function ShoppingDetailPage() {
     broadcast()
   }
 
+  const handleRename = async (itemId: string, name: string) => {
+    setItems((prev) => prev.map((i) => i.id === itemId ? { ...i, name } : i))
+    await renameShoppingItem(itemId, name)
+    broadcast()
+  }
+
   const uncheckedItems = items.filter((i) => !i.is_checked)
   const checkedItems = items.filter((i) => i.is_checked)
 
@@ -174,6 +181,7 @@ export default function ShoppingDetailPage() {
             listType={list?.type as 'strikethrough' | 'delete' ?? 'strikethrough'}
             onCheck={handleCheck}
             onDelete={handleDelete}
+            onRename={handleRename}
           />
         ))}
 
@@ -191,6 +199,7 @@ export default function ShoppingDetailPage() {
                 listType="strikethrough"
                 onCheck={handleCheck}
                 onDelete={handleDelete}
+                onRename={handleRename}
               />
             ))}
           </>

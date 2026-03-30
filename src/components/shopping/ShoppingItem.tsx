@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { ShoppingItem as ShoppingItemType } from '@/lib/shopping'
 
@@ -8,11 +9,40 @@ interface Props {
   listType: 'strikethrough' | 'delete'
   onCheck: (itemId: string, checked: boolean) => void
   onDelete: (itemId: string) => void
+  onRename: (itemId: string, name: string) => void
 }
 
-export function ShoppingItem({ item, listType, onCheck, onDelete }: Props) {
+export function ShoppingItem({ item, listType, onCheck, onDelete, onRename }: Props) {
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState(item.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleNameClick = () => {
+    setEditValue(item.name)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== item.name) {
+      onRename(item.id, trimmed)
+    } else {
+      setEditValue(item.name)
+    }
+    setEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') commitEdit()
+    if (e.key === 'Escape') {
+      setEditValue(item.name)
+      setEditing(false)
+    }
+  }
+
   const handleCheck = () => {
-    onCheck(item.id, !item.is_checked)
+    if (!editing) onCheck(item.id, !item.is_checked)
   }
 
   return (
@@ -39,15 +69,28 @@ export function ShoppingItem({ item, listType, onCheck, onDelete }: Props) {
         )}
       </button>
 
-      <span
-        className={`flex-1 text-stone-800 dark:text-stone-100 transition-all ${
-          item.is_checked && listType === 'strikethrough'
-            ? 'line-through text-stone-400 dark:text-stone-500'
-            : ''
-        }`}
-      >
-        {item.name}
-      </span>
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={handleKeyDown}
+          className="flex-1 text-stone-800 dark:text-stone-100 bg-transparent border-b border-orange-400 outline-none"
+          aria-label="아이템 이름 수정"
+        />
+      ) : (
+        <span
+          onClick={handleNameClick}
+          className={`flex-1 text-stone-800 dark:text-stone-100 transition-all cursor-text ${
+            item.is_checked && listType === 'strikethrough'
+              ? 'line-through text-stone-400 dark:text-stone-500'
+              : ''
+          }`}
+        >
+          {item.name}
+        </span>
+      )}
 
       <button
         onClick={() => onDelete(item.id)}
