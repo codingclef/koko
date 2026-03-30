@@ -62,7 +62,6 @@ describe('CalendarFilter', () => {
 
   it('"+" 버튼 클릭 시 onAdd가 호출된다', () => {
     render(<CalendarFilter {...defaultProps} />)
-    const addBtn = screen.getByRole('button', { name: '' })
     // Plus icon button has no text, but it's the last button
     const buttons = screen.getAllByRole('button')
     fireEvent.click(buttons[buttons.length - 1])

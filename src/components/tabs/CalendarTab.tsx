@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -50,12 +50,12 @@ export function CalendarTab() {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
 
-  const loadEvents = () => {
+  const loadEvents = useCallback(() => {
     if (!familyId) return
     getEventsByMonth(familyId, year, month)
       .then(setEvents)
       .catch((e) => console.error('[CalendarTab] loadEvents failed:', e))
-  }
+  }, [familyId, year, month])
 
   useEffect(() => {
     if (!familyId) return
@@ -68,7 +68,7 @@ export function CalendarTab() {
     channelRef.current = channel
 
     return () => { supabase.removeChannel(channel) }
-  }, [familyId, year, month])
+  }, [familyId, year, month, loadEvents])
 
   const broadcast = () => {
     channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
@@ -306,7 +306,7 @@ function EventFormModalWithReminders({
     getReminders(event.id)
       .then((r) => setReminderMinutes(r.map((x) => x.remind_minutes_before)))
       .catch(() => setReminderMinutes([]))
-  }, [event?.id])
+  }, [event])
 
   if (reminderMinutes === null) return null
 
