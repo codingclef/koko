@@ -39,8 +39,6 @@ export default function ShoppingDetailPage() {
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [loading, setLoading] = useState(true)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const channelReadyRef = useRef(false)
-  const bcRef = useRef<BroadcastChannel | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -65,33 +63,19 @@ export default function ShoppingDetailPage() {
     }
     init()
 
-    // 같은 브라우저 내 탭 간 즉시 동기화
-    const bc = new BroadcastChannel(`koko-items-${id}`)
-    bc.onmessage = refreshItems
-    bcRef.current = bc
-
-    // 다른 기기 간 동기화
     const channel = supabase
       .channel(`list_items_${id}`)
       .on('broadcast', { event: 'refresh' }, refreshItems)
       .subscribe((status) => {
-        channelReadyRef.current = status === 'SUBSCRIBED'
         if (status === 'SUBSCRIBED') refreshItems()
       })
 
     channelRef.current = channel
-    return () => {
-      bc.close()
-      channelReadyRef.current = false
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [id])
 
   const broadcast = () => {
-    bcRef.current?.postMessage('refresh')
-    if (channelRef.current && channelReadyRef.current) {
-      channelRef.current.send({ type: 'broadcast', event: 'refresh', payload: {} })
-    }
+    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
   }
 
   const handleAdd = async (name: string) => {
