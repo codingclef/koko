@@ -197,7 +197,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto flex flex-col bg-white dark:bg-stone-950" style={{ height: '100dvh' }}>
+    <div className="w-full max-w-lg mx-auto flex flex-col bg-white dark:bg-stone-950" style={{ height: '100dvh' }}>
       {/* 헤더 */}
       <div className="px-4 pt-8 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2">

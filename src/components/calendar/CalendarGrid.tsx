@@ -71,7 +71,7 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
   }
 
   return (
-    <div className={`flex flex-col ${className ?? ''}`}>
+    <div className={`flex flex-col w-full ${className ?? ''}`}>
       {/* 요일 헤더 */}
       <div className="grid grid-cols-7 shrink-0">
         {DOW.map((d, i) => (
