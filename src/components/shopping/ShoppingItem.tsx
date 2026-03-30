@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -18,7 +18,6 @@ interface Props {
 export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, draggable = false }: Props) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(item.name)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   const {
     attributes,
@@ -38,7 +37,6 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, drag
   const handleNameClick = () => {
     setEditValue(item.name)
     setEditing(true)
-    setTimeout(() => inputRef.current?.select(), 0)
   }
 
   const commitEdit = () => {
@@ -102,9 +100,13 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, drag
 
       {editing ? (
         <input
-          ref={inputRef}
+          autoFocus
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
+          onFocus={(e) => {
+            const len = e.target.value.length
+            e.target.setSelectionRange(len, len)
+          }}
           onBlur={commitEdit}
           onKeyDown={handleKeyDown}
           className="flex-1 text-stone-800 dark:text-stone-100 bg-transparent border-b border-orange-400 outline-none"
