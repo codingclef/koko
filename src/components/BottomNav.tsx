@@ -10,24 +10,39 @@ const navItems = [
   { href: '/settings', icon: Settings, label: '설정' },
 ]
 
-export function BottomNav() {
+interface Props {
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
+export function BottomNav({ activeTab, onTabChange }: Props) {
   const pathname = usePathname()
+  const tabMode = !!onTabChange
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-950 border-t border-stone-100 dark:border-stone-800 pb-safe">
       <div className="max-w-lg mx-auto flex">
         {navItems.map(({ href, icon: Icon, label }) => {
-          const active = pathname.startsWith(href)
-          return (
-            <Link
+          const tabId = href.slice(1) // '/calendar' → 'calendar'
+          const active = tabMode
+            ? activeTab === tabId
+            : pathname.startsWith(href)
+          const className = `flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
+            active
+              ? 'text-orange-500'
+              : 'text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300'
+          }`
+          return tabMode ? (
+            <button
               key={href}
-              href={href}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
-                active
-                  ? 'text-orange-500'
-                  : 'text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300'
-              }`}
+              onClick={() => onTabChange(tabId)}
+              className={className}
             >
+              <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
+              {label}
+            </button>
+          ) : (
+            <Link key={href} href={href} className={className}>
               <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
               {label}
             </Link>
