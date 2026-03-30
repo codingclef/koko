@@ -56,50 +56,12 @@ jest.mock('@/components/calendar/CalendarFormModal', () => ({
   CalendarFormModal: () => <div />,
 }))
 
-// ── 헬퍼 ─────────────────────────────────────────────────────
-function makeTouchEvent(target: EventTarget) {
-  return new TouchEvent('touchmove', {
-    bubbles: true,
-    cancelable: true,
-    touches: [],
-    changedTouches: [],
-    targetTouches: [],
-  })
-}
-
-describe('CalendarTab — document touchmove 스크롤 차단', () => {
-  it('모달이 없을 때 캘린더 컨테이너 내부 touchmove를 preventDefault 한다', async () => {
+describe('CalendarTab — touch-action 스크롤 차단', () => {
+  it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
     const { container } = render(<CalendarTab />)
     await act(async () => {})
 
-    const inner = container.firstChild as HTMLElement
-    const event = makeTouchEvent(inner)
-    Object.defineProperty(event, 'target', { value: inner, configurable: true })
-    const preventSpy = jest.spyOn(event, 'preventDefault')
-
-    await act(async () => {
-      document.dispatchEvent(event)
-    })
-
-    expect(preventSpy).toHaveBeenCalled()
-  })
-
-  it('컨테이너 외부 touchmove는 preventDefault 하지 않는다', async () => {
-    render(<CalendarTab />)
-    await act(async () => {})
-
-    const outside = document.createElement('div')
-    document.body.appendChild(outside)
-
-    const event = makeTouchEvent(outside)
-    Object.defineProperty(event, 'target', { value: outside, configurable: true })
-    const preventSpy = jest.spyOn(event, 'preventDefault')
-
-    await act(async () => {
-      document.dispatchEvent(event)
-    })
-
-    expect(preventSpy).not.toHaveBeenCalled()
-    document.body.removeChild(outside)
+    const wrapper = container.firstChild as HTMLElement
+    expect(wrapper.style.touchAction).toBe('none')
   })
 })

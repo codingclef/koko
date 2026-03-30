@@ -57,17 +57,6 @@ export function CalendarTab() {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
 
-  // 모달이 닫혀 있을 때만 touchmove를 막아 캘린더 스크롤을 완전히 고정
-  // document 레벨에서 잡아야 iOS Safari body 스크롤까지 차단됨
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const handler = (e: TouchEvent) => {
-      if (!isModalOpen && el.contains(e.target as Node)) e.preventDefault()
-    }
-    document.addEventListener('touchmove', handler, { passive: false })
-    return () => document.removeEventListener('touchmove', handler)
-  }, [isModalOpen])
 
   const loadEvents = useCallback(() => {
     if (!familyId) return
@@ -219,7 +208,7 @@ export function CalendarTab() {
     <div
       ref={containerRef}
       className="w-full flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
-      style={{ height: '100dvh' }}
+      style={{ height: '100dvh', touchAction: isModalOpen ? 'auto' : 'none' }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
