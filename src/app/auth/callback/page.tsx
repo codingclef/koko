@@ -16,7 +16,7 @@ function AuthCallbackInner() {
       if (handledRef.current) return
       handledRef.current = true
 
-      const next = searchParams.get('next') ?? '/shopping'
+      const next = searchParams.get('next') ?? '/calendar'
       const inviteCode = parseInviteCodeFromNext(next)
 
       let allowed = false

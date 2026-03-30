@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ShoppingCart, Settings } from 'lucide-react'
+import { CalendarDays, ShoppingCart, Settings } from 'lucide-react'
 
 const navItems = [
+  { href: '/calendar', icon: CalendarDays, label: '캘린더' },
   { href: '/shopping', icon: ShoppingCart, label: '장바구니' },
   { href: '/settings', icon: Settings, label: '설정' },
 ]
