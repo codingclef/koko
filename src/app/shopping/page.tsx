@@ -36,6 +36,7 @@ export default function ShoppingPage() {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
   const [lists, setLists] = useState<ShoppingList[]>([])
+  const [fetchError, setFetchError] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const channelReadyRef = useRef(false)
@@ -51,7 +52,13 @@ export default function ShoppingPage() {
   useEffect(() => {
     if (!familyId) return
 
-    const refresh = () => getShoppingLists(familyId).then(setLists)
+    const refresh = () =>
+      getShoppingLists(familyId)
+        .then(setLists)
+        .catch((e) => {
+          console.error('[ShoppingPage] getShoppingLists failed:', e)
+          setFetchError(true)
+        })
     refresh()
 
     // 같은 브라우저 내 탭 간 즉시 동기화 (WebSocket 연결 불필요)
@@ -157,7 +164,13 @@ export default function ShoppingPage() {
         </button>
       </div>
 
-      {lists.length === 0 ? (
+      {fetchError ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="text-5xl mb-4">⚠️</div>
+          <p className="text-stone-500 dark:text-stone-400 font-medium">목록을 불러오지 못했어요</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">잠시 후 다시 시도해주세요</p>
+        </div>
+      ) : lists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="text-5xl mb-4">🛍️</div>
           <p className="text-stone-500 dark:text-stone-400 font-medium">아직 장바구니가 없어요</p>
