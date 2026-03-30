@@ -46,6 +46,44 @@ export type Database = {
           },
         ]
       }
+      calendars: {
+        Row: {
+          id: string
+          family_id: string
+          created_by: string
+          name: string
+          color: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          family_id: string
+          created_by: string
+          name: string
+          color?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          family_id?: string
+          created_by?: string
+          name?: string
+          color?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendars_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_votes: {
         Row: {
           created_at: string
@@ -83,6 +121,7 @@ export type Database = {
       }
       events: {
         Row: {
+          calendar_id: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -95,6 +134,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          calendar_id?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -107,6 +147,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          calendar_id?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -119,6 +160,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "events_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "calendars"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "events_family_id_fkey"
             columns: ["family_id"]
