@@ -151,10 +151,10 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
             <span className="text-sm text-stone-600 dark:text-stone-300">종일</span>
             <button
               onClick={() => toggleAllDay(!isAllDay)}
-              className={`relative w-11 h-6 rounded-full overflow-hidden transition-colors ${isAllDay ? 'bg-orange-400' : 'bg-stone-200 dark:bg-stone-700'}`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${isAllDay ? 'bg-orange-400' : 'bg-stone-200 dark:bg-stone-700'}`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isAllDay ? 'translate-x-6' : 'translate-x-0.5'}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isAllDay ? 'translate-x-5' : 'translate-x-0'}`}
               />
             </button>
           </div>
