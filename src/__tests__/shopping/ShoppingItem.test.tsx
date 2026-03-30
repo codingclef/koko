@@ -48,11 +48,29 @@ describe('ShoppingItem', () => {
     expect(screen.getByText('우유')).toHaveClass('line-through')
   })
 
-  it('삭제 버튼 클릭 시 onDelete가 호출된다', () => {
+  it('삭제 버튼 클릭 시 확인 다이얼로그가 나타난다', () => {
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByLabelText('삭제'))
+    expect(screen.getByText('아이템 삭제')).toBeInTheDocument()
+    expect(screen.getByLabelText('삭제 확인')).toBeInTheDocument()
+    expect(screen.getByLabelText('취소')).toBeInTheDocument()
+  })
+
+  it('다이얼로그에서 삭제 확인 시 onDelete가 호출된다', () => {
     const onDelete = jest.fn()
     render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={onDelete} onRename={jest.fn()} />)
     fireEvent.click(screen.getByLabelText('삭제'))
+    fireEvent.click(screen.getByLabelText('삭제 확인'))
     expect(onDelete).toHaveBeenCalledWith('item-1')
+  })
+
+  it('다이얼로그에서 취소 시 onDelete가 호출되지 않는다', () => {
+    const onDelete = jest.fn()
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={onDelete} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByLabelText('삭제'))
+    fireEvent.click(screen.getByLabelText('취소'))
+    expect(onDelete).not.toHaveBeenCalled()
+    expect(screen.queryByText('아이템 삭제')).not.toBeInTheDocument()
   })
 
   it('이름 클릭 시 인라인 편집 입력창이 나타난다', () => {

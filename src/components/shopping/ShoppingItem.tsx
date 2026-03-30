@@ -18,6 +18,7 @@ interface Props {
 export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, draggable = false }: Props) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(item.name)
+  const [confirming, setConfirming] = useState(false)
 
   const {
     attributes,
@@ -126,12 +127,40 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, drag
       )}
 
       <button
-        onClick={() => onDelete(item.id)}
+        onClick={() => setConfirming(true)}
         className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
         aria-label="삭제"
       >
         <Trash2 size={14} />
       </button>
+
+      {confirming && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirming(false)} />
+          <div className="relative bg-white dark:bg-stone-900 rounded-2xl w-full sm:max-w-xs p-6 shadow-xl">
+            <p className="font-semibold text-stone-800 dark:text-stone-100 mb-1">아이템 삭제</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
+              &ldquo;{item.name}&rdquo;을(를) 삭제할까요?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirming(false)}
+                className="flex-1 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-semibold text-sm transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
+                aria-label="취소"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { setConfirming(false); onDelete(item.id) }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+                aria-label="삭제 확인"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
