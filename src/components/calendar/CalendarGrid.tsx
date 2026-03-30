@@ -9,11 +9,14 @@ interface DayCell {
   isCurrentMonth: boolean
 }
 
-function buildGrid(year: number, month: number): DayCell[] {
+function buildGrid(year: number, month: number): { cells: DayCell[]; rows: number } {
   const firstDay = new Date(year, month, 1)
   const startDow = firstDay.getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const prevMonthLastDay = new Date(year, month, 0).getDate()
+
+  const rows = Math.ceil((startDow + daysInMonth) / 7)
+  const totalCells = rows * 7
 
   const cells: DayCell[] = []
 
@@ -23,11 +26,11 @@ function buildGrid(year: number, month: number): DayCell[] {
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ date: new Date(year, month, d), isCurrentMonth: true })
   }
-  const remaining = 42 - cells.length
+  const remaining = totalCells - cells.length
   for (let d = 1; d <= remaining; d++) {
     cells.push({ date: new Date(year, month + 1, d), isCurrentMonth: false })
   }
-  return cells
+  return { cells, rows }
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -48,10 +51,11 @@ interface Props {
   activeIds: Set<string>
   selectedDate: Date | null
   onSelectDate: (date: Date) => void
+  className?: string
 }
 
-export function CalendarGrid({ year, month, events, calendars, activeIds, selectedDate, onSelectDate }: Props) {
-  const cells = buildGrid(year, month)
+export function CalendarGrid({ year, month, events, calendars, activeIds, selectedDate, onSelectDate, className }: Props) {
+  const { cells, rows } = buildGrid(year, month)
   const today = new Date()
 
   const calendarMap = new Map(calendars.map((c) => [c.id, c]))
@@ -67,13 +71,13 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
   }
 
   return (
-    <div>
+    <div className={`flex flex-col ${className ?? ''}`}>
       {/* 요일 헤더 */}
-      <div className="grid grid-cols-7 mb-1">
+      <div className="grid grid-cols-7 shrink-0">
         {DOW.map((d, i) => (
           <div
             key={d}
-            className={`text-center text-xs font-medium py-1 ${
+            className={`text-center text-xs font-medium py-1.5 ${
               i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-stone-400 dark:text-stone-500'
             }`}
           >
@@ -82,8 +86,8 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
         ))}
       </div>
 
-      {/* 날짜 그리드 */}
-      <div className="grid grid-cols-7">
+      {/* 날짜 그리드 — 행 수만큼만 생성 */}
+      <div className="grid grid-cols-7 flex-1" style={{ gridTemplateRows: `repeat(${rows}, 1fr)` }}>
         {cells.map((cell, idx) => {
           const dayEvents = getEventsForDay(cell.date, visibleEvents)
           const isToday = isSameDay(cell.date, today)
@@ -96,7 +100,7 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
             <button
               key={idx}
               onClick={() => onSelectDate(cell.date)}
-              className={`relative flex flex-col items-start min-h-[72px] p-0.5 border-t transition-colors ${
+              className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
                 isSelected
                   ? 'bg-orange-50 dark:bg-orange-950/30'
                   : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'

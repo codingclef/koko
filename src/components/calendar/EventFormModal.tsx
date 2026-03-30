@@ -100,7 +100,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={onClose}>
       <div
         className="w-full max-w-lg bg-white dark:bg-stone-900 rounded-t-2xl pb-safe max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}

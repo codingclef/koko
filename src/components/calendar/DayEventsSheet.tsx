@@ -36,7 +36,7 @@ export function DayEventsSheet({ date, events, calendars, onClose, onSelectEvent
   })
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end" onClick={onClose}>
       <div
         className="w-full max-w-lg mx-auto bg-white dark:bg-stone-900 rounded-t-2xl max-h-[60vh] flex flex-col pb-safe"
         onClick={(e) => e.stopPropagation()}

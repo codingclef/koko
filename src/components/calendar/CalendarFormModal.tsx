@@ -40,12 +40,13 @@ export function CalendarFormModal({ initial, onClose, onSave, onDelete }: Props)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-full max-w-lg bg-white dark:bg-stone-900 rounded-t-2xl p-6 pb-safe"
+        className="w-full max-w-lg bg-white dark:bg-stone-900 rounded-t-2xl flex flex-col max-h-[85dvh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-5">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
           <h2 className="text-lg font-bold text-stone-800 dark:text-stone-100">
             {initial ? '캘린더 편집' : '새 캘린더'}
           </h2>
@@ -54,7 +55,8 @@ export function CalendarFormModal({ initial, onClose, onSave, onDelete }: Props)
           </button>
         </div>
 
-        <div className="space-y-5">
+        {/* 스크롤 가능 콘텐츠 */}
+        <div className="overflow-y-auto flex-1 px-6 pb-2 space-y-5">
           <div>
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1.5">
               이름
@@ -86,32 +88,35 @@ export function CalendarFormModal({ initial, onClose, onSave, onDelete }: Props)
           </div>
         </div>
 
-        <div className="mt-6 flex gap-2">
-          {initial && onDelete && (
-            confirmDelete ? (
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm"
-              >
-                정말 삭제
-              </button>
-            ) : (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="px-4 py-2.5 rounded-xl border border-red-300 text-red-500 font-semibold text-sm"
-              >
-                삭제
-              </button>
-            )
-          )}
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || saving}
-            className="flex-1 py-2.5 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold text-sm transition-colors"
-          >
-            저장
-          </button>
+        {/* 저장 버튼 — 항상 하단 고정 */}
+        <div className="px-6 py-4 pb-safe shrink-0 border-t border-stone-100 dark:border-stone-800">
+          <div className="flex gap-2">
+            {initial && onDelete && (
+              confirmDelete ? (
+                <button
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm"
+                >
+                  정말 삭제
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="px-4 py-2.5 rounded-xl border border-red-300 text-red-500 font-semibold text-sm"
+                >
+                  삭제
+                </button>
+              )
+            )}
+            <button
+              onClick={handleSave}
+              disabled={!name.trim() || saving}
+              className="flex-1 py-2.5 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold text-sm transition-colors"
+            >
+              저장
+            </button>
+          </div>
         </div>
       </div>
     </div>

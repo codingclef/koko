@@ -197,10 +197,10 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto pb-24 min-h-screen bg-white dark:bg-stone-950">
+    <div className="max-w-lg mx-auto flex flex-col bg-white dark:bg-stone-950" style={{ height: '100dvh' }}>
       {/* 헤더 */}
-      <div className="px-4 pt-8 pb-3">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-4 pt-8 pb-2 shrink-0">
+        <div className="flex items-center justify-between mb-2">
           <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
             <ChevronLeft size={20} />
           </button>
@@ -222,22 +222,21 @@ export default function CalendarPage() {
         />
       </div>
 
-      {/* 달력 그리드 */}
-      <div className="px-1">
-        <CalendarGrid
-          year={year}
-          month={month}
-          events={events}
-          calendars={calendars}
-          activeIds={activeIds}
-          selectedDate={selectedDate}
-          onSelectDate={(date) => {
-            setSelectedDate((prev) =>
-              prev?.toDateString() === date.toDateString() ? null : date
-            )
-          }}
-        />
-      </div>
+      {/* 달력 그리드 — 남은 공간 꽉 채움 */}
+      <CalendarGrid
+        year={year}
+        month={month}
+        events={events}
+        calendars={calendars}
+        activeIds={activeIds}
+        selectedDate={selectedDate}
+        onSelectDate={(date) => {
+          setSelectedDate((prev) =>
+            prev?.toDateString() === date.toDateString() ? null : date
+          )
+        }}
+        className="flex-1 overflow-hidden pb-16"
+      />
 
       {/* FAB */}
       <button

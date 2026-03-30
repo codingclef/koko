@@ -9,7 +9,7 @@ function LoginInner() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? '/shopping'
+  const next = searchParams.get('next') ?? '/calendar'
   const error = searchParams.get('error')
 
   useEffect(() => {
