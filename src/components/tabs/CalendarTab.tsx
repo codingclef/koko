@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSwipe } from '@/hooks/useSwipe'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -85,6 +86,11 @@ export function CalendarTab() {
     else setMonth((m) => m + 1)
     setSelectedDate(null)
   }
+
+  const { onTouchStart, onTouchEnd } = useSwipe({
+    onSwipeLeft: nextMonth,
+    onSwipeRight: prevMonth,
+  })
 
   const toggleCalendar = (id: string) => {
     setActiveIds((prev) => {
@@ -188,7 +194,12 @@ export function CalendarTab() {
   }
 
   return (
-    <div className="w-full flex flex-col bg-white dark:bg-stone-950" style={{ height: '100dvh' }}>
+    <div
+      className="w-full flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
+      style={{ height: '100dvh' }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       {/* 헤더 */}
       <div className="px-4 pt-8 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2">
