@@ -140,7 +140,7 @@ export function ShoppingListCard({ list, onDelete, onRename }: Props) {
           {!editing && (
             <button
               onClick={handleDeleteClick}
-              className="opacity-0 group-hover:opacity-100 p-2 rounded-xl text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all flex-shrink-0"
+              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 rounded-xl text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all flex-shrink-0"
               aria-label="삭제"
             >
               <Trash2 size={16} />
