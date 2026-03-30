@@ -224,6 +224,7 @@ export function CalendarTab() {
             prev?.toDateString() === date.toDateString() ? null : date
           )
         }}
+        onSelectEvent={setSelectedEvent}
         className="flex-1 overflow-hidden pb-16"
       />
 
