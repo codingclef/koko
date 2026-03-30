@@ -32,18 +32,17 @@ const mockList: ShoppingList = {
 }
 
 describe('ShoppingListCard', () => {
-  it('삭제 버튼 클릭 시 확인 UI가 나타난다', () => {
-    const onDelete = jest.fn()
-    render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} />)
+  it('삭제 버튼 클릭 시 다이얼로그가 나타난다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
 
     fireEvent.click(screen.getByLabelText('삭제'))
 
-    expect(screen.getByText('삭제할까요?')).toBeInTheDocument()
+    expect(screen.getByText('장바구니 삭제')).toBeInTheDocument()
     expect(screen.getByLabelText('삭제 확인')).toBeInTheDocument()
     expect(screen.getByLabelText('취소')).toBeInTheDocument()
   })
 
-  it('확인 클릭 시 onDelete가 호출된다', () => {
+  it('다이얼로그에서 삭제 클릭 시 onDelete가 호출된다', () => {
     const onDelete = jest.fn()
     render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} />)
 
@@ -53,7 +52,7 @@ describe('ShoppingListCard', () => {
     expect(onDelete).toHaveBeenCalledWith('list-1')
   })
 
-  it('취소 클릭 시 onDelete가 호출되지 않고 확인 UI가 사라진다', () => {
+  it('다이얼로그에서 취소 클릭 시 onDelete가 호출되지 않고 다이얼로그가 닫힌다', () => {
     const onDelete = jest.fn()
     render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} />)
 
@@ -61,7 +60,7 @@ describe('ShoppingListCard', () => {
     fireEvent.click(screen.getByLabelText('취소'))
 
     expect(onDelete).not.toHaveBeenCalled()
-    expect(screen.queryByText('삭제할까요?')).not.toBeInTheDocument()
+    expect(screen.queryByText('장바구니 삭제')).not.toBeInTheDocument()
   })
 
   it('목록 이름이 렌더링된다', () => {
