@@ -97,7 +97,7 @@ describe('ShoppingListCard', () => {
   })
 
   it('드래그 핸들이 렌더링된다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
     expect(screen.getByLabelText('드래그 핸들')).toBeInTheDocument()
   })
 })
