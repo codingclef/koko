@@ -142,7 +142,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목"
-            className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+            className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base"
             autoFocus
           />
 
@@ -166,14 +166,14 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
               type={isAllDay ? 'date' : 'datetime-local'}
               value={startValue}
               onChange={(e) => setStartValue(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base"
             />
             <label className="text-xs text-stone-500">종료 (선택)</label>
             <input
               type={isAllDay ? 'date' : 'datetime-local'}
               value={endValue}
               onChange={(e) => setEndValue(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base"
             />
           </div>
 
@@ -183,7 +183,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
             onChange={(e) => setDescription(e.target.value)}
             placeholder="메모 (선택)"
             rows={2}
-            className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm resize-none"
+            className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base resize-none"
           />
 
           {/* 알림 */}

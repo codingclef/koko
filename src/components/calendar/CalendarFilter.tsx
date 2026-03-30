@@ -26,7 +26,6 @@ export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }
                 : 'bg-transparent text-stone-500 dark:text-stone-400 border-stone-200 dark:border-stone-700'
             }`}
             style={active ? { backgroundColor: cal.color, borderColor: cal.color } : {}}
-            onContextMenu={(e) => { e.preventDefault(); onEdit(cal) }}
           >
             <span
               className="w-2 h-2 rounded-full shrink-0"
