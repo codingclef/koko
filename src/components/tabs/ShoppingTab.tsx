@@ -39,8 +39,6 @@ export function ShoppingTab() {
   const [fetchError, setFetchError] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const channelReadyRef = useRef(false)
-  const bcRef = useRef<BroadcastChannel | null>(null)
 
   const loading = authLoading || familyLoading
 
@@ -61,32 +59,20 @@ export function ShoppingTab() {
         })
     refresh()
 
-    const bc = new BroadcastChannel(`koko-lists-${familyId}`)
-    bc.onmessage = refresh
-    bcRef.current = bc
-
     const channel = supabase
       .channel(`family_lists_${familyId}`)
       .on('broadcast', { event: 'refresh' }, refresh)
       .subscribe((status) => {
-        channelReadyRef.current = status === 'SUBSCRIBED'
         if (status === 'SUBSCRIBED') refresh()
       })
 
     channelRef.current = channel
 
-    return () => {
-      bc.close()
-      channelReadyRef.current = false
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [familyId])
 
   const broadcast = () => {
-    bcRef.current?.postMessage('refresh')
-    if (channelRef.current && channelReadyRef.current) {
-      channelRef.current.send({ type: 'broadcast', event: 'refresh', payload: {} })
-    }
+    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
   }
 
   const handleCreate = async (name: string, type: ListType) => {

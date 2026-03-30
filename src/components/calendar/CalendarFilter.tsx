@@ -1,7 +1,10 @@
 'use client'
 
+import { useRef } from 'react'
 import { Plus } from 'lucide-react'
 import type { Calendar } from '@/lib/calendar'
+
+const LONG_PRESS_MS = 500
 
 interface Props {
   calendars: Calendar[]
@@ -12,6 +15,26 @@ interface Props {
 }
 
 export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }: Props) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didLongPressRef = useRef(false)
+
+  const startPress = (cal: Calendar) => {
+    didLongPressRef.current = false
+    timerRef.current = setTimeout(() => {
+      didLongPressRef.current = true
+      onEdit(cal)
+    }, LONG_PRESS_MS)
+  }
+
+  const cancelPress = () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }
+
+  const handleClick = (cal: Calendar) => {
+    if (didLongPressRef.current) return
+    onToggle(cal.id)
+  }
+
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
       {calendars.map((cal) => {
@@ -19,7 +42,13 @@ export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }
         return (
           <button
             key={cal.id}
-            onClick={() => onToggle(cal.id)}
+            onMouseDown={() => startPress(cal)}
+            onMouseUp={cancelPress}
+            onMouseLeave={cancelPress}
+            onTouchStart={() => startPress(cal)}
+            onTouchEnd={cancelPress}
+            onTouchCancel={cancelPress}
+            onClick={() => handleClick(cal)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
               active
                 ? 'text-white border-transparent'

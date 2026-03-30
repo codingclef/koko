@@ -51,10 +51,11 @@ interface Props {
   activeIds: Set<string>
   selectedDate: Date | null
   onSelectDate: (date: Date) => void
+  onSelectEvent?: (event: CalendarEvent) => void
   className?: string
 }
 
-export function CalendarGrid({ year, month, events, calendars, activeIds, selectedDate, onSelectDate, className }: Props) {
+export function CalendarGrid({ year, month, events, calendars, activeIds, selectedDate, onSelectDate, onSelectEvent, className }: Props) {
   const { cells, rows } = buildGrid(year, month)
   const today = new Date()
 
@@ -128,7 +129,9 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
                 {dayEvents.slice(0, 3).map((evt) => (
                   <div
                     key={evt.id}
-                    className="w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate"
+                    role={onSelectEvent ? 'button' : undefined}
+                    onClick={onSelectEvent ? (e) => { e.stopPropagation(); onSelectEvent(evt) } : undefined}
+                    className={`w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate${onSelectEvent ? ' cursor-pointer active:opacity-70' : ''}`}
                     style={{ backgroundColor: getEventColor(evt) }}
                   >
                     {evt.title}
