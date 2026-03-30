@@ -85,3 +85,19 @@ export async function deleteShoppingItem(itemId: string): Promise<void> {
   const { error } = await supabase.from('shopping_items').delete().eq('id', itemId)
   if (error) throw error
 }
+
+export async function renameShoppingList(listId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('shopping_lists')
+    .update({ name })
+    .eq('id', listId)
+  if (error) throw error
+}
+
+export async function renameShoppingItem(itemId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('shopping_items')
+    .update({ name })
+    .eq('id', itemId)
+  if (error) throw error
+}
