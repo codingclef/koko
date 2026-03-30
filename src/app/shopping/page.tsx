@@ -3,9 +3,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
-import { getShoppingLists, createShoppingList, deleteShoppingList, renameShoppingList } from '@/lib/shopping'
+import {
+  getShoppingLists,
+  createShoppingList,
+  deleteShoppingList,
+  renameShoppingList,
+  reorderShoppingLists,
+} from '@/lib/shopping'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { BottomNav } from '@/components/BottomNav'
@@ -27,6 +42,11 @@ export default function ShoppingPage() {
   const bcRef = useRef<BroadcastChannel | null>(null)
 
   const loading = authLoading || familyLoading
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  )
 
   useEffect(() => {
     if (!familyId) return
@@ -73,6 +93,7 @@ export default function ShoppingPage() {
       created_by: user.id,
       name,
       type,
+      sort_order: 0,
       created_at: new Date().toISOString(),
     }
     setLists((prev) => [optimisticList, ...prev])
@@ -93,6 +114,21 @@ export default function ShoppingPage() {
     setLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
     await renameShoppingList(listId, name)
     broadcast()
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setLists((prev) => {
+      const oldIndex = prev.findIndex((l) => l.id === active.id)
+      const newIndex = prev.findIndex((l) => l.id === over.id)
+      const reordered = arrayMove(prev, oldIndex, newIndex)
+      const updates = reordered.map((l, i) => ({ id: l.id, sort_order: i }))
+      reorderShoppingLists(updates)
+      broadcast()
+      return reordered.map((l, i) => ({ ...l, sort_order: i }))
+    })
   }
 
   if (loading) {
@@ -128,11 +164,15 @@ export default function ShoppingPage() {
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 새 목록 버튼을 눌러보세요</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {lists.map((list) => (
-            <ShoppingListCard key={list.id} list={list} onDelete={handleDelete} onRename={handleRename} />
-          ))}
-        </div>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext items={lists.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {lists.map((list) => (
+                <ShoppingListCard key={list.id} list={list} onDelete={handleDelete} onRename={handleRename} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {showModal && (

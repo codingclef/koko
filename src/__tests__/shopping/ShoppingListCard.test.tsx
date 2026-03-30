@@ -6,12 +6,28 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }))
 
+jest.mock('@dnd-kit/sortable', () => ({
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: jest.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  }),
+}))
+
+jest.mock('@dnd-kit/utilities', () => ({
+  CSS: { Transform: { toString: () => '' } },
+}))
+
 const mockList: ShoppingList = {
   id: 'list-1',
   family_id: 'fam-1',
   created_by: 'user-1',
   name: '이마트',
   type: 'strikethrough',
+  sort_order: 0,
   created_at: '2026-01-01T00:00:00Z',
 }
 
@@ -78,5 +94,10 @@ describe('ShoppingListCard', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(onRename).not.toHaveBeenCalled()
     expect(screen.getByText('이마트')).toBeInTheDocument()
+  })
+
+  it('드래그 핸들이 렌더링된다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    expect(screen.getByLabelText('드래그 핸들')).toBeInTheDocument()
   })
 })
