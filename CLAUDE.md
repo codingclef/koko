@@ -16,8 +16,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. Direct push to main is prohibited (branch protection enabled)
 5. After a PR is merged, delete the feature branch immediately
 
-## Before Implementation
-1. Before starting implementation, explain back the requirements to the user
+## Before Any Action
+1. Before starting any task (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking
 2. Implementation begins only after the user's explicit approval
 
 ## Development Rules
