@@ -1,7 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { GripVertical, Trash2 } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { ShoppingItem as ShoppingItemType } from '@/lib/shopping'
 
 interface Props {
@@ -10,12 +12,28 @@ interface Props {
   onCheck: (itemId: string, checked: boolean) => void
   onDelete: (itemId: string) => void
   onRename: (itemId: string, name: string) => void
+  draggable?: boolean
 }
 
-export function ShoppingItem({ item, listType, onCheck, onDelete, onRename }: Props) {
+export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, draggable = false }: Props) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(item.name)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled: !draggable })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  }
 
   const handleNameClick = () => {
     setEditValue(item.name)
@@ -47,12 +65,25 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename }: Pr
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
         item.is_checked && listType === 'strikethrough'
           ? 'opacity-60'
           : 'opacity-100'
       }`}
     >
+      {draggable && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 p-0.5 text-stone-300 dark:text-stone-600 touch-none cursor-grab active:cursor-grabbing"
+          aria-label="드래그 핸들"
+        >
+          <GripVertical size={14} />
+        </button>
+      )}
+
       <button
         onClick={handleCheck}
         aria-label={item.is_checked ? '체크 해제' : '체크'}

@@ -2,6 +2,21 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ShoppingItem } from '@/components/shopping/ShoppingItem'
 import type { ShoppingItem as ShoppingItemType } from '@/lib/shopping'
 
+jest.mock('@dnd-kit/sortable', () => ({
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: jest.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  }),
+}))
+
+jest.mock('@dnd-kit/utilities', () => ({
+  CSS: { Transform: { toString: () => '' } },
+}))
+
 const mockItem: ShoppingItemType = {
   id: 'item-1',
   list_id: 'list-1',
@@ -16,32 +31,26 @@ const mockItem: ShoppingItemType = {
 
 describe('ShoppingItem', () => {
   it('아이템 이름을 표시한다', () => {
-    const onCheck = jest.fn()
-    const onDelete = jest.fn()
-    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={onCheck} onDelete={onDelete} onRename={jest.fn()} />)
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} />)
     expect(screen.getByText('우유')).toBeInTheDocument()
   })
 
   it('체크 버튼 클릭 시 onCheck가 호출된다', () => {
     const onCheck = jest.fn()
-    const onDelete = jest.fn()
-    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={onCheck} onDelete={onDelete} onRename={jest.fn()} />)
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={onCheck} onDelete={jest.fn()} onRename={jest.fn()} />)
     fireEvent.click(screen.getByLabelText('체크'))
     expect(onCheck).toHaveBeenCalledWith('item-1', true)
   })
 
   it('체크된 아이템은 취소선이 표시된다 (strikethrough 방식)', () => {
-    const onCheck = jest.fn()
-    const onDelete = jest.fn()
     const checkedItem = { ...mockItem, is_checked: true }
-    render(<ShoppingItem item={checkedItem} listType="strikethrough" onCheck={onCheck} onDelete={onDelete} onRename={jest.fn()} />)
+    render(<ShoppingItem item={checkedItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} />)
     expect(screen.getByText('우유')).toHaveClass('line-through')
   })
 
   it('삭제 버튼 클릭 시 onDelete가 호출된다', () => {
-    const onCheck = jest.fn()
     const onDelete = jest.fn()
-    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={onCheck} onDelete={onDelete} onRename={jest.fn()} />)
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={onDelete} onRename={jest.fn()} />)
     fireEvent.click(screen.getByLabelText('삭제'))
     expect(onDelete).toHaveBeenCalledWith('item-1')
   })
@@ -71,5 +80,15 @@ describe('ShoppingItem', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(onRename).not.toHaveBeenCalled()
     expect(screen.getByText('우유')).toBeInTheDocument()
+  })
+
+  it('draggable=true이면 드래그 핸들이 표시된다', () => {
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} draggable />)
+    expect(screen.getByLabelText('드래그 핸들')).toBeInTheDocument()
+  })
+
+  it('draggable이 없으면 드래그 핸들이 표시되지 않는다', () => {
+    render(<ShoppingItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} />)
+    expect(screen.queryByLabelText('드래그 핸들')).not.toBeInTheDocument()
   })
 })

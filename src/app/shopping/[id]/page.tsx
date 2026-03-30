@@ -3,6 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useAuth } from '@/hooks/useAuth'
 import {
   getShoppingItems,
@@ -10,6 +19,7 @@ import {
   checkShoppingItem,
   deleteShoppingItem,
   renameShoppingItem,
+  reorderShoppingItems,
 } from '@/lib/shopping'
 import { ShoppingItem } from '@/components/shopping/ShoppingItem'
 import { AddItemInput } from '@/components/shopping/AddItemInput'
@@ -31,6 +41,11 @@ export default function ShoppingDetailPage() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const channelReadyRef = useRef(false)
   const bcRef = useRef<BroadcastChannel | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  )
 
   useEffect(() => {
     if (!id) return
@@ -130,6 +145,23 @@ export default function ShoppingDetailPage() {
     broadcast()
   }
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setItems((prev) => {
+      const unchecked = prev.filter((i) => !i.is_checked)
+      const checked = prev.filter((i) => i.is_checked)
+      const oldIndex = unchecked.findIndex((i) => i.id === active.id)
+      const newIndex = unchecked.findIndex((i) => i.id === over.id)
+      const reordered = arrayMove(unchecked, oldIndex, newIndex)
+      const updates = reordered.map((i, idx) => ({ id: i.id, sort_order: idx }))
+      reorderShoppingItems(updates)
+      broadcast()
+      return [...reordered.map((i, idx) => ({ ...i, sort_order: idx })), ...checked]
+    })
+  }
+
   const uncheckedItems = items.filter((i) => !i.is_checked)
   const checkedItems = items.filter((i) => i.is_checked)
 
@@ -174,16 +206,24 @@ export default function ShoppingDetailPage() {
           </div>
         )}
 
-        {uncheckedItems.map((item) => (
-          <ShoppingItem
-            key={item.id}
-            item={item}
-            listType={list?.type as 'strikethrough' | 'delete' ?? 'strikethrough'}
-            onCheck={handleCheck}
-            onDelete={handleDelete}
-            onRename={handleRename}
-          />
-        ))}
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={uncheckedItems.map((i) => i.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {uncheckedItems.map((item) => (
+              <ShoppingItem
+                key={item.id}
+                item={item}
+                listType={list?.type as 'strikethrough' | 'delete' ?? 'strikethrough'}
+                onCheck={handleCheck}
+                onDelete={handleDelete}
+                onRename={handleRename}
+                draggable
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {list?.type === 'strikethrough' && checkedItems.length > 0 && (
           <>

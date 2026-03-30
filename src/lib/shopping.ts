@@ -10,6 +10,7 @@ export async function getShoppingLists(familyId: string): Promise<ShoppingList[]
     .from('shopping_lists')
     .select('*')
     .eq('family_id', familyId)
+    .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -100,4 +101,24 @@ export async function renameShoppingItem(itemId: string, name: string): Promise<
     .update({ name })
     .eq('id', itemId)
   if (error) throw error
+}
+
+export async function reorderShoppingLists(
+  updates: { id: string; sort_order: number }[]
+): Promise<void> {
+  await Promise.all(
+    updates.map(({ id, sort_order }) =>
+      supabase.from('shopping_lists').update({ sort_order }).eq('id', id)
+    )
+  )
+}
+
+export async function reorderShoppingItems(
+  updates: { id: string; sort_order: number }[]
+): Promise<void> {
+  await Promise.all(
+    updates.map(({ id, sort_order }) =>
+      supabase.from('shopping_items').update({ sort_order }).eq('id', id)
+    )
+  )
 }

@@ -298,6 +298,7 @@ export type Database = {
           family_id: string
           id: string
           name: string
+          sort_order: number
           type: string
         }
         Insert: {
@@ -306,6 +307,7 @@ export type Database = {
           family_id: string
           id?: string
           name: string
+          sort_order?: number
           type?: string
         }
         Update: {
@@ -314,6 +316,7 @@ export type Database = {
           family_id?: string
           id?: string
           name?: string
+          sort_order?: number
           type?: string
         }
         Relationships: [
