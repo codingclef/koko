@@ -24,3 +24,21 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+@keyframes calendar-slide-from-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes calendar-slide-from-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.calendar-slide-from-right {
+  animation: calendar-slide-from-right 0.25s ease-out;
+}
+
+.calendar-slide-from-left {
+  animation: calendar-slide-from-left 0.25s ease-out;
+}

@@ -161,3 +161,47 @@ Supabase Realtime 구독이 이미 각 탭에 구현되어 있어, 탭이 항상
 ```
 
 허용 목록은 Supabase `allowed_emails` 테이블로 관리하며, 유효한 초대 코드를 통해 처음 로그인하는 사용자는 자동으로 테이블에 추가된다. 환경변수 방식은 Vercel 재배포 없이 멤버를 추가/제거할 수 없어 DB 방식으로 전환했다.
+
+---
+
+## 8. iOS Safari에서 캘린더 화면 상하 스크롤이 차단되지 않는 문제
+
+### 과제
+캘린더 화면은 `height: 100dvh`로 뷰포트 전체를 채우며, 세로 스크롤이 필요 없는 구조다. 그러나 모바일에서 화면을 위아래로 드래그하면 페이지가 따라서 움직였다.
+
+### 시도 1 — 컨테이너에 touchmove 이벤트 방지 (실패)
+
+```typescript
+el.addEventListener('touchmove', (e) => {
+  if (!isModalOpen) e.preventDefault()
+}, { passive: false })
+```
+
+iOS Safari에서는 `body`가 스크롤 가능한 상태이면 자식 엘리먼트에서 `e.preventDefault()`를 호출해도 body 레벨 스크롤이 막히지 않았다.
+
+### 시도 2 — document 레벨로 이벤트 이동 (실패)
+
+```typescript
+document.addEventListener('touchmove', (e) => {
+  if (!isModalOpen && el.contains(e.target as Node)) e.preventDefault()
+}, { passive: false })
+```
+
+`body`에 `min-h-full`이 설정되어 있어 스크롤 가능한 상태인 점은 동일했다. Shopping 탭은 body 스크롤을 사용하므로 `overflow: hidden`을 전역으로 추가할 수도 없었다. 결과적으로 iOS Safari에서 여전히 스크롤이 발생했다.
+
+### 해결 — CSS `touch-action: none`
+
+```tsx
+<div
+  style={{ height: '100dvh', touchAction: isModalOpen ? 'auto' : 'none' }}
+>
+```
+
+JavaScript 이벤트 핸들러 방식은 iOS Safari에서 body 스크롤을 신뢰성 있게 막지 못한다. CSS `touch-action: none`은 브라우저에게 "이 요소에서 터치 기반 스크롤/줌 제스처를 처리하지 말 것"을 직접 지시하므로 JavaScript보다 앞선 레이어에서 동작한다.
+
+모달이 열렸을 때(`isModalOpen: true`)는 `auto`로 복원해 모달 내부의 `overflow-y-auto` 스크롤 영역이 정상 동작하게 했다. 좌우 스와이프 월 이동은 JavaScript `touchstart`/`touchend` 이벤트로 구현되어 있어 `touch-action`의 영향을 받지 않는다.
+
+```
+실패: JS e.preventDefault() → iOS Safari body 스크롤 레이어에서 무시됨
+해결: CSS touch-action: none → 브라우저가 스크롤 시도 자체를 하지 않음
+```
