@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_preferences: {
+        Row: {
+          user_id: string
+          holiday_countries: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          holiday_countries?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          holiday_countries?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       event_reminders: {
         Row: {
           created_at: string
