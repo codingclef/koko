@@ -1,6 +1,7 @@
 'use client'
 
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
+import type { Holiday } from '@/hooks/useHolidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -43,19 +44,25 @@ function getEventsForDay(date: Date, events: CalendarEvent[]): CalendarEvent[] {
   return events.filter((e) => isSameDay(new Date(e.start_at), date))
 }
 
+function getHolidaysForDay(date: Date, holidays: Holiday[]): Holiday[] {
+  const ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return holidays.filter((h) => h.date === ymd)
+}
+
 interface Props {
   year: number
   month: number
   events: CalendarEvent[]
   calendars: Calendar[]
   activeIds: Set<string>
+  holidays?: Holiday[]
   selectedDate: Date | null
   onSelectDate: (date: Date) => void
   onSelectEvent?: (event: CalendarEvent) => void
   className?: string
 }
 
-export function CalendarGrid({ year, month, events, calendars, activeIds, selectedDate, onSelectDate, onSelectEvent, className }: Props) {
+export function CalendarGrid({ year, month, events, calendars, activeIds, holidays = [], selectedDate, onSelectDate, onSelectEvent, className }: Props) {
   const { cells, rows } = buildGrid(year, month)
   const today = new Date()
 
@@ -91,6 +98,7 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
       <div className="grid grid-cols-7 flex-1" style={{ gridTemplateRows: `repeat(${rows}, 1fr)` }}>
         {cells.map((cell, idx) => {
           const dayEvents = getEventsForDay(cell.date, visibleEvents)
+          const dayHolidays = getHolidaysForDay(cell.date, holidays)
           const isToday = isSameDay(cell.date, today)
           const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
           const dow = cell.date.getDay()
@@ -123,6 +131,18 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, select
               >
                 {cell.date.getDate()}
               </span>
+
+              {/* 공휴일 chips */}
+              <div className="w-full space-y-0.5 px-0.5">
+                {dayHolidays.map((h) => (
+                  <div
+                    key={`${h.countryCode}-${h.date}`}
+                    className="w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate bg-red-400"
+                  >
+                    {h.localName}
+                  </div>
+                ))}
+              </div>
 
               {/* 일정 pills */}
               <div className="w-full space-y-0.5 px-0.5">

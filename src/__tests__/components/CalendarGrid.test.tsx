@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { CalendarGrid } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
+import type { Holiday } from '@/hooks/useHolidays'
 
 const calendars: Calendar[] = [
   { id: 'cal-1', family_id: 'fam-1', created_by: 'user-1', name: '가족', color: '#f97316', created_at: '', updated_at: '' },
@@ -69,5 +70,28 @@ describe('CalendarGrid', () => {
     render(<CalendarGrid {...defaultProps} onSelectEvent={onSelectEvent} />)
     fireEvent.click(screen.getByText('생일파티'))
     expect(defaultProps.onSelectDate).not.toHaveBeenCalled()
+  })
+
+  it('holidays prop이 있으면 해당 날짜에 공휴일 칩이 렌더링된다', () => {
+    const holidays: Holiday[] = [
+      { date: '2025-06-06', localName: '현충일', countryCode: 'KR' },
+    ]
+    render(<CalendarGrid {...defaultProps} holidays={holidays} />)
+    expect(screen.getByText('현충일')).toBeInTheDocument()
+  })
+
+  it('holidays가 없으면 공휴일 칩이 렌더링되지 않는다', () => {
+    render(<CalendarGrid {...defaultProps} />)
+    expect(screen.queryByText('현충일')).not.toBeInTheDocument()
+  })
+
+  it('그리드에 없는 날짜의 공휴일은 표시되지 않는다', () => {
+    // June 2025 그리드는 5/25~6/30 + trailing 7/1~7/6까지 포함.
+    // 8월 이후 날짜는 절대 표시되지 않는다.
+    const holidays: Holiday[] = [
+      { date: '2025-08-15', localName: '광복절', countryCode: 'KR' },
+    ]
+    render(<CalendarGrid {...defaultProps} holidays={holidays} />)
+    expect(screen.queryByText('광복절')).not.toBeInTheDocument()
   })
 })
