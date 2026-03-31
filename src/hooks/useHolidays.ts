@@ -23,6 +23,60 @@ export function clearHolidayCache() {
   cache.clear()
 }
 
+/** Parse an ISO date string (YYYY-MM-DD) as local midnight to avoid UTC offset issues. */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function toYMD(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const SUBSTITUTE_NAME: Record<string, string> = {
+  KR: '대체공휴일',
+  JP: '振替休日',
+}
+
+/**
+ * Calculate substitute holidays for countries whose law grants a replacement
+ * weekday when a public holiday falls on Sunday.
+ * Applies to KR (대체공휴일) and JP (振替休日).
+ */
+function calcSubstituteHolidays(holidays: Holiday[]): Holiday[] {
+  const substitutes: Holiday[] = []
+  const allDates = new Set(holidays.map((h) => h.date))
+
+  for (const holiday of holidays) {
+    if (!(holiday.countryCode in SUBSTITUTE_NAME)) continue
+
+    const date = parseLocalDate(holiday.date)
+    if (date.getDay() !== 0) continue // only process Sundays
+
+    // Find the next non-holiday weekday
+    const candidate = new Date(date)
+    candidate.setDate(candidate.getDate() + 1)
+    while (allDates.has(toYMD(candidate)) || candidate.getDay() === 0) {
+      candidate.setDate(candidate.getDate() + 1)
+    }
+
+    const substituteDate = toYMD(candidate)
+    if (!allDates.has(substituteDate)) {
+      allDates.add(substituteDate) // prevent duplicate substitutes
+      substitutes.push({
+        date: substituteDate,
+        localName: SUBSTITUTE_NAME[holiday.countryCode],
+        countryCode: holiday.countryCode,
+      })
+    }
+  }
+
+  return substitutes
+}
+
 async function fetchYearHolidays(year: number, countryCode: string): Promise<Holiday[]> {
   const key = `${year}-${countryCode}`
   if (cache.has(key)) return cache.get(key)!
@@ -38,8 +92,11 @@ async function fetchYearHolidays(year: number, countryCode: string): Promise<Hol
     localName: h.localName,
     countryCode: h.countryCode,
   }))
-  cache.set(key, holidays)
-  return holidays
+
+  const substitutes = calcSubstituteHolidays(holidays)
+  const all = [...holidays, ...substitutes]
+  cache.set(key, all)
+  return all
 }
 
 export function useHolidays(
@@ -59,7 +116,7 @@ export function useHolidays(
     Promise.all(countryCodes.map((cc) => fetchYearHolidays(year, cc)))
       .then((results) => {
         const filtered = results.flat().filter((h) => {
-          const d = new Date(h.date)
+          const d = parseLocalDate(h.date)
           return d.getFullYear() === year && d.getMonth() === month
         })
         setHolidays(filtered)
