@@ -45,31 +45,21 @@ describe('CalendarGrid', () => {
     expect(defaultProps.onSelectDate).toHaveBeenCalledTimes(1)
   })
 
-  it('onSelectEvent 없을 때 이벤트 pill이 role=button 없이 렌더링된다', () => {
+  it('이벤트 pill이 렌더링된다', () => {
     render(<CalendarGrid {...defaultProps} />)
     expect(screen.getByText('생일파티')).toBeInTheDocument()
+  })
+
+  it('이벤트 pill은 role=button 없이 렌더링된다', () => {
+    render(<CalendarGrid {...defaultProps} />)
     expect(screen.getByText('생일파티')).not.toHaveAttribute('role', 'button')
   })
 
-  it('onSelectEvent 있을 때 이벤트 pill이 role=button으로 렌더링된다', () => {
-    const onSelectEvent = jest.fn()
-    render(<CalendarGrid {...defaultProps} onSelectEvent={onSelectEvent} />)
-    const pill = screen.getByText('생일파티')
-    expect(pill).toHaveAttribute('role', 'button')
-  })
-
-  it('이벤트 pill 클릭 시 onSelectEvent가 해당 이벤트로 호출된다', () => {
-    const onSelectEvent = jest.fn()
-    render(<CalendarGrid {...defaultProps} onSelectEvent={onSelectEvent} />)
+  it('이벤트 pill 클릭 시 onSelectDate가 호출된다 (날짜 셀과 동일 동작)', () => {
+    render(<CalendarGrid {...defaultProps} />)
+    // pill은 stopPropagation 없으므로 부모 셀의 onSelectDate 호출
     fireEvent.click(screen.getByText('생일파티'))
-    expect(onSelectEvent).toHaveBeenCalledWith(events[0])
-  })
-
-  it('이벤트 pill 클릭 시 onSelectDate는 호출되지 않는다', () => {
-    const onSelectEvent = jest.fn()
-    render(<CalendarGrid {...defaultProps} onSelectEvent={onSelectEvent} />)
-    fireEvent.click(screen.getByText('생일파티'))
-    expect(defaultProps.onSelectDate).not.toHaveBeenCalled()
+    expect(defaultProps.onSelectDate).toHaveBeenCalledTimes(1)
   })
 
   it('holidays prop이 있으면 해당 날짜에 공휴일 칩이 렌더링된다', () => {
@@ -86,8 +76,6 @@ describe('CalendarGrid', () => {
   })
 
   it('그리드에 없는 날짜의 공휴일은 표시되지 않는다', () => {
-    // June 2025 그리드는 5/25~6/30 + trailing 7/1~7/6까지 포함.
-    // 8월 이후 날짜는 절대 표시되지 않는다.
     const holidays: Holiday[] = [
       { date: '2025-08-15', localName: '광복절', countryCode: 'KR' },
     ]

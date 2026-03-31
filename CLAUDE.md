@@ -16,16 +16,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. Direct push to main is prohibited (branch protection enabled)
 5. After a PR is merged, delete the feature branch immediately
 
-## Before Any Action
-1. Before starting any task (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking
-2. Implementation begins only after the user's explicit approval
+## ⚠️ Before Any Action — MANDATORY, NO EXCEPTIONS
+> These rules apply to EVERY task without exception. Skipping them is not allowed under any circumstances.
+
+1. **Before starting any task** (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking
+2. **Implementation begins ONLY after the user's explicit approval** — never start coding before receiving approval
 
 ## Development Rules
 1. When asking the user to run a command or tool, always include a Korean explanation
 2. Whenever code is written or modified, unit tests must also be written or modified
-3. Use GitHub Actions CI — tests must pass before merging
-4. Items requiring manual visual verification by the user must be listed as checkboxes in the PR (exclude automated test items)
-5. Before adding or modifying features, read PATTERNS.md first
+3. After writing or modifying code, always run `npx tsc --noEmit` to verify no TypeScript errors before committing
+4. Use GitHub Actions CI — tests must pass before merging
+5. Items requiring manual visual verification by the user must be listed as checkboxes in the PR (exclude automated test items)
+6. Before adding or modifying features, read PATTERNS.md first
 
 ## Commands
 
