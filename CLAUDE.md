@@ -19,8 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## ⚠️ Before Any Action — MANDATORY, NO EXCEPTIONS
 > These rules apply to EVERY task without exception. Skipping them is not allowed under any circumstances.
 
-1. **Before starting any task** (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking
-2. **Implementation begins ONLY after the user's explicit approval** — never start coding before receiving approval
+1. **Before starting any task** (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking. Keep re-explaining until the user explicitly confirms there is no problem — do not proceed after just one explanation.
+2. **No action of any kind begins before the user's explicit approval** — this includes reading files, investigating, executing commands, and writing code. Nothing starts until the user confirms.
 
 ## Development Rules
 1. When asking the user to run a command or tool, always include a Korean explanation
