@@ -54,3 +54,30 @@ body {
 .shake {
   animation: shake 0.4s ease-in-out;
 }
+
+@keyframes modal-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes modal-slide-down {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+.modal-slide-up {
+  animation: modal-slide-up 0.28s ease-out;
+}
+
+.modal-slide-down {
+  animation: modal-slide-down 0.28s ease-in forwards;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
