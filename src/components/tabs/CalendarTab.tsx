@@ -260,7 +260,6 @@ export function CalendarTab({ preferences }: Props) {
               prev?.toDateString() === date.toDateString() ? null : date
             )
           }}
-          onSelectEvent={setSelectedEvent}
           className="h-full pb-16"
         />
       </div>

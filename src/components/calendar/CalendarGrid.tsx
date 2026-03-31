@@ -58,11 +58,10 @@ interface Props {
   holidays?: Holiday[]
   selectedDate: Date | null
   onSelectDate: (date: Date) => void
-  onSelectEvent?: (event: CalendarEvent) => void
   className?: string
 }
 
-export function CalendarGrid({ year, month, events, calendars, activeIds, holidays = [], selectedDate, onSelectDate, onSelectEvent, className }: Props) {
+export function CalendarGrid({ year, month, events, calendars, activeIds, holidays = [], selectedDate, onSelectDate, className }: Props) {
   const { cells, rows } = buildGrid(year, month)
   const today = new Date()
 
@@ -149,9 +148,7 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
                 {dayEvents.slice(0, 3).map((evt) => (
                   <div
                     key={evt.id}
-                    role={onSelectEvent ? 'button' : undefined}
-                    onClick={onSelectEvent ? (e) => { e.stopPropagation(); onSelectEvent(evt) } : undefined}
-                    className={`w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate${onSelectEvent ? ' cursor-pointer active:opacity-70' : ''}`}
+                    className="w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate"
                     style={{ backgroundColor: getEventColor(evt) }}
                   >
                     {evt.title}
