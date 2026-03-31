@@ -11,6 +11,12 @@ jest.mock('@/hooks/useFamily', () => ({
 jest.mock('@/hooks/useCalendars', () => ({
   useCalendars: () => ({ calendars: [], loading: false, reload: jest.fn() }),
 }))
+jest.mock('@/hooks/useUserPreferences', () => ({
+  useUserPreferences: () => ({ preferences: null, loading: false, updatePreferences: jest.fn() }),
+}))
+jest.mock('@/hooks/useHolidays', () => ({
+  useHolidays: () => [],
+}))
 jest.mock('@/lib/calendar', () => ({
   getEventsByMonth: jest.fn().mockResolvedValue([]),
   createCalendar: jest.fn(),

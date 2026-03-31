@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { useCalendars } from '@/hooks/useCalendars'
+import { useUserPreferences } from '@/hooks/useUserPreferences'
+import { useHolidays } from '@/hooks/useHolidays'
 import {
   getEventsByMonth,
   createCalendar,
@@ -32,11 +34,14 @@ export function CalendarTab() {
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
   const { calendars, loading: calLoading, reload: reloadCalendars } = useCalendars(familyId)
+  const { preferences } = useUserPreferences(user)
   const router = useRouter()
 
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+
+  const holidays = useHolidays(year, month, preferences?.holiday_countries ?? [])
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
 
@@ -245,6 +250,7 @@ export function CalendarTab() {
           events={events}
           calendars={calendars}
           activeIds={activeIds}
+          holidays={holidays}
           selectedDate={selectedDate}
           onSelectDate={(date) => {
             setSelectedDate((prev) =>
