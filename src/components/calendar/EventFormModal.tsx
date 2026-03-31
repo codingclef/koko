@@ -251,7 +251,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
               <input
                 type="date"
                 value={endDate}
-                onChange={handleEndDateChange}
+                onChange={(e) => handleEndDateChange(e.target.value)}
                 className={`w-full ${inputCls}${endShake ? ' shake' : ''}`}
               />
             ) : (
