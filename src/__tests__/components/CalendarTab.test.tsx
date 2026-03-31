@@ -64,7 +64,7 @@ jest.mock('@/components/calendar/CalendarFormModal', () => ({
 
 describe('CalendarTab — touch-action 스크롤 차단', () => {
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
-    const { container } = render(<CalendarTab />)
+    const { container } = render(<CalendarTab preferences={null} />)
     await act(async () => {})
 
     const wrapper = container.firstChild as HTMLElement

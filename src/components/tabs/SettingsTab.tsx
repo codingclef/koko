@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { LogOut, Share2, Check, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
-import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { supabase } from '@/lib/supabase'
+import type { UserPreferences } from '@/lib/preferences'
 
 const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'KR', label: '🇰🇷 한국' },
@@ -16,12 +16,13 @@ const SUPPORTED_HOLIDAY_COUNTRIES = [
 
 interface Props {
   onNavigateToTab: (tab: 'calendar' | 'shopping' | 'settings') => void
+  preferences: UserPreferences | null
+  updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
 }
 
-export function SettingsTab({ onNavigateToTab }: Props) {
+export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }: Props) {
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
-  const { preferences, updatePreferences } = useUserPreferences(user)
   const router = useRouter()
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)

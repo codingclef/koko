@@ -7,8 +7,8 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { useCalendars } from '@/hooks/useCalendars'
-import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { useHolidays } from '@/hooks/useHolidays'
+import type { UserPreferences } from '@/lib/preferences'
 import {
   getEventsByMonth,
   createCalendar,
@@ -30,11 +30,14 @@ import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
 import { supabase } from '@/lib/supabase'
 import type { Calendar } from '@/lib/calendar'
 
-export function CalendarTab() {
+interface Props {
+  preferences: UserPreferences | null
+}
+
+export function CalendarTab({ preferences }: Props) {
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
   const { calendars, loading: calLoading, reload: reloadCalendars } = useCalendars(familyId)
-  const { preferences } = useUserPreferences(user)
   const router = useRouter()
 
   const today = new Date()
