@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Bell } from 'lucide-react'
 import { REMINDER_OPTIONS, type Calendar, type CalendarEvent } from '@/lib/calendar'
 import { TimeWheelPicker } from './TimeWheelPicker'
@@ -90,6 +90,26 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
     new Set(initialReminderMinutes)
   )
   const [saving, setSaving] = useState(false)
+
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    const handler = () => {
+      if (!modalRef.current) return
+      const offsetY = vv.offsetTop ?? 0
+      modalRef.current.style.transform = `translateY(${offsetY}px)`
+    }
+
+    vv.addEventListener('resize', handler)
+    vv.addEventListener('scroll', handler)
+    return () => {
+      vv.removeEventListener('resize', handler)
+      vv.removeEventListener('scroll', handler)
+    }
+  }, [])
 
   const triggerShake = () => {
     setEndShake(false)
@@ -196,7 +216,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
   const dateBtnCls = 'relative overflow-hidden px-3 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-sm font-medium text-stone-700 dark:text-stone-200 text-left'
 
   return (
-    <div className={`fixed inset-0 z-[70] bg-white dark:bg-stone-900 flex flex-col ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
+    <div ref={modalRef} className={`fixed inset-0 z-[70] bg-white dark:bg-stone-900 flex flex-col ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800 shrink-0 pt-safe">
         <h2 className="text-base font-bold text-stone-800 dark:text-stone-100">
