@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { DEFAULT_THEME } from '@/lib/preferences'
+import { registerPushSubscription } from '@/lib/push'
 
 type Tab = 'calendar' | 'shopping' | 'settings'
 
@@ -24,6 +25,10 @@ export function TabsShell() {
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (user) registerPushSubscription(user.id).catch(() => {})
+  }, [user?.id])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', preferences?.app_theme ?? DEFAULT_THEME)

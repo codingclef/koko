@@ -324,27 +324,36 @@ export type Database = {
           },
         ]
       }
-      push_tokens: {
+      push_subscriptions: {
         Row: {
-          created_at: string
           id: string
-          platform: string
-          token: string
-          user_id: string
+          user_id: string | null
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+          updated_at: string
+          last_used_at: string | null
         }
         Insert: {
-          created_at?: string
           id?: string
-          platform: string
-          token: string
-          user_id: string
+          user_id?: string | null
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+          updated_at?: string
+          last_used_at?: string | null
         }
         Update: {
-          created_at?: string
           id?: string
-          platform?: string
-          token?: string
-          user_id?: string
+          user_id?: string | null
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string
+          updated_at?: string
+          last_used_at?: string | null
         }
         Relationships: []
       }
@@ -450,6 +459,15 @@ export type Database = {
       get_my_calendar_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      get_and_mark_due_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          reminder_id: string
+          event_title: string
+          event_start: string
+          family_id: string
+        }[]
       }
     }
     Enums: {
