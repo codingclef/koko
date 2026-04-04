@@ -19,8 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## ⚠️ Before Any Action — MANDATORY, NO EXCEPTIONS
 > These rules apply to EVERY task without exception. Skipping them is not allowed under any circumstances.
 
-1. **Before starting any task** (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking
-2. **Implementation begins ONLY after the user's explicit approval** — never start coding before receiving approval
+1. **Before starting any task** (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking. Keep re-explaining until the user explicitly confirms there is no problem — do not proceed after just one explanation.
+2. **No action of any kind begins before the user's explicit approval** — this includes reading files, investigating, executing commands, and writing code. Nothing starts until the user confirms.
 
 ## Development Rules
 1. When asking the user to run a command or tool, always include a Korean explanation
@@ -29,6 +29,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. Use GitHub Actions CI — tests must pass before merging
 5. Items requiring manual visual verification by the user must be listed as checkboxes in the PR (exclude automated test items)
 6. Before adding or modifying features, read PATTERNS.md first
+
+## Behavior Rules
+
+1. **Systematic Debugging** (`/superpowers:systematic-debugging`): When an error occurs, do not simply patch a single line of code. Instead, logically trace the root cause from a system-wide perspective and resolve it at its source.
+2. **Simplify** (`/simplify`): Write code as concisely and readably as possible. Avoid complex logic and always favor maintainability.
+3. **Verification Before Completion** (`/superpowers:verification-before-completion`): Before marking any task as done, self-verify that the code works correctly and is implemented as intended.
 
 ## Commands
 
