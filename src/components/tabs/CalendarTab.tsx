@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
-import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { useFamily } from '@/hooks/useFamily'
 import { useCalendars } from '@/hooks/useCalendars'
 import { useHolidays } from '@/hooks/useHolidays'
 import type { UserPreferences } from '@/lib/preferences'
+import type { AuthState } from '@/types/tabs'
 import {
   getEventsByMonth,
   createCalendar,
@@ -36,15 +34,12 @@ import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
 import { supabase } from '@/lib/supabase'
 import type { Calendar } from '@/lib/calendar'
 
-interface Props {
+interface Props extends AuthState {
   preferences: UserPreferences | null
 }
 
-export function CalendarTab({ preferences }: Props) {
-  const { user, loading: authLoading } = useAuth()
-  const { familyId, loading: familyLoading } = useFamily(user)
+export function CalendarTab({ preferences, user, familyId, isInitializing }: Props) {
   const { calendars, loading: calLoading, reload: reloadCalendars } = useCalendars(familyId)
-  const router = useRouter()
 
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -70,10 +65,6 @@ export function CalendarTab({ preferences }: Props) {
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
 
   const isModalOpen = selectedDate !== null || selectedEvent !== null || editingEvent !== null || calendarForm !== null
-
-  useEffect(() => {
-    if (!authLoading && !user) router.replace('/login')
-  }, [user, authLoading, router])
 
   useEffect(() => {
     if (!familyId) return
@@ -230,7 +221,7 @@ export function CalendarTab({ preferences }: Props) {
     setSelectedEvent(null)
   }
 
-  const loading = authLoading || familyLoading || calLoading
+  const loading = isInitializing || calLoading
 
   if (loading) {
     return (

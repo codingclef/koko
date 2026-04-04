@@ -1,13 +1,8 @@
 import { render, act } from '@testing-library/react'
+import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
-jest.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'user-1' }, loading: false }),
-}))
-jest.mock('@/hooks/useFamily', () => ({
-  useFamily: () => ({ familyId: 'fam-1', loading: false }),
-}))
 jest.mock('@/hooks/useCalendars', () => ({
   useCalendars: () => ({ calendars: [], loading: false, reload: jest.fn() }),
 }))
@@ -71,7 +66,14 @@ jest.mock('@/components/calendar/CalendarListSheet', () => ({
 
 describe('CalendarTab — touch-action 스크롤 차단', () => {
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
-    const { container } = render(<CalendarTab preferences={null} />)
+    const { container } = render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
     await act(async () => {})
 
     const wrapper = container.firstChild as HTMLElement

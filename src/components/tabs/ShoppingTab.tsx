@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react'
 import {
   DndContext,
@@ -12,8 +11,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
-import { useAuth } from '@/hooks/useAuth'
-import { useFamily } from '@/hooks/useFamily'
+import type { AuthState } from '@/types/tabs'
 import {
   getShoppingListsWithPreviews,
   createShoppingList,
@@ -26,21 +24,15 @@ import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { supabase } from '@/lib/supabase'
 import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
-export function ShoppingTab() {
-  const { user, loading: authLoading } = useAuth()
-  const { familyId, loading: familyLoading } = useFamily(user)
-  const router = useRouter()
+type Props = AuthState
 
-  useEffect(() => {
-    if (!authLoading && !user) router.replace('/login')
-  }, [user, authLoading, router])
-
+export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const [lists, setLists] = useState<ShoppingListWithPreview[]>([])
   const [fetchError, setFetchError] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  const loading = authLoading || familyLoading
+  const loading = isInitializing
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
