@@ -42,7 +42,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [savingName, setSavingName] = useState(false)
 
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(
-    () => ('Notification' in window ? Notification.permission : 'unsupported')
+    () => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported')
   )
   const [enablingNotif, setEnablingNotif] = useState(false)
 
