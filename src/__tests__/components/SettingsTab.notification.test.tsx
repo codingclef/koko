@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
+import { registerPushSubscription } from '@/lib/push'
 import type { User } from '@supabase/supabase-js'
 
 jest.mock('@/lib/supabase', () => ({
@@ -71,8 +72,6 @@ describe('SettingsTab 알림 섹션', () => {
   })
 
   it('"알림 허용하기" 버튼 클릭 시 registerPushSubscription이 호출된다', async () => {
-    const { registerPushSubscription } = require('@/lib/push')
-
     Object.defineProperty(window, 'Notification', {
       value: { permission: 'default', requestPermission: jest.fn().mockResolvedValue('granted') },
       configurable: true,
