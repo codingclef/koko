@@ -91,4 +91,32 @@ describe('POST /api/family/join', () => {
     const res = await POST(makeRequest({ userId: 'user-1', inviteCode: 'ABC123' }))
     expect(res.status).toBe(500)
   })
+
+  it('displayName이 제공되면 해당 이름으로 합류한다', async () => {
+    const insertChain = makeChain({ data: null, error: null })
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: { id: 'fam-1' }, error: null }))
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+      .mockReturnValueOnce(insertChain)
+
+    const res = await POST(makeRequest({ userId: 'user-1', inviteCode: 'ABC123', displayName: '엄마' }))
+    expect(res.status).toBe(200)
+    expect(insertChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ display_name: '엄마' })
+    )
+  })
+
+  it('displayName이 없으면 Member로 합류한다', async () => {
+    const insertChain = makeChain({ data: null, error: null })
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: { id: 'fam-1' }, error: null }))
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+      .mockReturnValueOnce(insertChain)
+
+    const res = await POST(makeRequest({ userId: 'user-1', inviteCode: 'ABC123' }))
+    expect(res.status).toBe(200)
+    expect(insertChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ display_name: 'Member' })
+    )
+  })
 })
