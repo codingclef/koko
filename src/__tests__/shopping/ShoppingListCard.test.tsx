@@ -2,8 +2,10 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import type { ShoppingList, ItemPreview } from '@/lib/shopping'
 
+const mockPush = jest.fn()
+
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }))
 
 jest.mock('@dnd-kit/sortable', () => ({
@@ -39,6 +41,10 @@ const mockPreviewItems: ItemPreview[] = [
 ]
 
 describe('ShoppingListCard', () => {
+  beforeEach(() => {
+    mockPush.mockClear()
+  })
+
   it('삭제 버튼 클릭 시 다이얼로그가 나타난다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
 
@@ -149,12 +155,10 @@ describe('ShoppingListCard', () => {
   })
 
   it('카드 본문에서 Enter 키 입력 시 라우터 push가 호출된다', () => {
-    const push = jest.fn()
-    jest.spyOn(require('next/navigation'), 'useRouter').mockReturnValue({ push })
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
     const cardBody = screen.getByLabelText('이마트 장바구니 열기')
     fireEvent.keyDown(cardBody, { key: 'Enter' })
-    expect(push).toHaveBeenCalledWith('/shopping/list-1')
+    expect(mockPush).toHaveBeenCalledWith('/shopping/list-1')
   })
 
   it('이름에서 Enter 키 입력 시 인라인 편집 입력창이 나타난다', () => {
