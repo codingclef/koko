@@ -5,6 +5,11 @@ export type ShoppingList = Database['public']['Tables']['shopping_lists']['Row']
 export type ShoppingItem = Database['public']['Tables']['shopping_items']['Row']
 export type ListType = 'strikethrough' | 'delete'
 
+export type ItemPreview = Pick<ShoppingItem, 'id' | 'name' | 'is_checked' | 'sort_order'>
+export type ShoppingListWithPreview = ShoppingList & { previewItems: ItemPreview[] }
+
+type RawListWithItems = ShoppingList & { shopping_items: ItemPreview[] }
+
 export async function getShoppingLists(familyId: string): Promise<ShoppingList[]> {
   const { data, error } = await supabase
     .from('shopping_lists')
@@ -15,6 +20,22 @@ export async function getShoppingLists(familyId: string): Promise<ShoppingList[]
 
   if (error) throw error
   return data ?? []
+}
+
+export async function getShoppingListsWithPreviews(familyId: string): Promise<ShoppingListWithPreview[]> {
+  const { data, error } = await supabase
+    .from('shopping_lists')
+    .select('*, shopping_items(id, name, is_checked, sort_order)')
+    .eq('family_id', familyId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  return ((data ?? []) as unknown as RawListWithItems[]).map(({ shopping_items, ...list }) => ({
+    ...list,
+    previewItems: (shopping_items ?? []).sort((a, b) => a.sort_order - b.sort_order),
+  }))
 }
 
 export async function createShoppingList(
