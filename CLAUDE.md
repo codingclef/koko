@@ -30,6 +30,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. Items requiring manual visual verification by the user must be listed as checkboxes in the PR (exclude automated test items)
 6. Before adding or modifying features, read PATTERNS.md first
 
+## Behavior Rules
+
+1. **Systematic Debugging** (`/superpowers:systematic-debugging`): When an error occurs, do not simply patch a single line of code. Instead, logically trace the root cause from a system-wide perspective and resolve it at its source.
+2. **Simplify** (`/simplify`): Write code as concisely and readably as possible. Avoid complex logic and always favor maintainability.
+3. **Verification Before Completion** (`/superpowers:verification-before-completion`): Before marking any task as done, self-verify that the code works correctly and is implemented as intended.
+
 ## Commands
 
 ```bash
