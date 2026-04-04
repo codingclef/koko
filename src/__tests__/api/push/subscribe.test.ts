@@ -7,8 +7,8 @@ import { NextRequest } from 'next/server'
 const mockUpsert: jest.Mock = jest.fn()
 const mockFrom: jest.Mock = jest.fn(() => ({ upsert: mockUpsert }))
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ from: (arg: unknown) => mockFrom(arg) }),
+jest.mock('@/lib/supabase-admin', () => ({
+  supabaseAdmin: { from: (arg: unknown) => mockFrom(arg) },
 }))
 
 function makeRequest(body: object) {

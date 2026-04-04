@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      allowed_emails: {
+        Row: {
+          email: string
+          created_at: string
+        }
+        Insert: {
+          email: string
+          created_at?: string
+        }
+        Update: {
+          email?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           user_id: string

@@ -6,29 +6,18 @@ import { NextRequest } from 'next/server'
 
 const mockSendNotification = jest.fn()
 
-jest.mock('web-push', () => ({
-  setVapidDetails: jest.fn(),
-  sendNotification: (...args: unknown[]) => mockSendNotification(...args),
+jest.mock('@/lib/webpush', () => ({
+  __esModule: true,
+  default: { sendNotification: (arg: unknown) => mockSendNotification(arg) },
 }))
 
-// Supabase mock: rpc, from().select().in(), from().update().in(), from().delete().in()
 let mockRpcResult: { data: unknown; error: unknown } = { data: [], error: null }
-let mockMembersResult: { data: unknown } = { data: [] }
-let mockSubsResult: { data: unknown } = { data: [] }
-
-const mockChain = {
-  select: jest.fn().mockReturnThis(),
-  in: jest.fn().mockReturnThis(),
-  eq: jest.fn().mockReturnThis(),
-  update: jest.fn().mockReturnThis(),
-  delete: jest.fn().mockReturnThis(),
-}
 
 const mockRpc: jest.Mock = jest.fn(() => Promise.resolve(mockRpcResult))
 const mockFrom: jest.Mock = jest.fn()
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ rpc: (arg: unknown) => mockRpc(arg), from: (arg: unknown) => mockFrom(arg) }),
+jest.mock('@/lib/supabase-admin', () => ({
+  supabaseAdmin: { rpc: (arg: unknown) => mockRpc(arg), from: (arg: unknown) => mockFrom(arg) },
 }))
 
 function makeRequest(secret = 'test-secret') {

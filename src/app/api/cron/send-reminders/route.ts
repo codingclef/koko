@@ -1,18 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import webpush from 'web-push'
-import type { Database } from '@/types/database'
-
-const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-webpush.setVapidDetails(
-  'mailto:koko@family.app',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import webpush from '@/lib/webpush'
 
 function formatReminderBody(eventStart: string): string {
   const d = new Date(eventStart)
@@ -66,8 +54,8 @@ export async function POST(req: NextRequest) {
   // 4. 각 리마인더를 가족 구성원 전체에게 발송
   await Promise.all(
     reminders.map(async (reminder) => {
-      const memberUserIds = usersByFamily.get(reminder.family_id) ?? []
-      const familySubs = subs.filter((s) => s.user_id && memberUserIds.includes(s.user_id))
+      const memberUserIds = new Set(usersByFamily.get(reminder.family_id) ?? [])
+      const familySubs = subs.filter((s) => s.user_id && memberUserIds.has(s.user_id))
       const payload = JSON.stringify({
         title: reminder.event_title,
         body: formatReminderBody(reminder.event_start),
