@@ -3,10 +3,15 @@
 import { Plus, X } from 'lucide-react'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 
-function formatTime(isoString: string, isAllDay: boolean): string {
+function formatHHMM(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function formatTimeRange(startAt: string, endAt: string | null, isAllDay: boolean): string {
   if (isAllDay) return '종일'
-  const d = new Date(isoString)
-  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const start = formatHHMM(startAt)
+  if (!endAt) return start
+  return `${start}~${formatHHMM(endAt)}`
 }
 
 function formatDate(date: Date): string {
@@ -87,10 +92,15 @@ export function DayEventsSheet({ date, events, calendars, onClose, onSelectEvent
                       <p className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
                         {evt.title}
                       </p>
-                      <p className="text-xs text-stone-400 mt-0.5">
-                        {formatTime(evt.start_at, evt.is_all_day)}
+                      <p className="text-xs text-stone-400 mt-0.5 tabular-nums">
+                        {formatTimeRange(evt.start_at, evt.end_at, evt.is_all_day)}
                         {cal && <span className="ml-2">{cal.name}</span>}
                       </p>
+                      {evt.description && (
+                        <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 line-clamp-2 leading-relaxed">
+                          {evt.description}
+                        </p>
+                      )}
                     </div>
                   </button>
                 )
