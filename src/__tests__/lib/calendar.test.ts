@@ -64,30 +64,42 @@ describe('getCalendars', () => {
 // ── createCalendar ────────────────────────────────────────
 
 describe('createCalendar', () => {
-  it('생성된 캘린더를 반환한다', async () => {
+  it('생성된 캘린더를 반환한다 (owner 먼저, members 따로)', async () => {
     const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
-    // calendars insert → single 반환, calendar_members insert 는 별도 체인
     mockFrom
-      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))  // calendars
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members
+      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))  // calendars insert
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members: owner
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members: members
     const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316', ['user-2'])
     expect(result).toEqual(mockCal)
     expect(mockFrom).toHaveBeenCalledWith('calendars')
     expect(mockFrom).toHaveBeenCalledWith('calendar_members')
+    // owner + members = calendar_members 2회 호출
+    expect(mockFrom.mock.calls.filter(([t]) => t === 'calendar_members')).toHaveLength(2)
   })
 
-  it('memberUserIds 없이도 동작한다 (owner만 등록)', async () => {
+  it('memberUserIds 없이도 동작한다 (owner만 등록, members insert 생략)', async () => {
+    const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))  // calendars insert
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members: owner only
+    const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316')
+    expect(result).toEqual(mockCal)
+    // owner만 = calendar_members 1회 호출
+    expect(mockFrom.mock.calls.filter(([t]) => t === 'calendar_members')).toHaveLength(1)
+  })
+
+  it('calendars insert error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValueOnce(makeChain({ data: null, error: { message: 'insert error' } }))
+    await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toEqual({ message: 'insert error' })
+  })
+
+  it('owner insert error가 있으면 throw한다', async () => {
     const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
     mockFrom
       .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))
-    const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316')
-    expect(result).toEqual(mockCal)
-  })
-
-  it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'insert error' } }))
-    await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toEqual({ message: 'insert error' })
+      .mockReturnValueOnce(makeChain({ data: null, error: { message: 'owner insert error' } }))
+    await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toEqual({ message: 'owner insert error' })
   })
 })
 
