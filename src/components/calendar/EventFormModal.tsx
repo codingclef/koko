@@ -1,8 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Bell } from 'lucide-react'
 import { REMINDER_OPTIONS, type Calendar, type CalendarEvent } from '@/lib/calendar'
+import { TimeWheelPicker } from './TimeWheelPicker'
+
+const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
+
+function formatDateWithDOW(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T00:00:00')
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}(${DOW_KR[d.getDay()]})`
+}
+
+function buildTime(h: number, m: number): string {
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
 
 function parseDate(isoString: string): string {
   const d = new Date(isoString)
@@ -71,10 +84,21 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
   })
 
   const [endShake, setEndShake] = useState(false)
+  const [activeTimePicker, setActiveTimePicker] = useState<'start' | 'end' | null>(null)
+  const [isClosing, setIsClosing] = useState(false)
   const [reminderMinutes, setReminderMinutes] = useState<Set<number>>(
     new Set(initialReminderMinutes)
   )
   const [saving, setSaving] = useState(false)
+
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      titleInputRef.current?.focus({ preventScroll: true })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   const triggerShake = () => {
     setEndShake(false)
@@ -84,12 +108,22 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
     setTimeout(() => setEndShake(false), 400)
   }
 
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => onClose(), 280)
+  }
+
   const toggleAllDay = (val: boolean) => {
     setIsAllDay(val)
     if (!val) {
       setStartTime('09:00')
       setEndTime('10:00')
     }
+    setActiveTimePicker(null)
+  }
+
+  const toggleTimePicker = (which: 'start' | 'end') => {
+    setActiveTimePicker((prev) => (prev === which ? null : which))
   }
 
   const handleEndDateChange = (value: string) => {
@@ -109,16 +143,21 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
     }
   }
 
-  const handleEndTimeChange = (value: string) => {
+  const handleStartTimeChange = (h: number, m: number) => {
+    setStartTime(buildTime(h, m))
+  }
+
+  const handleEndTimeChange = (h: number, m: number) => {
+    const newEndTime = buildTime(h, m)
     const start = new Date(`${startDate}T${startTime}`)
-    const end = new Date(`${endDate}T${value}`)
+    const end = new Date(`${endDate}T${newEndTime}`)
 
     if (end < start) {
       setEndDate(startDate)
       setEndTime(startTime)
       triggerShake()
     } else {
-      setEndTime(value)
+      setEndTime(newEndTime)
     }
   }
 
@@ -156,16 +195,23 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
     }
   }
 
-  const inputCls = 'px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm'
+  const timeBtnCls = (active: boolean) =>
+    `w-24 px-3 py-2.5 rounded-xl text-sm font-semibold text-center transition-colors shrink-0 ${
+      active
+        ? 'bg-orange-400 text-white'
+        : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200'
+    }`
+
+  const dateBtnCls = 'relative overflow-hidden px-3 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-sm font-medium text-stone-700 dark:text-stone-200 text-left'
 
   return (
-    <div className="fixed inset-0 z-[70] bg-white dark:bg-stone-900 flex flex-col pb-safe">
+    <div className={`fixed inset-0 z-[70] bg-white dark:bg-stone-900 flex flex-col ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800 shrink-0 pt-safe">
         <h2 className="text-base font-bold text-stone-800 dark:text-stone-100">
           {initial ? '일정 편집' : '새 일정'}
         </h2>
-        <button onClick={onClose} className="p-1 text-stone-400">
+        <button onClick={handleClose} className="p-1 text-stone-400">
           <X size={20} />
         </button>
       </div>
@@ -193,12 +239,12 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
 
         {/* 제목 */}
         <input
+          ref={titleInputRef}
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목"
           className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base"
-          autoFocus
         />
 
         {/* 종일 토글 */}
@@ -219,58 +265,68 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           {/* 시작 */}
           <div>
             <label className="text-xs text-stone-500 mb-1.5 block">시작</label>
-            {isAllDay ? (
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full ${inputCls}`}
-              />
-            ) : (
-              <div className="flex gap-2">
+            <div className="flex gap-2">
+              <div className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}>
+                <span className="relative z-10 pointer-events-none">{formatDateWithDOW(startDate)}</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className={`flex-1 ${inputCls}`}
-                />
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className={`w-28 ${inputCls}`}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                 />
               </div>
-            )}
+              {!isAllDay && (
+                <button
+                  onClick={() => toggleTimePicker('start')}
+                  className={timeBtnCls(activeTimePicker === 'start')}
+                >
+                  {startTime}
+                </button>
+              )}
+            </div>
           </div>
 
+          {/* 시작 시간 wheel picker */}
+          {!isAllDay && activeTimePicker === 'start' && (
+            <TimeWheelPicker
+              hours={parseInt(startTime.split(':')[0])}
+              minutes={parseInt(startTime.split(':')[1])}
+              onChange={handleStartTimeChange}
+            />
+          )}
+
           {/* 종료 */}
-          <div>
+          <div className={endShake ? 'shake' : ''}>
             <label className="text-xs text-stone-500 mb-1.5 block">종료</label>
-            {isAllDay ? (
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => handleEndDateChange(e.target.value)}
-                className={`w-full ${inputCls}${endShake ? ' shake' : ''}`}
-              />
-            ) : (
-              <div className={`flex gap-2${endShake ? ' shake' : ''}`}>
+            <div className="flex gap-2">
+              <div className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}>
+                <span className="relative z-10 pointer-events-none">{formatDateWithDOW(endDate)}</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => handleEndDateChange(e.target.value)}
-                  className={`flex-1 ${inputCls}`}
-                />
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => handleEndTimeChange(e.target.value)}
-                  className={`w-28 ${inputCls}`}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                 />
               </div>
-            )}
+              {!isAllDay && (
+                <button
+                  onClick={() => toggleTimePicker('end')}
+                  className={timeBtnCls(activeTimePicker === 'end')}
+                >
+                  {endTime}
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* 종료 시간 wheel picker */}
+          {!isAllDay && activeTimePicker === 'end' && (
+            <TimeWheelPicker
+              hours={parseInt(endTime.split(':')[0])}
+              minutes={parseInt(endTime.split(':')[1])}
+              onChange={handleEndTimeChange}
+            />
+          )}
         </div>
 
         {/* 메모 */}
@@ -310,7 +366,10 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
       </div>
 
       {/* 저장 버튼 */}
-      <div className="px-5 py-3 border-t border-stone-100 dark:border-stone-800 shrink-0">
+      <div
+        className="px-5 pt-3 border-t border-stone-100 dark:border-stone-800 shrink-0"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
         <button
           onClick={handleSave}
           disabled={!title.trim() || !startDate || saving}

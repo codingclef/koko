@@ -12,6 +12,32 @@ jest.mock('@/lib/calendar', () => ({
 jest.mock('@/lib/supabase', () => ({
   supabase: {},
 }))
+jest.mock('@/components/calendar/TimeWheelPicker', () => ({
+  TimeWheelPicker: ({
+    hours,
+    minutes,
+    onChange,
+  }: {
+    hours: number
+    minutes: number
+    onChange: (h: number, m: number) => void
+  }) => (
+    <div data-testid="time-wheel-picker">
+      <input
+        data-testid="wheel-hours"
+        type="number"
+        value={hours}
+        onChange={(e) => onChange(parseInt(e.target.value), minutes)}
+      />
+      <input
+        data-testid="wheel-minutes"
+        type="number"
+        value={minutes}
+        onChange={(e) => onChange(hours, parseInt(e.target.value))}
+      />
+    </div>
+  ),
+}))
 
 const calendars: Calendar[] = [
   { id: 'cal-1', family_id: 'fam-1', created_by: 'user-1', name: '가족', color: '#f97316', created_at: '', updated_at: '' },
@@ -43,19 +69,19 @@ describe('EventFormModal', () => {
   it('종일 모드에서 날짜 input만 렌더링된다', () => {
     render(<EventFormModal {...defaultProps} />)
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)
-    const timeInputs = screen.queryAllByDisplayValue(/\d{2}:\d{2}/)
     expect(dateInputs.length).toBeGreaterThan(0)
-    expect(timeInputs.length).toBe(0)
+    // 시간 wheel picker는 종일 모드에서 없어야 함
+    expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
   })
 
-  it('종일 해제 시 시간 input이 나타난다', () => {
+  it('종일 해제 시 시간 버튼이 나타난다', () => {
     render(<EventFormModal {...defaultProps} />)
-    // 종일 토글 버튼 클릭 (현재 isAllDay=true → false)
     const allToggle = document.querySelector('button.w-11') as HTMLElement
     fireEvent.click(allToggle)
 
-    const timeInputs = document.querySelectorAll('input[type="time"]')
-    expect(timeInputs.length).toBe(2) // 시작 + 종료
+    // 시간 버튼(HH:MM 형태)이 나타나야 함
+    expect(screen.getByText('09:00')).toBeInTheDocument()
+    expect(screen.getByText('10:00')).toBeInTheDocument()
   })
 
   it('제목 없으면 저장 버튼이 disabled다', () => {
@@ -124,24 +150,24 @@ describe('EventFormModal', () => {
     const allToggle = document.querySelector('button.w-11') as HTMLElement
     fireEvent.click(allToggle)
 
-    // 시작 시간을 14:00으로 변경
-    const timeInputs = document.querySelectorAll('input[type="time"]')
-    const startTimeInput = timeInputs[0] as HTMLInputElement
-    fireEvent.change(startTimeInput, { target: { value: '14:00' } })
+    // 종료 시간 picker 열기
+    fireEvent.click(screen.getByText('10:00'))
 
-    // 종료 시간을 08:00으로 설정 (시작보다 이름)
-    const endTimeInput = timeInputs[1] as HTMLInputElement
-    fireEvent.change(endTimeInput, { target: { value: '08:00' } })
+    // 종료 시간을 08:00으로 설정 (시작 09:00보다 이름)
+    const hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '8' } })
 
-    // 종료 시간이 시작 시간(14:00)으로 복귀되어야 함
-    expect(endTimeInput.value).toBe('14:00')
+    // 종료 시간이 시작 시간(09:00)으로 복귀 → wheel hours 값이 9가 되어야 함
+    expect(hoursInput.value).toBe('9')
   })
 
-  it('X 버튼 클릭 시 onClose가 호출된다', () => {
+  it('X 버튼 클릭 시 애니메이션 후 onClose가 호출된다', () => {
     render(<EventFormModal {...defaultProps} />)
-    // 헤더의 닫기 버튼 (p-1 text-stone-400 클래스)
     const closeButton = document.querySelector('button.p-1.text-stone-400') as HTMLElement
     fireEvent.click(closeButton)
+    act(() => {
+      jest.advanceTimersByTime(300)
+    })
     expect(defaultProps.onClose).toHaveBeenCalled()
   })
 
@@ -161,5 +187,28 @@ describe('EventFormModal', () => {
     }
     render(<EventFormModal {...defaultProps} initial={initial} />)
     expect(screen.getByText('일정 편집')).toBeInTheDocument()
+  })
+
+  it('날짜 버튼에 요일이 표시된다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    // 2026-03-31은 화요일
+    expect(screen.getAllByText(/2026\/03\/31\(화\)/).length).toBeGreaterThan(0)
+  })
+
+  it('시간 버튼 클릭 시 wheel picker가 나타난다', () => {
+    render(<EventFormModal {...defaultProps} />)
+    // 종일 해제
+    const allToggle = document.querySelector('button.w-11') as HTMLElement
+    fireEvent.click(allToggle)
+
+    expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
+
+    // 시작 시간 버튼 클릭
+    fireEvent.click(screen.getByText('09:00'))
+    expect(screen.getByTestId('time-wheel-picker')).toBeInTheDocument()
+
+    // 다시 클릭하면 닫힘
+    fireEvent.click(screen.getByText('09:00'))
+    expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
   })
 })
