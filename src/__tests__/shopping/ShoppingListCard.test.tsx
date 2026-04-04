@@ -113,9 +113,10 @@ describe('ShoppingListCard', () => {
     expect(screen.getByLabelText('드래그 핸들')).toBeInTheDocument()
   })
 
-  it('previewItems가 없으면 미리보기 영역이 렌더링되지 않는다', () => {
+  it('previewItems가 없으면 빈 상태 텍스트가 렌더링된다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
-    expect(screen.queryByText('· 우유')).not.toBeInTheDocument()
+    expect(screen.getByText('아이템 없음')).toBeInTheDocument()
+    expect(screen.queryByText('우유')).not.toBeInTheDocument()
   })
 
   it('previewItems 3개까지 렌더링된다', () => {
@@ -127,10 +128,10 @@ describe('ShoppingListCard', () => {
         onRename={jest.fn()}
       />
     )
-    expect(screen.getByText('· 우유')).toBeInTheDocument()
-    expect(screen.getByText('· 계란')).toBeInTheDocument()
-    expect(screen.getByText('· 식빵')).toBeInTheDocument()
-    expect(screen.queryByText('· 버터')).not.toBeInTheDocument()
+    expect(screen.getByText('우유')).toBeInTheDocument()
+    expect(screen.getByText('계란')).toBeInTheDocument()
+    expect(screen.getByText('식빵')).toBeInTheDocument()
+    expect(screen.queryByText('버터')).not.toBeInTheDocument()
     expect(screen.getByText('+1개 더')).toBeInTheDocument()
   })
 
@@ -143,8 +144,8 @@ describe('ShoppingListCard', () => {
         onRename={jest.fn()}
       />
     )
-    expect(screen.getByText('· 우유')).toBeInTheDocument()
-    expect(screen.getByText('· 계란')).toBeInTheDocument()
+    expect(screen.getByText('우유')).toBeInTheDocument()
+    expect(screen.getByText('계란')).toBeInTheDocument()
     expect(screen.queryByText(/개 더/)).not.toBeInTheDocument()
   })
 

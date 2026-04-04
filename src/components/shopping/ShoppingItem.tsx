@@ -141,7 +141,7 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, drag
       {confirming && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirming(false)} />
-          <div className="relative bg-white dark:bg-stone-900 rounded-2xl w-full sm:max-w-xs p-6 shadow-xl">
+          <div className="relative bg-stone-50 dark:bg-stone-900 rounded-2xl w-full sm:max-w-xs p-6 shadow-xl">
             <p className="font-semibold text-stone-800 dark:text-stone-100 mb-1">아이템 삭제</p>
             <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
               &ldquo;{item.name}&rdquo;을(를) 삭제할까요?

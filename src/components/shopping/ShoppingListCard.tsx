@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, Trash2, CheckSquare, GripVertical, X } from 'lucide-react'
+import { ShoppingCart, Trash2, GripVertical } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { ShoppingList, ItemPreview } from '@/lib/shopping'
@@ -116,23 +116,60 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
       <div
         ref={setNodeRef}
         style={style}
-        className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-orange-200 dark:hover:border-orange-900 transition-all min-h-[160px]"
+        tabIndex={confirming || editing ? -1 : 0}
+        aria-label={`${list.name} 장바구니 열기`}
+        onClick={() => !confirming && !editing && router.push(`/shopping/${list.id}`)}
+        onKeyDown={handleCardKeyDown}
+        className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-orange-200 dark:hover:border-orange-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-1"
       >
-        {/* Top row: grip + delete */}
-        <div className="flex items-center justify-between mb-2.5">
+        {/* Header row: grip + cart icon + name + delete */}
+        <div className="flex items-center gap-2 mb-3">
           <button
             {...attributes}
             {...listeners}
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-stone-300 dark:text-stone-600 touch-none cursor-grab active:cursor-grabbing"
+            className="flex-shrink-0 p-2 -ml-1 text-stone-300 dark:text-stone-600 touch-none cursor-grab active:cursor-grabbing"
             aria-label="드래그 핸들"
             onClick={(e) => e.stopPropagation()}
           >
             <GripVertical size={14} />
           </button>
+
+          <div className="p-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-400 flex-shrink-0">
+            <ShoppingCart size={15} />
+          </div>
+
+          <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+            {editing ? (
+              <input
+                autoFocus
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onFocus={(e) => {
+                  const len = e.target.value.length
+                  e.target.setSelectionRange(len, len)
+                }}
+                onBlur={commitEdit}
+                onKeyDown={handleInputKeyDown}
+                className="w-full font-semibold text-sm text-stone-800 dark:text-stone-100 bg-transparent border-b border-orange-400 outline-none"
+                aria-label="목록 이름 수정"
+              />
+            ) : (
+              <p
+                role="button"
+                tabIndex={0}
+                className="font-semibold text-sm text-stone-800 dark:text-stone-100 truncate leading-snug outline-none focus-visible:underline"
+                onClick={handleNameClick}
+                onKeyDown={handleNameKeyDown}
+              >
+                {list.name}
+              </p>
+            )}
+          </div>
+
           {!editing && (
             <button
               onClick={handleDeleteClick}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
+              className="flex-shrink-0 p-2 -mr-1 rounded-lg text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
               aria-label="삭제"
             >
               <Trash2 size={14} />
@@ -140,79 +177,31 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
           )}
         </div>
 
-        {/* Card body — clickable for navigation */}
-        <div
-          tabIndex={confirming || editing ? -1 : 0}
-          aria-label={`${list.name} 장바구니 열기`}
-          onClick={() => !confirming && !editing && router.push(`/shopping/${list.id}`)}
-          onKeyDown={handleCardKeyDown}
-          className="flex flex-col flex-1 cursor-pointer active:scale-[0.98] transition-transform outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-1 rounded-xl"
-        >
-          {/* Icon + name */}
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="p-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-400 flex-shrink-0">
-              <ShoppingCart size={15} />
-            </div>
-            <div className="flex-1 min-w-0">
-              {editing ? (
-                <input
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onFocus={(e) => {
-                    const len = e.target.value.length
-                    e.target.setSelectionRange(len, len)
-                  }}
-                  onBlur={commitEdit}
-                  onKeyDown={handleInputKeyDown}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-full font-semibold text-sm text-stone-800 dark:text-stone-100 bg-transparent border-b border-orange-400 outline-none"
-                  aria-label="목록 이름 수정"
-                />
-              ) : (
-                <p
-                  role="button"
-                  tabIndex={0}
-                  className="font-semibold text-sm text-stone-800 dark:text-stone-100 truncate leading-snug outline-none focus-visible:underline"
-                  onClick={handleNameClick}
-                  onKeyDown={handleNameKeyDown}
-                >
-                  {list.name}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Type indicator */}
-          <p className="text-[11px] text-stone-400 dark:text-stone-500 flex items-center gap-1 mb-2.5 pl-0.5">
-            {list.type === 'strikethrough' ? (
-              <><CheckSquare size={9} />취소선 방식</>
-            ) : (
-              <><X size={9} />삭제 방식</>
-            )}
-          </p>
-
-          {/* Preview items */}
-          {visibleItems.length > 0 && (
-            <div className="border-t border-stone-100 dark:border-stone-800 pt-2 space-y-1">
+        {/* Preview items — divider always at same position (no mt-auto) */}
+        <div className="border-t border-stone-100 dark:border-stone-800 pt-2 space-y-1">
+          {visibleItems.length > 0 ? (
+            <>
               {visibleItems.map((item) => (
                 <p
                   key={item.id}
-                  className={`text-[11px] truncate ${
+                  className={`text-[11px] truncate flex items-center gap-1.5 ${
                     item.is_checked
                       ? 'line-through text-stone-300 dark:text-stone-600'
                       : 'text-stone-500 dark:text-stone-400'
                   }`}
                 >
-                  · {item.name}
+                  <span className={`w-1 h-1 rounded-full flex-shrink-0 ${item.is_checked ? 'bg-stone-300 dark:bg-stone-600' : 'bg-stone-400 dark:bg-stone-500'}`} />
+                  {item.name}
                 </p>
               ))}
               {hiddenCount > 0 && (
-                <p className="text-[11px] text-stone-400 dark:text-stone-500">
+                <p className="text-[11px] text-stone-400 dark:text-stone-500 pl-2.5">
                   +{hiddenCount}개 더
                 </p>
               )}
-            </div>
+            </>
+          ) : (
+            <p className="text-[11px] text-stone-300 dark:text-stone-600 italic">아이템 없음</p>
           )}
         </div>
       </div>
