@@ -141,4 +141,42 @@ describe('ShoppingListCard', () => {
     expect(screen.getByText('· 계란')).toBeInTheDocument()
     expect(screen.queryByText(/개 더/)).not.toBeInTheDocument()
   })
+
+  it('카드 본문이 키보드로 접근 가능하다 (tabIndex=0)', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    const cardBody = screen.getByLabelText('이마트 장바구니 열기')
+    expect(cardBody).toHaveAttribute('tabindex', '0')
+  })
+
+  it('카드 본문에서 Enter 키 입력 시 라우터 push가 호출된다', () => {
+    const push = jest.fn()
+    jest.spyOn(require('next/navigation'), 'useRouter').mockReturnValue({ push })
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    const cardBody = screen.getByLabelText('이마트 장바구니 열기')
+    fireEvent.keyDown(cardBody, { key: 'Enter' })
+    expect(push).toHaveBeenCalledWith('/shopping/list-1')
+  })
+
+  it('이름에서 Enter 키 입력 시 인라인 편집 입력창이 나타난다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    const nameBtn = screen.getByRole('button', { name: '이마트' })
+    fireEvent.keyDown(nameBtn, { key: 'Enter' })
+    expect(screen.getByLabelText('목록 이름 수정')).toBeInTheDocument()
+  })
+
+  it('삭제 모달이 role="dialog"와 aria-modal 속성을 가진다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByLabelText('삭제'))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('모달에서 Escape 키 입력 시 모달이 닫힌다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByLabelText('삭제'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })

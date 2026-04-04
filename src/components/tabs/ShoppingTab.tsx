@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -151,20 +151,20 @@ export function ShoppingTab() {
 
       {fetchError ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="text-5xl mb-4">⚠️</div>
+          <AlertTriangle size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
           <p className="text-stone-500 dark:text-stone-400 font-medium">목록을 불러오지 못했어요</p>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">잠시 후 다시 시도해주세요</p>
         </div>
       ) : lists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="text-5xl mb-4">🛍️</div>
+          <ShoppingCart size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
           <p className="text-stone-500 dark:text-stone-400 font-medium">아직 장바구니가 없어요</p>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 + 버튼을 눌러보세요</p>
         </div>
       ) : (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <SortableContext items={lists.map((l) => l.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {lists.map((list) => (
                 <ShoppingListCard
                   key={list.id}
