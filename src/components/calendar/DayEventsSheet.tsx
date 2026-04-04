@@ -52,12 +52,12 @@ export function DayEventsSheet({ date, events, calendars, onClose, onSelectEvent
           <div className="flex items-center gap-2">
             <button
               onClick={onAddEvent}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-orange-400 text-white text-xs font-semibold"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 text-xs font-semibold hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
             >
               <Plus size={13} />
               일정 추가
             </button>
-            <button onClick={onClose} className="p-1 text-stone-400">
+            <button onClick={onClose} className="p-2 text-stone-400">
               <X size={18} />
             </button>
           </div>
@@ -77,7 +77,7 @@ export function DayEventsSheet({ date, events, calendars, onClose, onSelectEvent
                   <button
                     key={evt.id}
                     onClick={() => onSelectEvent(evt)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-750 text-left transition-colors"
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-left transition-colors"
                   >
                     <div
                       className="w-1 self-stretch rounded-full shrink-0"
