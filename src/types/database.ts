@@ -67,6 +67,35 @@ export type Database = {
           },
         ]
       }
+      calendar_members: {
+        Row: {
+          calendar_id: string
+          user_id: string
+          role: 'owner' | 'member'
+          created_at: string
+        }
+        Insert: {
+          calendar_id: string
+          user_id: string
+          role?: 'owner' | 'member'
+          created_at?: string
+        }
+        Update: {
+          calendar_id?: string
+          user_id?: string
+          role?: 'owner' | 'member'
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_members_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "calendars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendars: {
         Row: {
           id: string
@@ -412,6 +441,10 @@ export type Database = {
         Returns: string[]
       }
       get_my_list_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      get_my_calendar_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }

@@ -2,8 +2,10 @@ import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 
 export type Calendar = Database['public']['Tables']['calendars']['Row']
+export type CalendarMember = Database['public']['Tables']['calendar_members']['Row']
 export type CalendarEvent = Database['public']['Tables']['events']['Row']
 export type EventReminder = Database['public']['Tables']['event_reminders']['Row']
+export type FamilyMember = Database['public']['Tables']['family_members']['Row']
 
 export const CALENDAR_COLORS = [
   '#f97316', // orange
@@ -27,6 +29,18 @@ export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [
   { label: '1주 전', minutes: 10080 },
 ]
 
+// ── Family Members ─────────────────────────────────────────
+
+export async function getFamilyMembers(familyId: string): Promise<FamilyMember[]> {
+  const { data, error } = await supabase
+    .from('family_members')
+    .select('*')
+    .eq('family_id', familyId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 // ── Calendars ──────────────────────────────────────────────
 
 export async function getCalendars(familyId: string): Promise<Calendar[]> {
@@ -43,7 +57,8 @@ export async function createCalendar(
   familyId: string,
   userId: string,
   name: string,
-  color: string
+  color: string,
+  memberUserIds: string[] = []
 ): Promise<Calendar> {
   const { data, error } = await supabase
     .from('calendars')
@@ -51,6 +66,17 @@ export async function createCalendar(
     .select()
     .single()
   if (error) throw error
+
+  // 생성자는 항상 owner, 선택된 멤버는 member로 등록
+  const members = [
+    { calendar_id: data.id, user_id: userId, role: 'owner' as const },
+    ...memberUserIds
+      .filter((id) => id !== userId)
+      .map((id) => ({ calendar_id: data.id, user_id: id, role: 'member' as const })),
+  ]
+  const { error: memberError } = await supabase.from('calendar_members').insert(members)
+  if (memberError) throw memberError
+
   return data
 }
 
@@ -67,6 +93,56 @@ export async function updateCalendar(
 
 export async function deleteCalendar(calendarId: string): Promise<void> {
   const { error } = await supabase.from('calendars').delete().eq('id', calendarId)
+  if (error) throw error
+}
+
+// ── Calendar Members ───────────────────────────────────────
+
+export async function getCalendarMembers(calendarId: string): Promise<CalendarMember[]> {
+  const { data, error } = await supabase
+    .from('calendar_members')
+    .select('*')
+    .eq('calendar_id', calendarId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/** 여러 캘린더의 멤버를 한 번에 조회 */
+export async function getCalendarMembersForCalendars(
+  calendarIds: string[]
+): Promise<CalendarMember[]> {
+  if (calendarIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('calendar_members')
+    .select('*')
+    .in('calendar_id', calendarIds)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/** 캘린더 멤버 목록을 일괄 교체 (owner는 항상 유지) */
+export async function setCalendarMembers(
+  calendarId: string,
+  ownerUserId: string,
+  memberUserIds: string[]
+): Promise<void> {
+  // owner 제외한 기존 멤버 전체 삭제
+  const { error: delError } = await supabase
+    .from('calendar_members')
+    .delete()
+    .eq('calendar_id', calendarId)
+    .neq('user_id', ownerUserId)
+  if (delError) throw delError
+
+  const newMembers = memberUserIds
+    .filter((id) => id !== ownerUserId)
+    .map((id) => ({ calendar_id: calendarId, user_id: id, role: 'member' as const }))
+
+  if (newMembers.length === 0) return
+
+  const { error } = await supabase.from('calendar_members').insert(newMembers)
   if (error) throw error
 }
 

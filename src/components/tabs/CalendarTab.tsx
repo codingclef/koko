@@ -14,15 +14,21 @@ import {
   createCalendar,
   updateCalendar,
   deleteCalendar,
+  getCalendarMembers,
+  setCalendarMembers,
+  getFamilyMembers,
   createEvent,
   updateEvent,
   deleteEvent,
   getReminders,
   setReminders,
   type CalendarEvent,
+  type FamilyMember,
+  type CalendarMember,
 } from '@/lib/calendar'
 import { CalendarFilter } from '@/components/calendar/CalendarFilter'
 import { CalendarGrid } from '@/components/calendar/CalendarGrid'
+import { CalendarListSheet } from '@/components/calendar/CalendarListSheet'
 import { DayEventsSheet } from '@/components/calendar/DayEventsSheet'
 import { EventDetailSheet } from '@/components/calendar/EventDetailSheet'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
@@ -53,6 +59,10 @@ export function CalendarTab({ preferences }: Props) {
   const [editingEvent, setEditingEvent] = useState<{ event?: CalendarEvent; date?: Date } | null>(null)
   const [calendarForm, setCalendarForm] = useState<{ calendar?: Calendar } | null>(null)
 
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
+  const [calendarMemberIds, setCalendarMemberIds] = useState<string[]>([])
+  const [showCalendarList, setShowCalendarList] = useState(false)
+
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -64,6 +74,13 @@ export function CalendarTab({ preferences }: Props) {
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (!familyId) return
+    getFamilyMembers(familyId)
+      .then(setFamilyMembers)
+      .catch((e) => console.error('[CalendarTab] getFamilyMembers failed:', e))
+  }, [familyId])
 
 
   const loadEvents = useCallback(() => {
@@ -128,12 +145,23 @@ export function CalendarTab({ preferences }: Props) {
     })
   }
 
-  const handleCalendarSave = async (name: string, color: string) => {
+  const openCalendarForm = async (calendar?: Calendar) => {
+    if (calendar) {
+      const members = await getCalendarMembers(calendar.id)
+      setCalendarMemberIds(members.map((m) => m.user_id))
+    } else {
+      setCalendarMemberIds([])
+    }
+    setCalendarForm(calendar ? { calendar } : {})
+  }
+
+  const handleCalendarSave = async (name: string, color: string, memberUserIds: string[]) => {
     if (!familyId || !user) return
     if (calendarForm?.calendar) {
       await updateCalendar(calendarForm.calendar.id, { name, color })
+      await setCalendarMembers(calendarForm.calendar.id, user.id, memberUserIds)
     } else {
-      await createCalendar(familyId, user.id, name, color)
+      await createCalendar(familyId, user.id, name, color, memberUserIds)
     }
     reloadCalendars()
   }
@@ -234,13 +262,31 @@ export function CalendarTab({ preferences }: Props) {
           </button>
         </div>
 
-        <CalendarFilter
-          calendars={calendars}
-          activeIds={activeIds}
-          onToggle={toggleCalendar}
-          onAdd={() => setCalendarForm({})}
-          onEdit={(cal) => setCalendarForm({ calendar: cal })}
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <CalendarFilter
+              calendars={calendars}
+              activeIds={activeIds}
+              onToggle={toggleCalendar}
+              onAdd={() => openCalendarForm()}
+              onEdit={(cal) => openCalendarForm(cal)}
+            />
+          </div>
+          <button
+            onClick={() => setShowCalendarList(true)}
+            className="shrink-0 p-1.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+            aria-label="캘린더 리스트"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div
@@ -302,9 +348,22 @@ export function CalendarTab({ preferences }: Props) {
         />
       )}
 
-      {calendarForm !== null && (
+      {showCalendarList && (
+        <CalendarListSheet
+          calendars={calendars}
+          familyMembers={familyMembers}
+          onClose={() => setShowCalendarList(false)}
+          onAdd={() => { setShowCalendarList(false); openCalendarForm() }}
+          onEdit={(cal) => { setShowCalendarList(false); openCalendarForm(cal) }}
+        />
+      )}
+
+      {calendarForm !== null && user && (
         <CalendarFormModal
           initial={calendarForm.calendar}
+          initialMemberIds={calendarForm.calendar ? calendarMemberIds : undefined}
+          familyMembers={familyMembers}
+          currentUserId={user.id}
           onClose={() => setCalendarForm(null)}
           onSave={handleCalendarSave}
           onDelete={calendarForm.calendar ? handleCalendarDelete : undefined}
