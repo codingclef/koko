@@ -8,7 +8,7 @@ const supabaseAdmin = createClient<Database>(
 )
 
 export async function POST(req: NextRequest) {
-  const { userId, inviteCode } = await req.json()
+  const { userId, inviteCode, displayName } = await req.json()
 
   if (!userId || !inviteCode) {
     return NextResponse.json({ error: 'userId and inviteCode are required' }, { status: 400 })
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabaseAdmin.from('family_members').insert({
     family_id: family.id,
     user_id: userId,
-    display_name: 'Member',
+    display_name: displayName?.trim() || 'Member',
     role: 'member',
   })
 

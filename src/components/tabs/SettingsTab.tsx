@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Share2, Check, Users } from 'lucide-react'
+import { LogOut, Share2, Check, Users, Pencil, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { supabase } from '@/lib/supabase'
+import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 import type { UserPreferences } from '@/lib/preferences'
 
 const SUPPORTED_HOLIDAY_COUNTRIES = [
@@ -24,11 +25,21 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
   const router = useRouter()
+
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  // 합류 폼
   const [joinCode, setJoinCode] = useState('')
+  const [joinDisplayName, setJoinDisplayName] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState<string | null>(null)
+
+  // 내 이름 편집
+  const [myDisplayName, setMyDisplayName] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [savingName, setSavingName] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -45,6 +56,13 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
       .single()
       .then(({ data }) => setInviteCode(data?.invite_code ?? null))
   }, [familyId])
+
+  useEffect(() => {
+    if (!user) return
+    getMyFamilyMember(user.id)
+      .then((m) => setMyDisplayName(m?.display_name ?? null))
+      .catch((e) => console.error('[SettingsTab] getMyFamilyMember failed:', e))
+  }, [user])
 
   const handleShare = async () => {
     if (!inviteCode) return
@@ -71,7 +89,11 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
     const res = await fetch('/api/family/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, inviteCode: joinCode.trim() }),
+      body: JSON.stringify({
+        userId: user.id,
+        inviteCode: joinCode.trim(),
+        displayName: joinDisplayName.trim() || undefined,
+      }),
     })
 
     if (!res.ok) {
@@ -81,6 +103,25 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
       onNavigateToTab('shopping')
     }
     setJoining(false)
+  }
+
+  const handleStartEditName = () => {
+    setNameInput(myDisplayName ?? '')
+    setEditingName(true)
+  }
+
+  const handleSaveName = async () => {
+    if (!user || !nameInput.trim()) return
+    setSavingName(true)
+    try {
+      await updateMyDisplayName(user.id, nameInput.trim())
+      setMyDisplayName(nameInput.trim())
+      setEditingName(false)
+    } catch (e) {
+      console.error('[SettingsTab] updateMyDisplayName failed:', e)
+    } finally {
+      setSavingName(false)
+    }
   }
 
   const handleLogout = async () => {
@@ -100,11 +141,55 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
     <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
       <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-6">설정</h1>
 
+      {/* 계정 */}
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
         <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-2">계정</p>
         <p className="text-sm text-stone-700 dark:text-stone-300">{user?.email}</p>
       </div>
 
+      {/* 내 이름 */}
+      {myDisplayName !== null && (
+        <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+          <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">내 이름</p>
+          {editingName ? (
+            <div className="flex gap-2">
+              <input
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="이름 입력"
+                maxLength={20}
+                autoFocus
+                className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={savingName || !nameInput.trim()}
+                className="px-4 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+              >
+                저장
+              </button>
+              <button
+                onClick={() => setEditingName(false)}
+                className="p-2 rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{myDisplayName}</p>
+              <button
+                onClick={handleStartEditName}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              >
+                <Pencil size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 우리 가족 초대 코드 */}
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
         <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">우리 가족 초대 코드</p>
         <div className="flex items-center gap-3">
@@ -122,31 +207,42 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
         <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">버튼을 눌러 카카오톡, 문자 등으로 공유하세요</p>
       </div>
 
+      {/* 가족 합류 */}
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
         <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
           <Users size={12} className="inline mr-1" />
           가족 합류
         </p>
-        <div className="flex gap-2">
+        <div className="space-y-2">
           <input
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="초대 코드 입력"
-            maxLength={6}
-            className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            value={joinDisplayName}
+            onChange={(e) => setJoinDisplayName(e.target.value)}
+            placeholder="내 이름 (예: 엄마, 홍길동)"
+            maxLength={20}
+            className="w-full px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
           />
-          <button
-            onClick={handleJoin}
-            disabled={joining || joinCode.length < 6}
-            className="px-4 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
-          >
-            {joining ? '합류 중...' : '합류'}
-          </button>
+          <div className="flex gap-2">
+            <input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="초대 코드 입력"
+              maxLength={6}
+              className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+            <button
+              onClick={handleJoin}
+              disabled={joining || joinCode.length < 6}
+              className="px-4 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+            >
+              {joining ? '합류 중...' : '합류'}
+            </button>
+          </div>
         </div>
         {joinError && <p className="text-xs text-red-400 mt-2">{joinError}</p>}
         <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">합류하면 현재 내 가족에서 나가고 새 가족으로 이동합니다</p>
       </div>
 
+      {/* 휴일 표시 */}
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
         <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
           휴일 표시
