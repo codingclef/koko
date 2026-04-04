@@ -3,6 +3,10 @@ import {
   createCalendar,
   updateCalendar,
   deleteCalendar,
+  getCalendarMembers,
+  getCalendarMembersForCalendars,
+  setCalendarMembers,
+  getFamilyMembers,
   getEventsByMonth,
   createEvent,
   updateEvent,
@@ -14,7 +18,7 @@ import {
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
   const chain: Record<string, unknown> = {}
-  ;['select', 'insert', 'update', 'delete', 'eq', 'gte', 'lte', 'order'].forEach((m) => {
+  ;['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'gte', 'lte', 'order'].forEach((m) => {
     chain[m] = jest.fn().mockReturnValue(chain)
   })
   chain.single = jest.fn().mockReturnValue(p)
@@ -62,15 +66,118 @@ describe('getCalendars', () => {
 describe('createCalendar', () => {
   it('생성된 캘린더를 반환한다', async () => {
     const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
-    mockFrom.mockReturnValue(makeChain({ data: mockCal, error: null }))
-    const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316')
+    // calendars insert → single 반환, calendar_members insert 는 별도 체인
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))  // calendars
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members
+    const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316', ['user-2'])
     expect(result).toEqual(mockCal)
     expect(mockFrom).toHaveBeenCalledWith('calendars')
+    expect(mockFrom).toHaveBeenCalledWith('calendar_members')
+  })
+
+  it('memberUserIds 없이도 동작한다 (owner만 등록)', async () => {
+    const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+    const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316')
+    expect(result).toEqual(mockCal)
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'insert error' } }))
     await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toEqual({ message: 'insert error' })
+  })
+})
+
+// ── getCalendarMembers ────────────────────────────────────
+
+describe('getCalendarMembers', () => {
+  it('캘린더 멤버 목록을 반환한다', async () => {
+    const mockData = [{ calendar_id: 'cal-1', user_id: 'user-1', role: 'owner' }]
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getCalendarMembers('cal-1')
+    expect(result).toEqual(mockData)
+    expect(mockFrom).toHaveBeenCalledWith('calendar_members')
+  })
+
+  it('data가 null이면 빈 배열을 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+    expect(await getCalendarMembers('cal-1')).toEqual([])
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
+    await expect(getCalendarMembers('cal-1')).rejects.toEqual({ message: 'fetch error' })
+  })
+})
+
+// ── getCalendarMembersForCalendars ────────────────────────
+
+describe('getCalendarMembersForCalendars', () => {
+  it('빈 배열이면 쿼리 없이 빈 배열을 반환한다', async () => {
+    const result = await getCalendarMembersForCalendars([])
+    expect(result).toEqual([])
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('여러 캘린더 멤버를 반환한다', async () => {
+    const mockData = [
+      { calendar_id: 'cal-1', user_id: 'user-1', role: 'owner' },
+      { calendar_id: 'cal-2', user_id: 'user-2', role: 'member' },
+    ]
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getCalendarMembersForCalendars(['cal-1', 'cal-2'])
+    expect(result).toEqual(mockData)
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
+    await expect(getCalendarMembersForCalendars(['cal-1'])).rejects.toEqual({ message: 'fetch error' })
+  })
+})
+
+// ── setCalendarMembers ────────────────────────────────────
+
+describe('setCalendarMembers', () => {
+  it('owner 제외 기존 멤버 삭제 후 새 멤버를 등록한다', async () => {
+    mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
+    await setCalendarMembers('cal-1', 'owner-1', ['user-2', 'user-3'])
+    expect(mockFrom).toHaveBeenCalledWith('calendar_members')
+  })
+
+  it('새 멤버가 없으면 삭제만 한다', async () => {
+    mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
+    await setCalendarMembers('cal-1', 'owner-1', [])
+    expect(mockFrom).toHaveBeenCalledTimes(1)
+  })
+
+  it('삭제 시 error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
+    await expect(setCalendarMembers('cal-1', 'owner-1', ['user-2'])).rejects.toEqual({ message: 'delete error' })
+  })
+})
+
+// ── getFamilyMembers ──────────────────────────────────────
+
+describe('getFamilyMembers', () => {
+  it('가족 구성원 목록을 반환한다', async () => {
+    const mockData = [{ id: 'fm-1', family_id: 'fam-1', user_id: 'user-1', display_name: '홍길동' }]
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getFamilyMembers('fam-1')
+    expect(result).toEqual(mockData)
+    expect(mockFrom).toHaveBeenCalledWith('family_members')
+  })
+
+  it('data가 null이면 빈 배열을 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+    expect(await getFamilyMembers('fam-1')).toEqual([])
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
+    await expect(getFamilyMembers('fam-1')).rejects.toEqual({ message: 'fetch error' })
   })
 })
 

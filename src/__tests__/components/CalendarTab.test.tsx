@@ -22,6 +22,10 @@ jest.mock('@/lib/calendar', () => ({
   createCalendar: jest.fn(),
   updateCalendar: jest.fn(),
   deleteCalendar: jest.fn(),
+  getCalendarMembers: jest.fn().mockResolvedValue([]),
+  getCalendarMembersForCalendars: jest.fn().mockResolvedValue([]),
+  setCalendarMembers: jest.fn(),
+  getFamilyMembers: jest.fn().mockResolvedValue([]),
   createEvent: jest.fn(),
   updateEvent: jest.fn(),
   deleteEvent: jest.fn(),
@@ -60,6 +64,9 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
 }))
 jest.mock('@/components/calendar/CalendarFormModal', () => ({
   CalendarFormModal: () => <div />,
+}))
+jest.mock('@/components/calendar/CalendarListSheet', () => ({
+  CalendarListSheet: () => <div />,
 }))
 
 describe('CalendarTab — touch-action 스크롤 차단', () => {
