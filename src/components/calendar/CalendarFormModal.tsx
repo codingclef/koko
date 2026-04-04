@@ -29,6 +29,7 @@ export function CalendarFormModal({
   const [name, setName] = useState(initial?.name ?? '')
   const [color, setColor] = useState(initial?.color ?? CALENDAR_COLORS[0])
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   // owner(currentUserId) 제외한 나머지 구성원만 선택 대상
@@ -54,9 +55,13 @@ export function CalendarFormModal({
   const handleSave = async () => {
     if (!name.trim()) return
     setSaving(true)
+    setSaveError(null)
     try {
       await onSave(name.trim(), color, Array.from(selectedIds))
       onClose()
+    } catch (e) {
+      console.error('[CalendarFormModal] save failed:', e)
+      setSaveError('저장에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setSaving(false)
     }
@@ -169,6 +174,9 @@ export function CalendarFormModal({
 
         {/* 저장/삭제 버튼 — 항상 하단 고정 */}
         <div className="px-6 py-4 pb-safe shrink-0 border-t border-stone-100 dark:border-stone-800">
+          {saveError && (
+            <p className="text-xs text-red-500 mb-3 text-center">{saveError}</p>
+          )}
           <div className="flex gap-2">
             {initial && onDelete && (
               confirmDelete ? (

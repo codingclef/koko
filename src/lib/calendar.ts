@@ -67,15 +67,22 @@ export async function createCalendar(
     .single()
   if (error) throw error
 
-  // 생성자는 항상 owner, 선택된 멤버는 member로 등록
-  const members = [
-    { calendar_id: data.id, user_id: userId, role: 'owner' as const },
-    ...memberUserIds
-      .filter((id) => id !== userId)
-      .map((id) => ({ calendar_id: data.id, user_id: id, role: 'member' as const })),
-  ]
-  const { error: memberError } = await supabase.from('calendar_members').insert(members)
-  if (memberError) throw memberError
+  // Step 1: 생성자를 owner로 먼저 단독 insert
+  // (bootstrap RLS 정책 케이스 A — owner 레코드가 없는 상태에서 첫 레코드 등록)
+  const { error: ownerError } = await supabase
+    .from('calendar_members')
+    .insert({ calendar_id: data.id, user_id: userId, role: 'owner' })
+  if (ownerError) throw ownerError
+
+  // Step 2: 나머지 멤버 insert
+  // (owner 레코드가 존재하므로 RLS 케이스 B 통과)
+  const newMembers = memberUserIds
+    .filter((id) => id !== userId)
+    .map((id) => ({ calendar_id: data.id, user_id: id, role: 'member' as const }))
+  if (newMembers.length > 0) {
+    const { error: memberError } = await supabase.from('calendar_members').insert(newMembers)
+    if (memberError) throw memberError
+  }
 
   return data
 }
