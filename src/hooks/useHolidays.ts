@@ -1,32 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
+import Holidays from 'date-holidays'
 
 export interface Holiday {
   date: string        // "2026-03-01"
-  localName: string   // "삼일절" or "春分の日"
+  localName: string   // "삼일절" or "憲法記念日"
   countryCode: string // "KR" or "JP"
 }
 
-interface NagerHoliday {
-  date: string
-  localName: string
-  name: string
-  countryCode: string
-  types: string[]
+const COUNTRY_LANGUAGE: Record<string, string> = {
+  KR: 'ko',
+  JP: 'ja',
+}
+
+// date-holidays does not calculate substitute holidays for these countries.
+// Custom logic is applied after fetching base holidays.
+const NEEDS_CUSTOM_SUBSTITUTE = new Set(['KR'])
+
+const SUBSTITUTE_NAME: Record<string, string> = {
+  KR: '대체공휴일',
+  JP: '振替休日',
 }
 
 // In-memory cache keyed by `${year}-${countryCode}`.
-// Holidays for a given year are stable, so no invalidation is needed.
+// Holiday rules for a given year are stable, so no invalidation is needed.
 const cache = new Map<string, Holiday[]>()
 
 /** Test utility: clears the in-memory cache between test cases. */
 export function clearHolidayCache() {
   cache.clear()
-}
-
-/** Parse an ISO date string (YYYY-MM-DD) as local midnight to avoid UTC offset issues. */
-function parseLocalDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d)
 }
 
 function toYMD(date: Date): string {
@@ -36,30 +37,27 @@ function toYMD(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-const SUBSTITUTE_NAME: Record<string, string> = {
-  KR: '대체공휴일',
-  JP: '振替休日',
-}
-
 /**
- * Calculate substitute holidays for countries whose law grants a replacement
- * weekday when a public holiday falls on Sunday.
- * Applies to KR (대체공휴일) and JP (振替休日).
+ * Calculate substitute holidays for KR (대체공휴일).
+ * date-holidays does not include KR substitutes, so we derive them:
+ * when a public holiday falls on Sunday, the next non-holiday weekday
+ * (Mon–Sat excluded) becomes the substitute.
  */
-function calcSubstituteHolidays(holidays: Holiday[]): Holiday[] {
+function calcKrSubstituteHolidays(holidays: Holiday[]): Holiday[] {
   const substitutes: Holiday[] = []
   const allDates = new Set(holidays.map((h) => h.date))
 
   for (const holiday of holidays) {
-    if (!(holiday.countryCode in SUBSTITUTE_NAME)) continue
+    const date = new Date(`${holiday.date}T00:00:00`)
+    if (date.getDay() !== 0) continue // only Sundays trigger a substitute
 
-    const date = parseLocalDate(holiday.date)
-    if (date.getDay() !== 0) continue // only process Sundays
-
-    // Find the next non-holiday weekday
     const candidate = new Date(date)
     candidate.setDate(candidate.getDate() + 1)
-    while (allDates.has(toYMD(candidate)) || candidate.getDay() === 0) {
+    while (
+      allDates.has(toYMD(candidate)) ||
+      candidate.getDay() === 0 ||
+      candidate.getDay() === 6
+    ) {
       candidate.setDate(candidate.getDate() + 1)
     }
 
@@ -68,7 +66,7 @@ function calcSubstituteHolidays(holidays: Holiday[]): Holiday[] {
       allDates.add(substituteDate) // prevent duplicate substitutes
       substitutes.push({
         date: substituteDate,
-        localName: SUBSTITUTE_NAME[holiday.countryCode],
+        localName: SUBSTITUTE_NAME.KR,
         countryCode: holiday.countryCode,
       })
     }
@@ -77,26 +75,29 @@ function calcSubstituteHolidays(holidays: Holiday[]): Holiday[] {
   return substitutes
 }
 
-async function fetchYearHolidays(year: number, countryCode: string): Promise<Holiday[]> {
+function getYearHolidays(year: number, countryCode: string): Holiday[] {
   const key = `${year}-${countryCode}`
   if (cache.has(key)) return cache.get(key)!
 
-  const res = await fetch(
-    `https://date.nager.at/api/v3/PublicHolidays/${year}/${countryCode}`
-  )
-  if (!res.ok) return []
+  const lang = COUNTRY_LANGUAGE[countryCode] ?? 'en'
+  const hd = new Holidays(countryCode, { languages: [lang] })
+  const holidays: Holiday[] = hd.getHolidays(year)
+    .filter((h) => h.type === 'public')
+    .map((h) => ({
+      date: h.date.slice(0, 10),
+      // date-holidays returns substitute names as "原日名 (振替休日)" — normalize to just the substitute label
+      localName: h.substitute
+        ? (SUBSTITUTE_NAME[countryCode] ?? h.name)
+        : h.name,
+      countryCode,
+    }))
 
-  const data: NagerHoliday[] = await res.json()
-  const holidays: Holiday[] = data.map((h) => ({
-    date: h.date,
-    localName: h.localName,
-    countryCode: h.countryCode,
-  }))
+  if (NEEDS_CUSTOM_SUBSTITUTE.has(countryCode)) {
+    holidays.push(...calcKrSubstituteHolidays(holidays))
+  }
 
-  const substitutes = calcSubstituteHolidays(holidays)
-  const all = [...holidays, ...substitutes]
-  cache.set(key, all)
-  return all
+  cache.set(key, holidays)
+  return holidays
 }
 
 export function useHolidays(
@@ -104,26 +105,15 @@ export function useHolidays(
   month: number,
   countryCodes: string[]
 ): Holiday[] {
-  const [holidays, setHolidays] = useState<Holiday[]>([])
   const countryKey = countryCodes.join(',')
-
-  useEffect(() => {
-    if (countryCodes.length === 0) {
-      setHolidays([])
-      return
-    }
-
-    Promise.all(countryCodes.map((cc) => fetchYearHolidays(year, cc)))
-      .then((results) => {
-        const filtered = results.flat().filter((h) => {
-          const d = parseLocalDate(h.date)
-          return d.getFullYear() === year && d.getMonth() === month
-        })
-        setHolidays(filtered)
+  return useMemo(() => {
+    if (!countryKey) return []
+    return countryKey
+      .split(',')
+      .flatMap((cc) => getYearHolidays(year, cc))
+      .filter((h) => {
+        const [y, m] = h.date.split('-').map(Number)
+        return y === year && m - 1 === month
       })
-      .catch(() => setHolidays([]))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month, countryKey])
-
-  return holidays
 }
