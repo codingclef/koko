@@ -184,7 +184,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
               {visibleItems.map((item) => (
                 <p
                   key={item.id}
-                  className={`text-[11px] truncate flex items-center gap-1.5 ${
+                  className={`text-xs truncate flex items-center gap-1.5 ${
                     item.is_checked
                       ? 'line-through text-stone-300 dark:text-stone-600'
                       : 'text-stone-500 dark:text-stone-400'
@@ -195,13 +195,13 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
                 </p>
               ))}
               {hiddenCount > 0 && (
-                <p className="text-[11px] text-stone-400 dark:text-stone-500 pl-2.5">
+                <p className="text-xs text-stone-400 dark:text-stone-500 pl-2.5">
                   +{hiddenCount}개 더
                 </p>
               )}
             </>
           ) : (
-            <p className="text-[11px] text-stone-300 dark:text-stone-600 italic">아이템 없음</p>
+            <p className="text-xs text-stone-300 dark:text-stone-600 italic">아이템 없음</p>
           )}
         </div>
       </div>
