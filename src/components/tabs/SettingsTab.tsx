@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Share2, Check, Users, Pencil, X } from 'lucide-react'
+import { LogOut, Share2, Check, Users, Pencil, X, Bell, BellOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { registerPushSubscription } from '@/lib/push'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState } from '@/types/tabs'
@@ -40,6 +41,10 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [nameInput, setNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
 
+  // 알림 권한
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default')
+  const [enablingNotif, setEnablingNotif] = useState(false)
+
   useEffect(() => {
     if (!familyId) return
     supabase
@@ -56,6 +61,25 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
       .then((m) => setMyDisplayName(m?.display_name ?? null))
       .catch((e) => console.error('[SettingsTab] getMyFamilyMember failed:', e))
   }, [user])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotifPermission('unsupported')
+      return
+    }
+    setNotifPermission(Notification.permission)
+  }, [])
+
+  const handleEnableNotifications = async () => {
+    if (!user) return
+    setEnablingNotif(true)
+    try {
+      await registerPushSubscription(user.id)
+      setNotifPermission(Notification.permission)
+    } finally {
+      setEnablingNotif(false)
+    }
+  }
 
   const handleShare = async () => {
     if (!inviteCode) return
@@ -139,6 +163,38 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
         <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-2">계정</p>
         <p className="text-sm text-stone-700 dark:text-stone-300">{user?.email}</p>
       </div>
+
+      {/* 알림 */}
+      {notifPermission !== 'unsupported' && (
+        <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+          <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">알림</p>
+          {notifPermission === 'granted' ? (
+            <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
+              <Bell size={15} className="text-accent-400" />
+              알림이 허용되어 있습니다
+            </div>
+          ) : notifPermission === 'denied' ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
+                <BellOff size={15} />
+                알림이 차단되어 있습니다
+              </div>
+              <p className="text-xs text-stone-400 dark:text-stone-500">
+                브라우저 설정에서 이 사이트의 알림 권한을 허용으로 변경해주세요
+              </p>
+            </div>
+          ) : (
+            <button
+              onClick={handleEnableNotifications}
+              disabled={enablingNotif}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+            >
+              <Bell size={15} />
+              {enablingNotif ? '설정 중...' : '알림 허용하기'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 내 이름 */}
       {myDisplayName !== null && (
