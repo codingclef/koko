@@ -11,11 +11,11 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import {
-  getShoppingLists,
+  getShoppingListsWithPreviews,
   createShoppingList,
   deleteShoppingList,
   renameShoppingList,
@@ -24,7 +24,7 @@ import {
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { supabase } from '@/lib/supabase'
-import type { ShoppingList, ListType } from '@/lib/shopping'
+import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
 export function ShoppingTab() {
   const { user, loading: authLoading } = useAuth()
@@ -35,7 +35,7 @@ export function ShoppingTab() {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
 
-  const [lists, setLists] = useState<ShoppingList[]>([])
+  const [lists, setLists] = useState<ShoppingListWithPreview[]>([])
   const [fetchError, setFetchError] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -51,10 +51,10 @@ export function ShoppingTab() {
     if (!familyId) return
 
     const refresh = () =>
-      getShoppingLists(familyId)
+      getShoppingListsWithPreviews(familyId)
         .then(setLists)
         .catch((e) => {
-          console.error('[ShoppingTab] getShoppingLists failed:', e)
+          console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
           setFetchError(true)
         })
     refresh()
@@ -78,7 +78,7 @@ export function ShoppingTab() {
   const handleCreate = async (name: string, type: ListType) => {
     if (!familyId || !user) return
 
-    const optimisticList: ShoppingList = {
+    const optimisticList: ShoppingListWithPreview = {
       id: crypto.randomUUID(),
       family_id: familyId,
       created_by: user.id,
@@ -86,12 +86,13 @@ export function ShoppingTab() {
       type,
       sort_order: 0,
       created_at: new Date().toISOString(),
+      previewItems: [],
     }
     setLists((prev) => [optimisticList, ...prev])
     setShowModal(false)
 
     const realList = await createShoppingList(familyId, user.id, name, type)
-    setLists((prev) => prev.map((l) => l.id === optimisticList.id ? realList : l))
+    setLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
     broadcast()
   }
 
@@ -131,20 +132,20 @@ export function ShoppingTab() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
+    <div className="px-4 py-8 pb-24 min-h-screen">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">🛒 장바구니</h1>
+          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
             {lists.length > 0 ? `${lists.length}개의 목록` : '장바구니를 만들어보세요'}
           </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 text-white font-semibold text-sm transition-colors shadow-sm"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-orange-400 hover:bg-orange-500 text-white shadow-sm transition-colors"
+          aria-label="새 장바구니 추가"
         >
-          <Plus size={16} />
-          새 목록
+          <Plus size={20} />
         </button>
       </div>
 
@@ -158,14 +159,20 @@ export function ShoppingTab() {
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="text-5xl mb-4">🛍️</div>
           <p className="text-stone-500 dark:text-stone-400 font-medium">아직 장바구니가 없어요</p>
-          <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 새 목록 버튼을 눌러보세요</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 + 버튼을 눌러보세요</p>
         </div>
       ) : (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <SortableContext items={lists.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
+          <SortableContext items={lists.map((l) => l.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-2 gap-3">
               {lists.map((list) => (
-                <ShoppingListCard key={list.id} list={list} onDelete={handleDelete} onRename={handleRename} />
+                <ShoppingListCard
+                  key={list.id}
+                  list={list}
+                  previewItems={list.previewItems}
+                  onDelete={handleDelete}
+                  onRename={handleRename}
+                />
               ))}
             </div>
           </SortableContext>
