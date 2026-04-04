@@ -33,6 +33,7 @@ describe('useUserPreferences', () => {
     const mockData = {
       user_id: 'user-1',
       holiday_countries: ['KR', 'JP'],
+      app_theme: 'tangerine',
       created_at: '',
       updated_at: '',
     }
@@ -65,6 +66,7 @@ describe('useUserPreferences', () => {
     const updated = {
       user_id: 'user-1',
       holiday_countries: ['KR'],
+      app_theme: 'tangerine',
       created_at: '',
       updated_at: '',
     }

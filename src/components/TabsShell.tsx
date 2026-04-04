@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/BottomNav'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
+import { DEFAULT_THEME } from '@/lib/preferences'
 
 type Tab = 'calendar' | 'shopping' | 'settings'
 
@@ -23,6 +24,10 @@ export function TabsShell() {
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', preferences?.app_theme ?? DEFAULT_THEME)
+  }, [preferences?.app_theme])
 
   return (
     <>

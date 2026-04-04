@@ -46,7 +46,7 @@ function WheelCol({ values, selected, onSelect }: ColProps) {
   return (
     <div className="relative flex-1">
       <div
-        className="pointer-events-none absolute inset-x-0 bg-orange-50 dark:bg-orange-950/30 rounded-xl z-10"
+        className="pointer-events-none absolute inset-x-0 bg-accent-50 dark:bg-accent-950/30 rounded-xl z-10"
         style={{ top: ITEM_H * 2, height: ITEM_H }}
       />
       <div

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { LogOut, Share2, Check, Users, Pencil, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState } from '@/types/tabs'
 
@@ -13,6 +14,7 @@ const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'JP', label: '🇯🇵 일본' },
   { code: 'US', label: '🇺🇸 미국' },
 ]
+
 
 interface Props extends AuthState {
   onNavigateToTab: (tab: 'calendar' | 'shopping' | 'settings') => void
@@ -123,7 +125,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   if (isInitializing) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-orange-300 border-t-orange-500 animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
       </div>
     )
   }
@@ -150,12 +152,12 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
                 placeholder="이름 입력"
                 maxLength={20}
                 autoFocus
-                className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-accent-300"
               />
               <button
                 onClick={handleSaveName}
                 disabled={savingName || !nameInput.trim()}
-                className="px-4 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+                className="px-4 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
               >
                 저장
               </button>
@@ -189,7 +191,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
           </span>
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 text-white text-sm font-semibold transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 text-white text-sm font-semibold transition-colors shadow-sm"
           >
             {copied ? <Check size={14} /> : <Share2 size={14} />}
             {copied ? '복사됨' : '초대하기'}
@@ -210,7 +212,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
             onChange={(e) => setJoinDisplayName(e.target.value)}
             placeholder="내 이름 (예: 엄마, 홍길동)"
             maxLength={20}
-            className="w-full px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            className="w-full px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-accent-300"
           />
           <div className="flex gap-2">
             <input
@@ -218,12 +220,12 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               placeholder="초대 코드 입력"
               maxLength={6}
-              className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-accent-300"
             />
             <button
               onClick={handleJoin}
               disabled={joining || joinCode.length < 6}
-              className="px-4 py-2 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+              className="px-4 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
             >
               {joining ? '합류 중...' : '합류'}
             </button>
@@ -256,7 +258,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
                   selected
-                    ? 'border-orange-300 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-700'
+                    ? 'border-accent-300 bg-accent-50 dark:bg-accent-950/30 dark:border-accent-700'
                     : 'border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'
                 }`}
               >
@@ -264,12 +266,42 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
                 <span
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                     selected
-                      ? 'border-orange-400 bg-orange-400'
+                      ? 'border-accent-400 bg-accent-400'
                       : 'border-stone-300 dark:border-stone-600'
                   }`}
                 >
                   {selected && <Check size={11} strokeWidth={3} className="text-white" />}
                 </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+        <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
+          테마 색상
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {APP_THEMES.map(({ key, label, color }) => {
+            const selected = (preferences?.app_theme ?? DEFAULT_THEME) === key
+            return (
+              <button
+                key={key}
+                onClick={() => updatePreferences({ app_theme: key })}
+                className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border transition-all ${
+                  selected
+                    ? 'border-stone-400 bg-stone-50 dark:bg-stone-800'
+                    : 'border-stone-100 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800/60'
+                }`}
+              >
+                <span
+                  className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm"
+                  style={{ backgroundColor: color }}
+                >
+                  {selected && <Check size={14} strokeWidth={3} className="text-white" />}
+                </span>
+                <span className="text-xs text-stone-600 dark:text-stone-400 font-medium">{label}</span>
               </button>
             )
           })}

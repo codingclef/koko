@@ -106,7 +106,7 @@ export function CalendarFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="캘린더 이름"
-              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base"
+              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 text-base"
               autoFocus
             />
           </div>
@@ -148,14 +148,14 @@ export function CalendarFormModal({
                       onClick={() => toggleMember(member.user_id)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors ${
                         selected
-                          ? 'border-orange-300 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-700'
+                          ? 'border-accent-300 bg-accent-50 dark:bg-accent-950/30 dark:border-accent-700'
                           : 'border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800'
                       }`}
                     >
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                           selected
-                            ? 'border-orange-400 bg-orange-400'
+                            ? 'border-accent-400 bg-accent-400'
                             : 'border-stone-300 dark:border-stone-600'
                         }`}
                       >
@@ -199,7 +199,7 @@ export function CalendarFormModal({
             <button
               onClick={handleSave}
               disabled={!name.trim() || saving}
-              className="flex-1 py-2.5 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold text-sm transition-colors"
+              className="flex-1 py-2.5 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-40 text-white font-semibold text-sm transition-colors"
             >
               저장
             </button>

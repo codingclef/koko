@@ -120,7 +120,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
         aria-label={`${list.name} 장바구니 열기`}
         onClick={() => !confirming && !editing && router.push(`/shopping/${list.id}`)}
         onKeyDown={handleCardKeyDown}
-        className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-orange-200 dark:hover:border-orange-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-1"
+        className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-accent-200 dark:hover:border-accent-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-1"
       >
         {/* Header row: grip + cart icon + name + delete */}
         <div className="flex items-center gap-2 mb-3">
@@ -134,7 +134,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
             <GripVertical size={14} />
           </button>
 
-          <div className="p-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-400 flex-shrink-0">
+          <div className="p-1.5 rounded-xl bg-accent-50 dark:bg-accent-950/40 text-accent-400 flex-shrink-0">
             <ShoppingCart size={15} />
           </div>
 
@@ -150,7 +150,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
                 }}
                 onBlur={commitEdit}
                 onKeyDown={handleInputKeyDown}
-                className="w-full font-semibold text-sm text-stone-800 dark:text-stone-100 bg-transparent border-b border-orange-400 outline-none"
+                className="w-full font-semibold text-sm text-stone-800 dark:text-stone-100 bg-transparent border-b border-accent-400 outline-none"
                 aria-label="목록 이름 수정"
               />
             ) : (

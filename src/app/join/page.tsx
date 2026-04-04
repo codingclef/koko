@@ -47,7 +47,7 @@ function JoinInner() {
   if (authLoading || familyLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-orange-300 border-t-orange-500 animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
       </div>
     )
   }
@@ -56,8 +56,8 @@ function JoinInner() {
     <div className="max-w-lg mx-auto px-4 min-h-screen flex flex-col items-center justify-center">
       <div className="w-full">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-950/40 mb-4">
-            <Users size={32} className="text-orange-400" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent-50 dark:bg-accent-950/40 mb-4">
+            <Users size={32} className="text-accent-400" />
           </div>
           <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">가족에 합류하기</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">초대 코드를 확인하고 합류하세요</p>
@@ -72,13 +72,13 @@ function JoinInner() {
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="ABC123"
             maxLength={6}
-            className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-xl text-center focus:outline-none focus:ring-2 focus:ring-orange-300 mb-4"
+            className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-xl text-center focus:outline-none focus:ring-2 focus:ring-accent-300 mb-4"
           />
           {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
           <button
             onClick={handleJoin}
             disabled={joining || joinCode.length < 6}
-            className="w-full py-3 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-base transition-colors shadow-sm"
+            className="w-full py-3 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-50 text-white font-bold text-base transition-colors shadow-sm"
           >
             {joining ? '합류 중...' : '가족에 합류하기'}
           </button>
@@ -95,7 +95,7 @@ export default function JoinPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-orange-300 border-t-orange-500 animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
       </div>
     }>
       <JoinInner />

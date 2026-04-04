@@ -31,6 +31,7 @@ describe('getUserPreferences', () => {
     const mockData = {
       user_id: 'user-1',
       holiday_countries: ['KR', 'JP'],
+      app_theme: 'tangerine',
       created_at: '',
       updated_at: '',
     }
@@ -59,6 +60,7 @@ describe('upsertUserPreferences', () => {
     const mockData = {
       user_id: 'user-1',
       holiday_countries: ['KR'],
+      app_theme: 'tangerine',
       created_at: '',
       updated_at: '',
     }
@@ -66,6 +68,19 @@ describe('upsertUserPreferences', () => {
     const result = await upsertUserPreferences('user-1', { holiday_countries: ['KR'] })
     expect(result).toEqual(mockData)
     expect(mockFrom).toHaveBeenCalledWith('user_preferences')
+  })
+
+  it('app_theme을 저장하고 반환한다', async () => {
+    const mockData = {
+      user_id: 'user-1',
+      holiday_countries: [],
+      app_theme: 'ocean',
+      created_at: '',
+      updated_at: '',
+    }
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await upsertUserPreferences('user-1', { app_theme: 'ocean' })
+    expect(result.app_theme).toBe('ocean')
   })
 
   it('error가 있으면 throw한다', async () => {

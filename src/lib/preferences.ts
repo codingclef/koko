@@ -1,6 +1,18 @@
 import { supabase } from './supabase'
 import type { Database } from '@/types/database'
 
+export const APP_THEMES = [
+  { key: 'tangerine', label: '탠저린', color: '#fb923c' },
+  { key: 'sage',      label: '세이지',   color: '#2dd4bf' },
+  { key: 'ocean',     label: '오션',     color: '#38bdf8' },
+  { key: 'rose',      label: '로즈',     color: '#fb7185' },
+  { key: 'violet',    label: '바이올렛', color: '#a78bfa' },
+  { key: 'denim',     label: '데님',     color: '#818cf8' },
+] as const
+
+export type AppTheme = typeof APP_THEMES[number]['key']
+export const DEFAULT_THEME: AppTheme = 'tangerine'
+
 export type UserPreferences = Database['public']['Tables']['user_preferences']['Row']
 
 export async function getUserPreferences(userId: string): Promise<UserPreferences | null> {

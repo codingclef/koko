@@ -198,7 +198,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
   const timeBtnCls = (active: boolean) =>
     `w-24 px-3 py-2.5 rounded-xl text-sm font-semibold text-center transition-colors shrink-0 ${
       active
-        ? 'bg-orange-400 text-white'
+        ? 'bg-accent-400 text-white'
         : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200'
     }`
 
@@ -244,7 +244,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목"
-          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base"
+          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 text-base"
         />
 
         {/* 종일 토글 */}
@@ -252,7 +252,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           <span className="text-sm text-stone-600 dark:text-stone-300">종일</span>
           <button
             onClick={() => toggleAllDay(!isAllDay)}
-            className={`relative w-11 h-6 rounded-full transition-colors ${isAllDay ? 'bg-orange-400' : 'bg-stone-200 dark:bg-stone-700'}`}
+            className={`relative w-11 h-6 rounded-full transition-colors ${isAllDay ? 'bg-accent-400' : 'bg-stone-200 dark:bg-stone-700'}`}
           >
             <span
               className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isAllDay ? 'translate-x-5' : 'translate-x-0'}`}
@@ -335,7 +335,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           onChange={(e) => setDescription(e.target.value)}
           placeholder="메모 (선택)"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400 text-base resize-none"
+          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 text-base resize-none"
         />
 
         {/* 알림 */}
@@ -353,7 +353,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
                   onClick={() => toggleReminder(opt.minutes)}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                     active
-                      ? 'bg-orange-400 border-orange-400 text-white'
+                      ? 'bg-accent-400 border-accent-400 text-white'
                       : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400'
                   }`}
                 >
@@ -373,7 +373,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
         <button
           onClick={handleSave}
           disabled={!title.trim() || !startDate || saving}
-          className="w-full py-3 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:opacity-40 text-white font-semibold text-sm transition-colors"
+          className="w-full py-3 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-40 text-white font-semibold text-sm transition-colors"
         >
           저장
         </button>

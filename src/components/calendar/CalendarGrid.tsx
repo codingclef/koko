@@ -110,7 +110,7 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
               onClick={() => onSelectDate(cell.date)}
               className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
                 isSelected
-                  ? 'bg-orange-50 dark:bg-orange-950/30'
+                  ? 'bg-accent-50 dark:bg-accent-950/30'
                   : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'
               } border-stone-100 dark:border-stone-800`}
             >
@@ -118,9 +118,9 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
               <span
                 className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mx-auto mb-0.5 ${
                   isToday
-                    ? 'bg-orange-400 text-white font-bold'
+                    ? 'bg-accent-400 text-white font-bold'
                     : isSelected
-                    ? 'underline underline-offset-2 decoration-orange-400 font-bold ' + (
+                    ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
                         !cell.isCurrentMonth ? 'text-stone-300 dark:text-stone-600'
                         : isSun ? 'text-red-400'
                         : isSat ? 'text-blue-400'
