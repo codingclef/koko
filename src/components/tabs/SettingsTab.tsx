@@ -41,8 +41,9 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [nameInput, setNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
 
-  // 알림 권한
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default')
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(
+    () => ('Notification' in window ? Notification.permission : 'unsupported')
+  )
   const [enablingNotif, setEnablingNotif] = useState(false)
 
   useEffect(() => {
@@ -61,14 +62,6 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
       .then((m) => setMyDisplayName(m?.display_name ?? null))
       .catch((e) => console.error('[SettingsTab] getMyFamilyMember failed:', e))
   }, [user])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setNotifPermission('unsupported')
-      return
-    }
-    setNotifPermission(Notification.permission)
-  }, [])
 
   const handleEnableNotifications = async () => {
     if (!user) return
@@ -164,16 +157,16 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
         <p className="text-sm text-stone-700 dark:text-stone-300">{user?.email}</p>
       </div>
 
-      {/* 알림 */}
       {notifPermission !== 'unsupported' && (
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
           <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">알림</p>
-          {notifPermission === 'granted' ? (
+          {notifPermission === 'granted' && (
             <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
               <Bell size={15} className="text-accent-400" />
               알림이 허용되어 있습니다
             </div>
-          ) : notifPermission === 'denied' ? (
+          )}
+          {notifPermission === 'denied' && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
                 <BellOff size={15} />
@@ -183,7 +176,8 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
                 브라우저 설정에서 이 사이트의 알림 권한을 허용으로 변경해주세요
               </p>
             </div>
-          ) : (
+          )}
+          {notifPermission === 'default' && (
             <button
               onClick={handleEnableNotifications}
               disabled={enablingNotif}
