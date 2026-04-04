@@ -169,7 +169,7 @@ export default function ShoppingDetailPage() {
         </button>
         <div>
           <h1 className="text-xl font-bold text-stone-800 dark:text-stone-100">
-            🛒 {list?.name ?? '장바구니'}
+            {list?.name ?? '장바구니'}
           </h1>
           <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
             {uncheckedItems.length > 0
