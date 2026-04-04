@@ -135,7 +135,7 @@ export function ShoppingTab() {
     <div className="px-4 py-8 pb-24 min-h-screen">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">🛒 장바구니</h1>
+          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
             {lists.length > 0 ? `${lists.length}개의 목록` : '장바구니를 만들어보세요'}
           </p>

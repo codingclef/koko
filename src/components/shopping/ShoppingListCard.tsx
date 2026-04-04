@@ -111,8 +111,8 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
           className="flex flex-col flex-1 cursor-pointer active:scale-[0.98] transition-transform"
         >
           {/* Icon + name */}
-          <div className="flex items-start gap-2 mb-1.5">
-            <div className="p-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-400 flex-shrink-0 mt-0.5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="p-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-400 flex-shrink-0">
               <ShoppingCart size={15} />
             </div>
             <div className="flex-1 min-w-0">
