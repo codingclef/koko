@@ -27,12 +27,12 @@ export function AddItemInput({ onAdd }: Props) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="아이템 추가..."
-        className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 dark:focus:ring-orange-500 transition text-sm"
+        className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-300 dark:focus:ring-accent-500 transition text-sm"
       />
       <button
         type="submit"
         disabled={!value.trim() || loading}
-        className="p-2.5 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:bg-stone-200 dark:disabled:bg-stone-700 text-white disabled:text-stone-400 transition-colors flex-shrink-0"
+        className="p-2.5 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:bg-stone-200 dark:disabled:bg-stone-700 text-white disabled:text-stone-400 transition-colors flex-shrink-0"
         aria-label="추가"
       >
         <Plus size={20} />

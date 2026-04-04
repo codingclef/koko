@@ -91,8 +91,8 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, drag
         <span
           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
             item.is_checked
-              ? 'bg-orange-400 border-orange-400'
-              : 'border-stone-300 dark:border-stone-600 hover:border-orange-300'
+              ? 'bg-accent-400 border-accent-400'
+              : 'border-stone-300 dark:border-stone-600 hover:border-accent-300'
           }`}
         >
           {item.is_checked && (
@@ -114,7 +114,7 @@ export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, drag
           }}
           onBlur={commitEdit}
           onKeyDown={handleKeyDown}
-          className="flex-1 text-stone-800 dark:text-stone-100 bg-transparent border-b border-orange-400 outline-none"
+          className="flex-1 text-stone-800 dark:text-stone-100 bg-transparent border-b border-accent-400 outline-none"
           aria-label="아이템 이름 수정"
         />
       ) : (

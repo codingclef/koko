@@ -47,7 +47,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 이마트, 코스트코"
               autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-300 dark:focus:ring-orange-500 transition"
+              className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-300 dark:focus:ring-accent-500 transition"
             />
           </div>
 
@@ -61,7 +61,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
                 onClick={() => setType('strikethrough')}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
                   type === 'strikethrough'
-                    ? 'border-orange-400 bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400'
+                    ? 'border-accent-400 bg-accent-50 dark:bg-accent-950/40 text-accent-600 dark:text-accent-400'
                     : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-300'
                 }`}
               >
@@ -74,7 +74,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
                 onClick={() => setType('delete')}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
                   type === 'delete'
-                    ? 'border-orange-400 bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400'
+                    ? 'border-accent-400 bg-accent-50 dark:bg-accent-950/40 text-accent-600 dark:text-accent-400'
                     : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-300'
                 }`}
               >
@@ -88,7 +88,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
           <button
             type="submit"
             disabled={!name.trim() || loading}
-            className="w-full py-3 rounded-xl bg-orange-400 hover:bg-orange-500 disabled:bg-stone-200 dark:disabled:bg-stone-700 text-white disabled:text-stone-400 font-semibold transition-colors"
+            className="w-full py-3 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:bg-stone-200 dark:disabled:bg-stone-700 text-white disabled:text-stone-400 font-semibold transition-colors"
           >
             {loading ? '만드는 중...' : '만들기'}
           </button>

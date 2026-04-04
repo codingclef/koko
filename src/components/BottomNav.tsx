@@ -29,7 +29,7 @@ export function BottomNav({ activeTab, onTabChange }: Props) {
             : pathname.startsWith(href)
           const className = `flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
             active
-              ? 'text-orange-500'
+              ? 'text-accent-500'
               : 'text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300'
           }`
           return tabMode ? (
