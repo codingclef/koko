@@ -3,11 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut, Share2, Check, Users, Pencil, X } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { useFamily } from '@/hooks/useFamily'
 import { supabase } from '@/lib/supabase'
 import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 import type { UserPreferences } from '@/lib/preferences'
+import type { AuthState } from '@/types/tabs'
 
 const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'KR', label: '🇰🇷 한국' },
@@ -15,15 +14,13 @@ const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'US', label: '🇺🇸 미국' },
 ]
 
-interface Props {
+interface Props extends AuthState {
   onNavigateToTab: (tab: 'calendar' | 'shopping' | 'settings') => void
   preferences: UserPreferences | null
   updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
 }
 
-export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }: Props) {
-  const { user, loading: authLoading } = useAuth()
-  const { familyId, loading: familyLoading } = useFamily(user)
+export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, user, familyId, isInitializing }: Props) {
   const router = useRouter()
 
   const [inviteCode, setInviteCode] = useState<string | null>(null)
@@ -40,12 +37,6 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/login')
-    }
-  }, [user, authLoading, router])
 
   useEffect(() => {
     if (!familyId) return
@@ -129,7 +120,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences }:
     router.replace('/login')
   }
 
-  if (authLoading || familyLoading) {
+  if (isInitializing) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-8 h-8 rounded-full border-2 border-orange-300 border-t-orange-500 animate-spin" />
