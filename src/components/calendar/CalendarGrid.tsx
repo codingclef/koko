@@ -119,6 +119,13 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
                 className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mx-auto mb-0.5 ${
                   isToday
                     ? 'bg-orange-400 text-white font-bold'
+                    : isSelected
+                    ? 'underline underline-offset-2 decoration-orange-400 font-bold ' + (
+                        !cell.isCurrentMonth ? 'text-stone-300 dark:text-stone-600'
+                        : isSun ? 'text-red-400'
+                        : isSat ? 'text-blue-400'
+                        : 'text-stone-700 dark:text-stone-200'
+                      )
                     : !cell.isCurrentMonth
                     ? 'text-stone-300 dark:text-stone-600'
                     : isSun
@@ -136,7 +143,7 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
                 {dayHolidays.map((h) => (
                   <div
                     key={`${h.countryCode}-${h.date}`}
-                    className="w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate bg-red-400"
+                    className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 truncate bg-red-400"
                   >
                     {h.localName}
                   </div>
@@ -148,14 +155,14 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
                 {dayEvents.slice(0, 3).map((evt) => (
                   <div
                     key={evt.id}
-                    className="w-full rounded text-white text-[9px] leading-tight px-1 py-0.5 truncate"
+                    className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 truncate"
                     style={{ backgroundColor: getEventColor(evt) }}
                   >
                     {evt.title}
                   </div>
                 ))}
                 {dayEvents.length > 3 && (
-                  <div className="text-[9px] text-stone-400 px-1">+{dayEvents.length - 3}</div>
+                  <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium px-1">+{dayEvents.length - 3}</div>
                 )}
               </div>
             </button>
