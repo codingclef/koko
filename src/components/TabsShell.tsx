@@ -14,6 +14,8 @@ import { registerPushSubscription } from '@/lib/push'
 
 type Tab = 'calendar' | 'shopping' | 'settings'
 
+const TABS: Tab[] = ['calendar', 'shopping', 'settings']
+
 export function TabsShell() {
   const [activeTab, setActiveTab] = useState<Tab>('calendar')
   const router = useRouter()
@@ -21,6 +23,14 @@ export function TabsShell() {
   const { familyId, loading: familyLoading } = useFamily(user)
   const { preferences, updatePreferences } = useUserPreferences(user)
   const isInitializing = authLoading || familyLoading
+
+  useEffect(() => {
+    const tabParam = new URLSearchParams(window.location.search).get('tab')
+    if (tabParam && TABS.includes(tabParam as Tab)) {
+      setActiveTab(tabParam as Tab)
+      router.replace('/calendar')
+    }
+  }, [router])
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
