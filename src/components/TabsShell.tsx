@@ -29,13 +29,6 @@ export function TabsShell() {
   const isInitializing = authLoading || familyLoading
 
   useEffect(() => {
-    const tabParam = new URLSearchParams(window.location.search).get('tab')
-    if (tabParam && TABS.includes(tabParam as Tab)) {
-      router.replace('/calendar')
-    }
-  }, [router])
-
-  useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
 

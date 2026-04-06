@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { TabsShell } from '@/components/TabsShell'
 
 const mockReplace = jest.fn()
@@ -43,36 +43,39 @@ jest.mock('@/components/BottomNav', () => ({
   BottomNav: () => <div data-testid="bottom-nav" />,
 }))
 
+function mockTab(tab: string | null) {
+  jest.spyOn(global, 'URLSearchParams').mockImplementation(
+    () => ({ get: () => tab }) as unknown as URLSearchParams
+  )
+}
+
 describe('TabsShell', () => {
   beforeEach(() => {
     mockReplace.mockClear()
   })
 
-  function mockTab(tab: string | null) {
-    jest.spyOn(global, 'URLSearchParams').mockImplementation(
-      () => ({ get: () => tab }) as unknown as URLSearchParams
-    )
-  }
-
   afterEach(() => {
     jest.restoreAllMocks()
   })
 
-  it('?tab=shopping 파라미터가 있으면 router.replace로 URL을 정리한다', () => {
-    mockTab('shopping')
-    render(<TabsShell />)
-    expect(mockReplace).toHaveBeenCalledWith('/calendar')
-  })
-
-  it('?tab 파라미터가 없으면 router.replace를 호출하지 않는다', () => {
+  it('?tab 파라미터가 없으면 캘린더 탭이 표시된다', () => {
     mockTab(null)
     render(<TabsShell />)
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
+    expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
   })
 
-  it('유효하지 않은 ?tab 값이면 router.replace를 호출하지 않는다', () => {
+  it('?tab=shopping 파라미터가 있으면 쇼핑 탭이 활성화된다', () => {
+    mockTab('shopping')
+    render(<TabsShell />)
+    expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'contents' })
+    expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'none' })
+  })
+
+  it('유효하지 않은 ?tab 값이면 캘린더 탭이 표시된다', () => {
     mockTab('invalid')
     render(<TabsShell />)
-    expect(mockReplace).not.toHaveBeenCalled()
+    expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
+    expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
   })
 })
