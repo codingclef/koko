@@ -56,13 +56,13 @@ describe('ShoppingDetailPage', () => {
     mockBack.mockClear()
   })
 
-  it('뒤로가기 버튼 클릭 시 /calendar?tab=shopping으로 이동한다', async () => {
+  it('뒤로가기 버튼 클릭 시 router.back()이 호출된다', async () => {
     render(<ShoppingDetailPage />)
 
     const backButton = await screen.findByLabelText('뒤로가기')
     fireEvent.click(backButton)
 
-    expect(mockPush).toHaveBeenCalledWith('/calendar?tab=shopping')
-    expect(mockBack).not.toHaveBeenCalled()
+    expect(mockBack).toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })

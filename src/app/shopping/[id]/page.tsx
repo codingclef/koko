@@ -161,7 +161,7 @@ export default function ShoppingDetailPage() {
     <div className="max-w-lg mx-auto min-h-screen flex flex-col">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
         <button
-          onClick={() => router.push('/calendar?tab=shopping')}
+          onClick={() => router.back()}
           className="p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
           aria-label="뒤로가기"
         >

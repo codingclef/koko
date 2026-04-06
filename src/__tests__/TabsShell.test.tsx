@@ -2,9 +2,11 @@ import { render, screen } from '@testing-library/react'
 import { TabsShell } from '@/components/TabsShell'
 
 const mockReplace = jest.fn()
+let mockTabParam: string | null = null
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
+  useSearchParams: () => ({ get: () => mockTabParam }),
 }))
 
 jest.mock('@/hooks/useAuth', () => ({
@@ -43,37 +45,27 @@ jest.mock('@/components/BottomNav', () => ({
   BottomNav: () => <div data-testid="bottom-nav" />,
 }))
 
-function mockTab(tab: string | null) {
-  jest.spyOn(global, 'URLSearchParams').mockImplementation(
-    () => ({ get: () => tab }) as unknown as URLSearchParams
-  )
-}
-
 describe('TabsShell', () => {
   beforeEach(() => {
     mockReplace.mockClear()
-  })
-
-  afterEach(() => {
-    jest.restoreAllMocks()
+    mockTabParam = null
   })
 
   it('?tab 파라미터가 없으면 캘린더 탭이 표시된다', () => {
-    mockTab(null)
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
     expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
   })
 
   it('?tab=shopping 파라미터가 있으면 쇼핑 탭이 활성화된다', () => {
-    mockTab('shopping')
+    mockTabParam = 'shopping'
     render(<TabsShell />)
     expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'contents' })
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'none' })
   })
 
   it('유효하지 않은 ?tab 값이면 캘린더 탭이 표시된다', () => {
-    mockTab('invalid')
+    mockTabParam = 'invalid'
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
     expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
