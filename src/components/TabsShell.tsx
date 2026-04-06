@@ -17,7 +17,11 @@ type Tab = 'calendar' | 'shopping' | 'settings'
 const TABS: Tab[] = ['calendar', 'shopping', 'settings']
 
 export function TabsShell() {
-  const [activeTab, setActiveTab] = useState<Tab>('calendar')
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (typeof window === 'undefined') return 'calendar'
+    const tabParam = new URLSearchParams(window.location.search).get('tab')
+    return tabParam && TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'calendar'
+  })
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
@@ -27,7 +31,6 @@ export function TabsShell() {
   useEffect(() => {
     const tabParam = new URLSearchParams(window.location.search).get('tab')
     if (tabParam && TABS.includes(tabParam as Tab)) {
-      setActiveTab(tabParam as Tab)
       router.replace('/calendar')
     }
   }, [router])
