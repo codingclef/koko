@@ -10,6 +10,7 @@ export function useUserPreferences(user: User | null) {
   } = useAsyncData<UserPreferences | null>({
     enabled: Boolean(user),
     initialValue: null,
+    reloadKey: user?.id,
     load: () => getUserPreferences(user!.id),
     onSuccess: (data) => {
       if (data?.app_theme) persistTheme(data.app_theme as AppTheme)

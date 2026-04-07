@@ -4,9 +4,10 @@ import { getCalendars, type Calendar } from '@/lib/calendar'
 import { useAsyncData } from '@/hooks/useAsyncData'
 
 export function useCalendars(familyId: string | null) {
-  const { value: calendars, loading, reload } = useAsyncData<Calendar[]>({
+  const { value: calendars, loading, error, reload } = useAsyncData<Calendar[]>({
     enabled: Boolean(familyId),
     initialValue: [],
+    reloadKey: familyId,
     load: () => getCalendars(familyId!),
     onError: (e) => {
       console.error('[useCalendars] fetch failed:', e)
@@ -16,6 +17,7 @@ export function useCalendars(familyId: string | null) {
   return {
     calendars,
     loading,
+    error,
     reload,
   }
 }
