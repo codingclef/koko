@@ -37,7 +37,8 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  const loading = isInitializing
+  // 세션 캐시가 있으면 auth 초기화 중에도 스피너 없이 캐시 데이터를 즉시 표시
+  const loading = isInitializing && lists.length === 0
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
