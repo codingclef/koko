@@ -2,6 +2,7 @@
 
 import { Plus, X } from 'lucide-react'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
+import { isEventOnDate } from '@/components/calendar/CalendarGrid'
 
 function formatHHMM(isoString: string): string {
   return new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -31,14 +32,7 @@ interface Props {
 export function DayEventsSheet({ date, events, calendars, onClose, onSelectEvent, onAddEvent }: Props) {
   const calendarMap = new Map(calendars.map((c) => [c.id, c]))
 
-  const dayEvents = events.filter((e) => {
-    const d = new Date(e.start_at)
-    return (
-      d.getFullYear() === date.getFullYear() &&
-      d.getMonth() === date.getMonth() &&
-      d.getDate() === date.getDate()
-    )
-  })
+  const dayEvents = events.filter((e) => isEventOnDate(e, date))
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end" onClick={onClose}>

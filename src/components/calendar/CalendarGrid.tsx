@@ -7,7 +7,7 @@ import type { Holiday } from '@/hooks/useHolidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 const DATE_HEADER_HEIGHT = 28 // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28
-const LANE_HEIGHT = 20        // px – bar (16) + gap (4)
+const LANE_HEIGHT = 18        // px – bar (16) + gap (2)
 
 interface DayCell {
   date: Date
@@ -50,6 +50,16 @@ function dateOnly(d: Date): Date {
 export function isMultiDayAllDay(event: CalendarEvent): boolean {
   if (!event.is_all_day || !event.end_at) return false
   return dateOnly(new Date(event.end_at)) > dateOnly(new Date(event.start_at))
+}
+
+export function isEventOnDate(event: CalendarEvent, date: Date): boolean {
+  const target = dateOnly(date)
+  const start = dateOnly(new Date(event.start_at))
+  if (isMultiDayAllDay(event)) {
+    const end = dateOnly(new Date(event.end_at!))
+    return target >= start && target <= end
+  }
+  return target.getTime() === start.getTime()
 }
 
 interface EventSegment {

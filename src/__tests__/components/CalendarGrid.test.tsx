@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { CalendarGrid, isMultiDayAllDay, computeSegments } from '@/components/calendar/CalendarGrid'
+import { CalendarGrid, isMultiDayAllDay, isEventOnDate, computeSegments } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
@@ -70,6 +70,69 @@ describe('isMultiDayAllDay', () => {
       start_at: '2025-06-15T00:00:00Z',
       end_at: '2025-06-17T00:00:00Z',
     }))).toBe(true)
+  })
+})
+
+// ── isEventOnDate ────────────────────────────────────────────
+
+describe('isEventOnDate', () => {
+  const target = new Date(2026, 4, 14) // 2026-05-14
+
+  it('단일 종일 일정: start_at 날짜만 매칭된다', () => {
+    const evt = makeEvent({
+      is_all_day: true,
+      start_at: '2026-05-14T00:00:00',
+      end_at: '2026-05-14T00:00:00',
+    })
+    expect(isEventOnDate(evt, target)).toBe(true)
+    expect(isEventOnDate(evt, new Date(2026, 4, 15))).toBe(false)
+  })
+
+  it('멀티데이 종일: 시작일에 매칭된다', () => {
+    const evt = makeEvent({
+      is_all_day: true,
+      start_at: '2026-05-12T00:00:00',
+      end_at: '2026-05-16T00:00:00',
+    })
+    expect(isEventOnDate(evt, new Date(2026, 4, 12))).toBe(true)
+  })
+
+  it('멀티데이 종일: 중간 날짜에 매칭된다', () => {
+    const evt = makeEvent({
+      is_all_day: true,
+      start_at: '2026-05-12T00:00:00',
+      end_at: '2026-05-16T00:00:00',
+    })
+    expect(isEventOnDate(evt, target)).toBe(true) // 5/14
+  })
+
+  it('멀티데이 종일: 종료일에 매칭된다', () => {
+    const evt = makeEvent({
+      is_all_day: true,
+      start_at: '2026-05-12T00:00:00',
+      end_at: '2026-05-16T00:00:00',
+    })
+    expect(isEventOnDate(evt, new Date(2026, 4, 16))).toBe(true)
+  })
+
+  it('멀티데이 종일: 범위 바깥 날짜는 매칭되지 않는다', () => {
+    const evt = makeEvent({
+      is_all_day: true,
+      start_at: '2026-05-12T00:00:00',
+      end_at: '2026-05-16T00:00:00',
+    })
+    expect(isEventOnDate(evt, new Date(2026, 4, 11))).toBe(false)
+    expect(isEventOnDate(evt, new Date(2026, 4, 17))).toBe(false)
+  })
+
+  it('비종일 일정: start_at 날짜만 매칭된다', () => {
+    const evt = makeEvent({
+      is_all_day: false,
+      start_at: '2026-05-14T10:00:00',
+      end_at: '2026-05-16T11:00:00',
+    })
+    expect(isEventOnDate(evt, target)).toBe(true)
+    expect(isEventOnDate(evt, new Date(2026, 4, 15))).toBe(false)
   })
 })
 
