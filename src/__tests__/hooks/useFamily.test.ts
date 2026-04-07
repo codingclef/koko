@@ -46,4 +46,17 @@ describe('useFamily', () => {
 
     expect(result.current.familyId).toBeNull()
   })
+
+  it('user가 사라지면 familyId를 초기화한다', async () => {
+    const { result, rerender } = renderHook(({ user }) => useFamily(user), {
+      initialProps: { user: mockUser as User | null },
+    })
+
+    await waitFor(() => expect(result.current.familyId).toBe('fam-1'))
+
+    rerender({ user: null })
+
+    expect(result.current.familyId).toBeNull()
+    expect(result.current.loading).toBe(true)
+  })
 })
