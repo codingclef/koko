@@ -25,35 +25,57 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
-// familyId는 마운트 시점에 미확정이므로 keyed Map 대신 단순 변수로 보관.
-let lastKnownLists: ShoppingListWithPreview[] | null = null
+const cachedListsByFamily = new Map<string, ShoppingListWithPreview[]>()
+
+function getCachedLists(familyId: string | null): ShoppingListWithPreview[] | null {
+  if (!familyId) return null
+  return cachedListsByFamily.get(familyId) ?? null
+}
+
+export function clearShoppingTabCache() {
+  cachedListsByFamily.clear()
+}
 
 type Props = AuthState
 
 export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const [lists, setLists] = useState<ShoppingListWithPreview[]>(
-    () => lastKnownLists ?? []
+    () => getCachedLists(familyId) ?? []
   )
+  const [listsFamilyId, setListsFamilyId] = useState<string | null>(familyId)
   const [fetchError, setFetchError] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
 
-  // lastKnownLists가 null이면 한 번도 로드된 적 없는 첫 진입 → 스피너 표시
-  // null이 아니면 캐시 데이터가 있으므로 auth 초기화 중에도 즉시 표시
-  const loading = isInitializing && lastKnownLists === null
+  const visibleLists = listsFamilyId === familyId ? lists : getCachedLists(familyId) ?? []
+
+  // 현재 family 기준 캐시가 없으면 첫 진입으로 간주한다.
+  const loading = isInitializing && getCachedLists(familyId) === null
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
-  const updateLists = (value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
+  const updateLists = useCallback((value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
     setLists((prev) => {
-      const next = typeof value === 'function' ? value(prev) : value
-      lastKnownLists = next
+      const base = listsFamilyId === familyId ? prev : getCachedLists(familyId) ?? []
+      const next = typeof value === 'function' ? value(base) : value
+      if (familyId) {
+        cachedListsByFamily.set(familyId, next)
+      }
       return next
     })
-  }
+    setListsFamilyId(familyId)
+  }, [familyId, listsFamilyId])
+
+  useEffect(() => {
+    const cached = getCachedLists(familyId)
+    setLists(cached ?? [])
+    setListsFamilyId(familyId)
+    setFetchError(false)
+    setMutationError(null)
+  }, [familyId])
 
   const refresh = useCallback(() => {
     if (!familyId) return
@@ -66,8 +88,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
         setFetchError(true)
       })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [familyId])
+  }, [familyId, updateLists])
 
   const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh)
 
@@ -107,7 +128,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   const handleDelete = async (listId: string) => {
     setMutationError(null)
-    const previousLists = lists
+    const previousLists = visibleLists
     updateLists((prev) => prev.filter((l) => l.id !== listId))
 
     try {
@@ -122,7 +143,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   const handleRename = async (listId: string, name: string) => {
     setMutationError(null)
-    const previousLists = lists
+    const previousLists = visibleLists
     updateLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
 
     try {
@@ -140,9 +161,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     if (!over || active.id === over.id) return
 
     setMutationError(null)
-    const oldIndex = lists.findIndex((l) => l.id === active.id)
-    const newIndex = lists.findIndex((l) => l.id === over.id)
-    const reordered = arrayMove(lists, oldIndex, newIndex).map((l, i) => ({ ...l, sort_order: i }))
+    const oldIndex = visibleLists.findIndex((l) => l.id === active.id)
+    const newIndex = visibleLists.findIndex((l) => l.id === over.id)
+    const reordered = arrayMove(visibleLists, oldIndex, newIndex).map((l, i) => ({ ...l, sort_order: i }))
     updateLists(reordered)
 
     try {
@@ -150,7 +171,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       broadcast()
     } catch (e) {
       console.error('[ShoppingTab] reorderShoppingLists failed:', e)
-      updateLists(lists)
+      updateLists(visibleLists)
       setMutationError('목록 순서를 저장하지 못했어요')
     }
   }
@@ -169,7 +190,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
-            {lists.length > 0 ? `${lists.length}개의 목록` : '장바구니를 만들어보세요'}
+            {visibleLists.length > 0 ? `${visibleLists.length}개의 목록` : '장바구니를 만들어보세요'}
           </p>
         </div>
         <button
@@ -193,7 +214,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
           <p className="text-stone-500 dark:text-stone-400 font-medium">목록을 불러오지 못했어요</p>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">잠시 후 다시 시도해주세요</p>
         </div>
-      ) : lists.length === 0 ? (
+      ) : visibleLists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <ShoppingCart size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
           <p className="text-stone-500 dark:text-stone-400 font-medium">아직 장바구니가 없어요</p>
@@ -201,9 +222,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         </div>
       ) : (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <SortableContext items={lists.map((l) => l.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={visibleLists.map((l) => l.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {lists.map((list) => (
+              {visibleLists.map((list) => (
                 <ShoppingListCard
                   key={list.id}
                   list={list}
