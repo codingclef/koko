@@ -90,7 +90,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       })
   }, [familyId, updateLists])
 
-  const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh)
+  const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh, {
+    refreshOnSubscribed: false,
+  })
 
   useEffect(() => {
     refresh()

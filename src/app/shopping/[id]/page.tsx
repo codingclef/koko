@@ -51,7 +51,9 @@ export default function ShoppingDetailPage() {
     getShoppingItems(id).then(setItems)
   }, [id])
 
-  const broadcast = useRealtimeSync(id ? `list_items_${id}` : null, refreshItems)
+  const broadcast = useRealtimeSync(id ? `list_items_${id}` : null, refreshItems, {
+    refreshOnSubscribed: false,
+  })
 
   useEffect(() => {
     if (!id) return

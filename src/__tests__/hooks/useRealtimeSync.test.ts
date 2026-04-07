@@ -66,6 +66,15 @@ describe('useRealtimeSync', () => {
     expect(onRefresh).toHaveBeenCalledTimes(1)
   })
 
+  it('refreshOnSubscribed=false이면 SUBSCRIBED 상태에서 onRefresh를 호출하지 않는다', () => {
+    const onRefresh = jest.fn()
+    renderHook(() => useRealtimeSync('test-channel', onRefresh, { refreshOnSubscribed: false }))
+
+    act(() => { subscribeCb?.('SUBSCRIBED') })
+
+    expect(onRefresh).not.toHaveBeenCalled()
+  })
+
   it('SUBSCRIBED 아닌 상태에서는 onRefresh를 호출하지 않는다', () => {
     const onRefresh = jest.fn()
     renderHook(() => useRealtimeSync('test-channel', onRefresh))
