@@ -8,6 +8,7 @@ jest.mock('@/lib/preferences', () => ({
   getUserPreferences: jest.fn(),
   upsertUserPreferences: jest.fn(),
   THEME_STORAGE_KEY: 'koko_theme',
+  persistTheme: jest.fn(),
 }))
 
 const mockGetUserPreferences = preferencesLib.getUserPreferences as jest.MockedFunction<
@@ -15,6 +16,9 @@ const mockGetUserPreferences = preferencesLib.getUserPreferences as jest.MockedF
 >
 const mockUpsertUserPreferences = preferencesLib.upsertUserPreferences as jest.MockedFunction<
   typeof preferencesLib.upsertUserPreferences
+>
+const mockPersistTheme = preferencesLib.persistTheme as jest.MockedFunction<
+  typeof preferencesLib.persistTheme
 >
 
 const mockUser = { id: 'user-1' } as User
@@ -86,7 +90,7 @@ describe('useUserPreferences', () => {
     expect(result.current.preferences).toEqual(updated)
   })
 
-  it('preferences 로드 시 app_theme을 localStorage에 저장한다', async () => {
+  it('preferences 로드 시 persistTheme을 호출한다', async () => {
     const mockData = {
       user_id: 'user-1',
       holiday_countries: ['KR'],
@@ -98,26 +102,18 @@ describe('useUserPreferences', () => {
 
     const { result } = renderHook(() => useUserPreferences(mockUser))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('ocean')
+    expect(mockPersistTheme).toHaveBeenCalledWith('ocean')
   })
 
-  it('localStorage와 다른 app_theme가 오면 localStorage를 갱신한다', async () => {
-    localStorage.setItem(THEME_STORAGE_KEY, 'tangerine')
-    const mockData = {
-      user_id: 'user-1',
-      holiday_countries: ['KR'],
-      app_theme: 'ocean',
-      created_at: '',
-      updated_at: '',
-    }
-    mockGetUserPreferences.mockResolvedValue(mockData)
+  it('app_theme이 없는 preferences 로드 시 persistTheme을 호출하지 않는다', async () => {
+    mockGetUserPreferences.mockResolvedValue(null)
 
     const { result } = renderHook(() => useUserPreferences(mockUser))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('ocean')
+    expect(mockPersistTheme).not.toHaveBeenCalled()
   })
 
-  it('updatePreferences 후 app_theme을 localStorage에 저장한다', async () => {
+  it('updatePreferences 후 persistTheme을 호출한다', async () => {
     mockGetUserPreferences.mockResolvedValue(null)
     const updated = {
       user_id: 'user-1',
@@ -135,7 +131,7 @@ describe('useUserPreferences', () => {
       await result.current.updatePreferences({ app_theme: 'violet' })
     })
 
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('violet')
+    expect(mockPersistTheme).toHaveBeenCalledWith('violet')
   })
 
   it('user가 없을 때 updatePreferences를 호출해도 upsert하지 않는다', async () => {
