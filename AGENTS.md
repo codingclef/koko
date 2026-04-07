@@ -32,6 +32,19 @@ Read this first, then follow the linked project documents before making changes.
 3. Commit messages and PR titles must be written in English.
 4. Direct push to `main` is prohibited.
 5. Delete the feature branch after merge.
+6. Prefer conventional titles in `type: summary` format.
+
+### Commit and PR Naming
+
+- Use lowercase conventional prefixes such as `feat:`, `fix:`, `refactor:`, `perf:`, `polish:`, `chore:`, `docs:`, `test:`.
+- Keep the summary concise and specific to the user-visible or engineering change.
+- PR titles should normally match the same `type: summary` style used in recent history.
+
+### PR Body Format
+
+- Include a `## Summary` section with flat bullets describing the main changes.
+- Include a `## Testing` section describing what was run, or explicitly state that tests were not run.
+- If manual visual verification is needed, include a checkbox list in the PR body.
 
 ## Working Rules
 
