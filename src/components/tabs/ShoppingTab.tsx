@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react'
 import {
   DndContext,
@@ -21,7 +21,7 @@ import {
 } from '@/lib/shopping'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
-import { supabase } from '@/lib/supabase'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
@@ -36,7 +36,6 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   )
   const [fetchError, setFetchError] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // lastKnownLists가 null이면 한 번도 로드된 적 없는 첫 진입 → 스피너 표시
   // null이 아니면 캐시 데이터가 있으므로 auth 초기화 중에도 즉시 표시
@@ -55,33 +54,22 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     })
   }
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     if (!familyId) return
-
-    const refresh = () =>
-      getShoppingListsWithPreviews(familyId)
-        .then(updateLists)
-        .catch((e) => {
-          console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
-          setFetchError(true)
-        })
-    refresh()
-
-    const channel = supabase
-      .channel(`family_lists_${familyId}`)
-      .on('broadcast', { event: 'refresh' }, refresh)
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') refresh()
+    getShoppingListsWithPreviews(familyId)
+      .then(updateLists)
+      .catch((e) => {
+        console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
+        setFetchError(true)
       })
-
-    channelRef.current = channel
-
-    return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [familyId])
 
-  const broadcast = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
-  }
+  const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh)
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   const handleCreate = async (name: string, type: ListType) => {
     if (!familyId || !user) return

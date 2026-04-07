@@ -31,7 +31,7 @@ import { DayEventsSheet } from '@/components/calendar/DayEventsSheet'
 import { EventDetailSheet } from '@/components/calendar/EventDetailSheet'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
-import { supabase } from '@/lib/supabase'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { Calendar } from '@/lib/calendar'
 
 interface Props extends AuthState {
@@ -58,7 +58,6 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
   const [calendarMemberIds, setCalendarMemberIds] = useState<string[]>([])
   const [showCalendarList, setShowCalendarList] = useState(false)
 
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [slideKey, setSlideKey] = useState(0)
@@ -81,22 +80,13 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
       .catch((e) => console.error('[CalendarTab] loadEvents failed:', e))
   }, [familyId, year, month])
 
+  const channelName = familyId ? `family_events_${familyId}_${year}_${month}` : null
+  const broadcast = useRealtimeSync(channelName, loadEvents)
+
   useEffect(() => {
     if (!familyId) return
     loadEvents()
-
-    const channel = supabase
-      .channel(`family_events_${familyId}_${year}_${month}`)
-      .on('broadcast', { event: 'refresh' }, loadEvents)
-      .subscribe()
-    channelRef.current = channel
-
-    return () => { supabase.removeChannel(channel) }
   }, [familyId, year, month, loadEvents])
-
-  const broadcast = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
-  }
 
   const prevMonth = () => {
     setSlideDir('right')

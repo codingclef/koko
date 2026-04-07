@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import {
@@ -24,6 +24,7 @@ import {
 import { ShoppingItem } from '@/components/shopping/ShoppingItem'
 import { AddItemInput } from '@/components/shopping/AddItemInput'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { ShoppingItem as ShoppingItemType, ShoppingList } from '@/lib/shopping'
 
 export default function ShoppingDetailPage() {
@@ -38,18 +39,21 @@ export default function ShoppingDetailPage() {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [loading, setLoading] = useState(true)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
+  const refreshItems = useCallback(() => {
+    if (!id) return
+    getShoppingItems(id).then(setItems)
+  }, [id])
+
+  const broadcast = useRealtimeSync(id ? `list_items_${id}` : null, refreshItems)
+
   useEffect(() => {
     if (!id) return
-
-    const refreshItems = () => getShoppingItems(id).then(setItems)
-
     const init = async () => {
       const { data } = await supabase
         .from('shopping_lists')
@@ -62,21 +66,7 @@ export default function ShoppingDetailPage() {
       setLoading(false)
     }
     init()
-
-    const channel = supabase
-      .channel(`list_items_${id}`)
-      .on('broadcast', { event: 'refresh' }, refreshItems)
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') refreshItems()
-      })
-
-    channelRef.current = channel
-    return () => { supabase.removeChannel(channel) }
   }, [id])
-
-  const broadcast = () => {
-    channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
-  }
 
   const handleAdd = async (name: string) => {
     if (!user) return
