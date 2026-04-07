@@ -9,7 +9,6 @@ import { BottomNav } from '@/components/BottomNav'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
-import { DEFAULT_THEME } from '@/lib/preferences'
 import { registerPushSubscription } from '@/lib/push'
 import { type Tab, TABS } from '@/types/tabs'
 
@@ -33,7 +32,11 @@ export function TabsShell() {
   }, [user?.id])
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', preferences?.app_theme ?? DEFAULT_THEME)
+    if (!preferences?.app_theme) return
+    const current = document.documentElement.getAttribute('data-theme')
+    if (current !== preferences.app_theme) {
+      document.documentElement.setAttribute('data-theme', preferences.app_theme)
+    }
   }, [preferences?.app_theme])
 
   const handleTabChange = (tab: Tab) => {

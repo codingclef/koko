@@ -12,6 +12,13 @@ export const APP_THEMES = [
 
 export type AppTheme = typeof APP_THEMES[number]['key']
 export const DEFAULT_THEME: AppTheme = 'tangerine'
+export const THEME_STORAGE_KEY = 'koko_theme'
+const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+export function persistTheme(theme: AppTheme) {
+  localStorage.setItem(THEME_STORAGE_KEY, theme)
+  document.cookie = `${THEME_STORAGE_KEY}=${theme}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; SameSite=Lax`
+}
 
 export type UserPreferences = Database['public']['Tables']['user_preferences']['Row']
 
