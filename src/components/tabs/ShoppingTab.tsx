@@ -47,7 +47,6 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
-  // setLists와 캐시를 동시에 업데이트
   const updateLists = (value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
     setLists((prev) => {
       const next = typeof value === 'function' ? value(prev) : value
