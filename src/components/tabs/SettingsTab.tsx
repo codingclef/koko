@@ -285,6 +285,32 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
         <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">합류하면 현재 내 가족에서 나가고 새 가족으로 이동합니다</p>
       </div>
 
+      {/* 캘린더 표시 설정 */}
+      <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+        <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
+          캘린더 표시
+        </p>
+        <div className="flex items-center justify-between py-1">
+          <span className="text-sm text-stone-700 dark:text-stone-300">음력</span>
+          <button
+            role="switch"
+            aria-checked={preferences?.show_lunar ?? false}
+            onClick={() => updatePreferences({ show_lunar: !(preferences?.show_lunar ?? false) })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              (preferences?.show_lunar ?? false)
+                ? 'bg-accent-400'
+                : 'bg-stone-200 dark:bg-stone-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                (preferences?.show_lunar ?? false) ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
       {/* 휴일 표시 */}
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
         <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">

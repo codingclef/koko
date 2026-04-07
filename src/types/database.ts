@@ -34,6 +34,7 @@ export type Database = {
           user_id: string
           holiday_countries: string[]
           app_theme: string
+          show_lunar: boolean
           created_at: string
           updated_at: string
         }
@@ -41,6 +42,7 @@ export type Database = {
           user_id: string
           holiday_countries?: string[]
           app_theme?: string
+          show_lunar?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -48,6 +50,7 @@ export type Database = {
           user_id?: string
           holiday_countries?: string[]
           app_theme?: string
+          show_lunar?: boolean
           created_at?: string
           updated_at?: string
         }
