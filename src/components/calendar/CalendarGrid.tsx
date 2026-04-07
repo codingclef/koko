@@ -309,27 +309,35 @@ export function CalendarGrid({
                     ].join(' ')
 
                     return (
-                      <button
+                      // outer: 위치/inset 전담 (px-0.5로 단일 칩과 좌측 정렬 맞춤)
+                      <div
                         key={`${seg.event.id}-row${rowIdx}`}
-                        type="button"
-                        title={seg.event.title}
-                        className="absolute flex items-center gap-0.5 text-white text-[10px] overflow-hidden whitespace-nowrap pointer-events-auto"
+                        className="absolute px-0.5 pointer-events-none"
                         style={{
                           left: `${(seg.colStart / 7) * 100}%`,
                           width: `${(seg.colSpan / 7) * 100}%`,
                           top: seg.lane * LANE_HEIGHT,
                           height: 16,
-                          backgroundColor: color,
-                          borderRadius,
-                          paddingLeft: seg.isStart ? 4 : 0,
-                          paddingRight: seg.isEnd ? 4 : 0,
                         }}
-                        onClick={() => onSelectDate(dateOnly(new Date(seg.event.start_at)))}
                       >
-                        {!seg.isStart && <span className="shrink-0 opacity-70">‹</span>}
-                        <span className="overflow-hidden min-w-0">{seg.event.title}</span>
-                        {!seg.isEnd && <span className="shrink-0 opacity-70">›</span>}
-                      </button>
+                        {/* inner: 색상/radius/텍스트 전담 */}
+                        <button
+                          type="button"
+                          title={seg.event.title}
+                          className="w-full h-full flex items-center justify-center gap-0.5 text-white text-[10px] overflow-hidden whitespace-nowrap pointer-events-auto"
+                          style={{
+                            backgroundColor: color,
+                            borderRadius,
+                            paddingLeft: seg.isStart ? 4 : 0,
+                            paddingRight: seg.isEnd ? 4 : 0,
+                          }}
+                          onClick={() => onSelectDate(dateOnly(new Date(seg.event.start_at)))}
+                        >
+                          {!seg.isStart && <span className="shrink-0 opacity-70">‹</span>}
+                          <span className="overflow-hidden min-w-0">{seg.event.title}</span>
+                          {!seg.isEnd && <span className="shrink-0 opacity-70">›</span>}
+                        </button>
+                      </div>
                     )
                   })}
                 </div>
