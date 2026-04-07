@@ -301,15 +301,11 @@ export function CalendarGrid({
                 >
                   {segments.map((seg) => {
                     const color = getEventColor(seg.event)
-                    const borderRadius = [
-                      seg.isStart ? '4px' : '0',
-                      seg.isEnd ? '4px' : '0',
-                      seg.isEnd ? '4px' : '0',
-                      seg.isStart ? '4px' : '0',
-                    ].join(' ')
+                    const s = seg.isStart ? '4px' : '0'
+                    const e = seg.isEnd ? '4px' : '0'
+                    const borderRadius = `${s} ${e} ${e} ${s}`
 
                     return (
-                      // outer: 위치/inset 전담 (px-0.5로 단일 칩과 좌측 정렬 맞춤)
                       <div
                         key={`${seg.event.id}-row${rowIdx}`}
                         className="absolute px-0.5 pointer-events-none"
@@ -320,7 +316,6 @@ export function CalendarGrid({
                           height: 16,
                         }}
                       >
-                        {/* inner: 색상/radius/텍스트 전담 */}
                         <button
                           type="button"
                           title={seg.event.title}
