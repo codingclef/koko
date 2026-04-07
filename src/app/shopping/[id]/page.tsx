@@ -39,6 +39,7 @@ export default function ShoppingDetailPage() {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
 
   const sensors = useSensors(
@@ -48,24 +49,38 @@ export default function ShoppingDetailPage() {
 
   const refreshItems = useCallback(() => {
     if (!id) return
-    getShoppingItems(id).then(setItems)
+    getShoppingItems(id)
+      .then(setItems)
+      .catch((e) => console.error('[ShoppingDetailPage] getShoppingItems failed:', e))
   }, [id])
 
   const broadcast = useRealtimeSync(id ? `list_items_${id}` : null, refreshItems, {
     refreshOnSubscribed: false,
   })
 
-  useEffect(() => {
+  const loadPage = useCallback(async () => {
     if (!id) return
-    const init = async () => {
+    setFetchError(false)
+    setLoading(true)
+
+    try {
       const shoppingList = await getShoppingList(id)
       setList(shoppingList)
       const fetchedItems = await getShoppingItems(id)
       setItems(fetchedItems)
+    } catch (e) {
+      console.error('[ShoppingDetailPage] initial load failed:', e)
+      setList(null)
+      setItems([])
+      setFetchError(true)
+    } finally {
       setLoading(false)
     }
-    init()
   }, [id])
+
+  useEffect(() => {
+    loadPage()
+  }, [loadPage])
 
   const handleAdd = async (name: string): Promise<boolean> => {
     if (!user) return false
@@ -196,6 +211,38 @@ export default function ShoppingDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="max-w-lg mx-auto min-h-screen flex flex-col">
+        <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
+          <button
+            onClick={() => router.back()}
+            className="p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+            aria-label="뒤로가기"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">목록을 불러오지 못했어요</p>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="text-5xl mb-4">📡</div>
+          <p className="text-stone-600 dark:text-stone-300 font-medium">장바구니를 불러오지 못했어요</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">잠시 후 다시 시도해주세요</p>
+          <button
+            onClick={loadPage}
+            className="mt-6 px-4 py-2.5 rounded-xl bg-accent-400 hover:bg-accent-500 text-white font-semibold text-sm transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
       </div>
     )
   }
