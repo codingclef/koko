@@ -14,12 +14,16 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 
 export async function registerPushSubscription(userId: string): Promise<void> {
   if (typeof window === 'undefined') return
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return
 
   const registration = await navigator.serviceWorker.register('/sw.js')
   await navigator.serviceWorker.ready
 
-  const permission = await Notification.requestPermission()
+  const permission =
+    Notification.permission === 'default'
+      ? await Notification.requestPermission()
+      : Notification.permission
+
   if (permission !== 'granted') return
 
   const existing = await registration.pushManager.getSubscription()

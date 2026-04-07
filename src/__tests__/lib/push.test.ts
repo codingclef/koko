@@ -45,7 +45,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'PushManager', { value: class {}, configurable: true })
 
   Object.defineProperty(window, 'Notification', {
-    value: { requestPermission: jest.fn().mockResolvedValue('granted') },
+    value: { permission: 'default', requestPermission: jest.fn().mockResolvedValue('granted') },
     configurable: true,
   })
 
@@ -85,15 +85,40 @@ describe('registerPushSubscription', () => {
     expect(global.fetch).toHaveBeenCalled()
   })
 
+  it('이미 알림이 허용되어 있으면 권한 요청 없이 서버로 전송한다', async () => {
+    const mockSub = { toJSON: () => mockSubscriptionJSON }
+    mockGetSubscription.mockResolvedValue(mockSub)
+    const requestPermission = jest.fn()
+
+    Object.defineProperty(window, 'Notification', {
+      value: { permission: 'granted', requestPermission },
+      configurable: true,
+    })
+
+    await registerPushSubscription('user-1')
+
+    expect(requestPermission).not.toHaveBeenCalled()
+    expect(global.fetch).toHaveBeenCalled()
+  })
+
   it('알림 권한 거부 시 fetch를 호출하지 않는다', async () => {
     Object.defineProperty(window, 'Notification', {
-      value: { requestPermission: jest.fn().mockResolvedValue('denied') },
+      value: { permission: 'default', requestPermission: jest.fn().mockResolvedValue('denied') },
       configurable: true,
     })
 
     await registerPushSubscription('user-1')
 
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('Notification 미지원 환경에서는 아무것도 하지 않는다', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (window as any).Notification
+
+    await registerPushSubscription('user-1')
+
+    expect(mockRegister).not.toHaveBeenCalled()
   })
 
   it('PushManager 미지원 환경에서는 아무것도 하지 않는다', async () => {

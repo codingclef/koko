@@ -9,7 +9,6 @@ import { BottomNav } from '@/components/BottomNav'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
-import { registerPushSubscription } from '@/lib/push'
 import { type Tab, TABS } from '@/types/tabs'
 import { AppSplash } from '@/components/AppSplash'
 
@@ -27,10 +26,6 @@ export function TabsShell() {
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
-
-  useEffect(() => {
-    if (user) registerPushSubscription(user.id).catch(() => {})
-  }, [user?.id])
 
   useEffect(() => {
     if (!preferences?.app_theme) return
