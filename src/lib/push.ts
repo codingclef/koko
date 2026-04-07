@@ -1,4 +1,4 @@
-import { getAuthHeaders } from '@/lib/api-client'
+import { postJsonWithAuth } from '@/lib/api-client'
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -12,14 +12,18 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return buffer
 }
 
-export async function registerPushSubscription(userId: string): Promise<void> {
+export async function registerPushSubscription(): Promise<void> {
   if (typeof window === 'undefined') return
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return
 
   const registration = await navigator.serviceWorker.register('/sw.js')
   await navigator.serviceWorker.ready
 
-  const permission = await Notification.requestPermission()
+  const permission =
+    Notification.permission === 'default'
+      ? await Notification.requestPermission()
+      : Notification.permission
+
   if (permission !== 'granted') return
 
   const existing = await registration.pushManager.getSubscription()
@@ -37,17 +41,9 @@ export async function registerPushSubscription(userId: string): Promise<void> {
     keys: { p256dh: string; auth: string }
   }
 
-  const authHeaders = await getAuthHeaders()
-  await fetch('/api/push/subscribe', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-    },
-    body: JSON.stringify({
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
-    }),
+  await postJsonWithAuth('/api/push/subscribe', {
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
   })
 }

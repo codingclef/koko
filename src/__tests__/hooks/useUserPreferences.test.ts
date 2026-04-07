@@ -147,4 +147,27 @@ describe('useUserPreferences', () => {
 
     expect(mockUpsertUserPreferences).not.toHaveBeenCalled()
   })
+
+  it('user가 사라지면 preferences를 초기화한다', async () => {
+    const mockData = {
+      user_id: 'user-1',
+      holiday_countries: ['KR'],
+      app_theme: 'ocean',
+      show_lunar: false,
+      created_at: '',
+      updated_at: '',
+    }
+    mockGetUserPreferences.mockResolvedValue(mockData)
+
+    const { result, rerender } = renderHook(({ user }) => useUserPreferences(user), {
+      initialProps: { user: mockUser as User | null },
+    })
+
+    await waitFor(() => expect(result.current.preferences).toEqual(mockData))
+
+    rerender({ user: null })
+
+    expect(result.current.preferences).toBeNull()
+    expect(result.current.loading).toBe(true)
+  })
 })

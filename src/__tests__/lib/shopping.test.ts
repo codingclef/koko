@@ -2,6 +2,7 @@ import {
   getShoppingLists,
   createShoppingList,
   deleteShoppingList,
+  getShoppingList,
   getShoppingItems,
   addShoppingItem,
   checkShoppingItem,
@@ -82,6 +83,27 @@ describe('deleteShoppingList', () => {
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
     await expect(deleteShoppingList('list-1')).rejects.toEqual({ message: 'delete error' })
+  })
+})
+
+describe('getShoppingList', () => {
+  it('단일 장바구니를 반환한다', async () => {
+    const mockData = { id: 'list-1', name: '이마트', type: 'strikethrough' }
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getShoppingList('list-1')
+    expect(result).toEqual(mockData)
+    expect(mockFrom).toHaveBeenCalledWith('shopping_lists')
+  })
+
+  it('data가 null이면 null을 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+    const result = await getShoppingList('list-1')
+    expect(result).toBeNull()
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
+    await expect(getShoppingList('list-1')).rejects.toEqual({ message: 'fetch error' })
   })
 })
 
