@@ -27,6 +27,7 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
   const [reminders, setReminders] = useState<EventReminder[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const cal = event.calendar_id ? calendars.find((c) => c.id === event.calendar_id) : null
 
@@ -39,9 +40,13 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
 
   const handleDelete = async () => {
     setDeleting(true)
+    setDeleteError(null)
     try {
       await onDelete()
       onClose()
+    } catch (e) {
+      console.error('[EventDetailSheet] delete failed:', e)
+      setDeleteError('삭제에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setDeleting(false)
     }
@@ -133,6 +138,9 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
 
         {/* 삭제 버튼 */}
         <div className="px-5 py-3 border-t border-stone-100 dark:border-stone-800">
+          {deleteError && (
+            <p className="text-xs text-red-500 mb-3 text-center">{deleteError}</p>
+          )}
           {confirmDelete ? (
             <div className="flex gap-2">
               <button
