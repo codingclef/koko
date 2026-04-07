@@ -98,4 +98,43 @@ describe('DayEventsSheet', () => {
     fireEvent.click(screen.getByText('일정 추가'))
     expect(defaultProps.onAddEvent).toHaveBeenCalled()
   })
+
+  it('멀티데이 종일 일정: 중간 날짜 클릭 시 일정이 표시된다', () => {
+    // 4/11 ~ 4/15 여행, date=4/13 (중간)
+    const multiDay = makeEvent({
+      id: 'multi-1',
+      title: '해외여행',
+      is_all_day: true,
+      start_at: '2026-04-11T00:00:00',
+      end_at: '2026-04-15T00:00:00',
+    })
+    render(<DayEventsSheet {...defaultProps} events={[multiDay]} />)
+    expect(screen.getByText('해외여행')).toBeInTheDocument()
+    expect(screen.queryByText('이 날의 일정이 없어요')).not.toBeInTheDocument()
+  })
+
+  it('멀티데이 종일 일정: 종료일 클릭 시 일정이 표시된다', () => {
+    const multiDay = makeEvent({
+      id: 'multi-2',
+      title: '해외여행',
+      is_all_day: true,
+      start_at: '2026-04-11T00:00:00',
+      end_at: '2026-04-13T00:00:00',
+    })
+    render(<DayEventsSheet {...defaultProps} events={[multiDay]} />)
+    expect(screen.getByText('해외여행')).toBeInTheDocument()
+  })
+
+  it('멀티데이 종일 일정: 범위 바깥 날짜는 표시되지 않는다', () => {
+    const multiDay = makeEvent({
+      id: 'multi-3',
+      title: '범위밖여행',
+      is_all_day: true,
+      start_at: '2026-04-01T00:00:00',
+      end_at: '2026-04-10T00:00:00',
+    })
+    render(<DayEventsSheet {...defaultProps} events={[multiDay]} />)
+    expect(screen.queryByText('범위밖여행')).not.toBeInTheDocument()
+    expect(screen.getByText('이 날의 일정이 없어요')).toBeInTheDocument()
+  })
 })
