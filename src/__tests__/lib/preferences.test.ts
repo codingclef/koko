@@ -32,6 +32,7 @@ describe('getUserPreferences', () => {
       user_id: 'user-1',
       holiday_countries: ['KR', 'JP'],
       app_theme: 'tangerine',
+      show_lunar: false,
       created_at: '',
       updated_at: '',
     }
@@ -61,6 +62,7 @@ describe('upsertUserPreferences', () => {
       user_id: 'user-1',
       holiday_countries: ['KR'],
       app_theme: 'tangerine',
+      show_lunar: false,
       created_at: '',
       updated_at: '',
     }
@@ -75,6 +77,7 @@ describe('upsertUserPreferences', () => {
       user_id: 'user-1',
       holiday_countries: [],
       app_theme: 'ocean',
+      show_lunar: false,
       created_at: '',
       updated_at: '',
     }

@@ -287,6 +287,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
               prev?.toDateString() === date.toDateString() ? null : date
             )
           }}
+          showLunar={preferences?.show_lunar ?? false}
           className="h-full pb-16"
         />
       </div>

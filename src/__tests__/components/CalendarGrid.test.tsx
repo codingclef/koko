@@ -3,6 +3,13 @@ import { CalendarGrid, isMultiDayAllDay, computeSegments } from '@/components/ca
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
+jest.mock('korean-lunar-calendar', () => {
+  return jest.fn().mockImplementation(() => ({
+    setSolarDate: jest.fn(),
+    getLunarCalendar: jest.fn().mockReturnValue({ month: 4, day: 20 }),
+  }))
+})
+
 // ── Fixtures ────────────────────────────────────────────────
 
 const calendars: Calendar[] = [
@@ -306,6 +313,23 @@ describe('CalendarGrid', () => {
     // 두 번째 bar (isEnd=true): ‹ 있음, › 없음
     expect(bars[1].textContent).toMatch(/‹/)
     expect(bars[1].textContent).not.toMatch(/›/)
+  })
+
+  it('showLunar=true 이면 음력 날짜가 표시된다', () => {
+    render(<CalendarGrid {...defaultProps} showLunar={true} />)
+    // 모킹된 값 4/20이 여러 셀에 표시되어야 함
+    const lunarLabels = screen.getAllByText('4/20')
+    expect(lunarLabels.length).toBeGreaterThan(0)
+  })
+
+  it('showLunar=false 이면 음력 날짜가 표시되지 않는다', () => {
+    render(<CalendarGrid {...defaultProps} showLunar={false} />)
+    expect(screen.queryByText('4/20')).not.toBeInTheDocument()
+  })
+
+  it('showLunar 기본값(미전달)이면 음력 날짜가 표시되지 않는다', () => {
+    render(<CalendarGrid {...defaultProps} />)
+    expect(screen.queryByText('4/20')).not.toBeInTheDocument()
   })
 
   it('멀티데이 이벤트 bar 클릭 시 이벤트 시작일로 onSelectDate가 호출된다', () => {

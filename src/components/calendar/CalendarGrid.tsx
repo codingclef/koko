@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
@@ -132,12 +133,13 @@ interface Props {
   holidays?: Holiday[]
   selectedDate: Date | null
   onSelectDate: (date: Date) => void
+  showLunar?: boolean
   className?: string
 }
 
 export function CalendarGrid({
   year, month, events, calendars, activeIds,
-  holidays = [], selectedDate, onSelectDate, className,
+  holidays = [], selectedDate, onSelectDate, showLunar = false, className,
 }: Props) {
   const cells = useMemo(() => buildGrid(year, month), [year, month])
   const today = useMemo(() => new Date(), [])
@@ -175,6 +177,18 @@ export function CalendarGrid({
     if (!event.calendar_id) return '#94a3b8'
     return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
   }
+
+  const lunarDateMap = useMemo(() => {
+    if (!showLunar) return new Map<number, string>()
+    const map = new Map<number, string>()
+    const calendar = new KoreanLunarCalendar()
+    for (const cell of cells) {
+      calendar.setSolarDate(cell.date.getFullYear(), cell.date.getMonth() + 1, cell.date.getDate())
+      const lunar = calendar.getLunarCalendar()
+      map.set(cell.date.getTime(), `${lunar.month}/${lunar.day}`)
+    }
+    return map
+  }, [showLunar, cells])
 
   const rows = useMemo(() => {
     const result: DayCell[][] = []
@@ -229,31 +243,42 @@ export function CalendarGrid({
                       } border-stone-100 dark:border-stone-800`}
                     >
                       {/* 날짜 숫자 */}
-                      <span
-                        className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mx-auto mb-0.5 ${
-                          isToday
-                            ? 'bg-accent-400 text-white font-bold'
-                            : isSelected
-                            ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
-                                !cell.isCurrentMonth
-                                  ? 'text-stone-300 dark:text-stone-600'
-                                  : isSun
-                                  ? 'text-red-400'
-                                  : isSat
-                                  ? 'text-blue-400'
-                                  : 'text-stone-700 dark:text-stone-200'
-                              )
-                            : !cell.isCurrentMonth
-                            ? 'text-stone-300 dark:text-stone-600'
-                            : isSun
-                            ? 'text-red-400 dark:text-red-400'
-                            : isSat
-                            ? 'text-blue-400 dark:text-blue-400'
-                            : 'text-stone-700 dark:text-stone-200'
-                        }`}
-                      >
-                        {cell.date.getDate()}
-                      </span>
+                      <div className="flex flex-col items-center mx-auto mb-0.5">
+                        <span
+                          className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
+                            isToday
+                              ? 'bg-accent-400 text-white font-bold'
+                              : isSelected
+                              ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
+                                  !cell.isCurrentMonth
+                                    ? 'text-stone-300 dark:text-stone-600'
+                                    : isSun
+                                    ? 'text-red-400'
+                                    : isSat
+                                    ? 'text-blue-400'
+                                    : 'text-stone-700 dark:text-stone-200'
+                                )
+                              : !cell.isCurrentMonth
+                              ? 'text-stone-300 dark:text-stone-600'
+                              : isSun
+                              ? 'text-red-400 dark:text-red-400'
+                              : isSat
+                              ? 'text-blue-400 dark:text-blue-400'
+                              : 'text-stone-700 dark:text-stone-200'
+                          }`}
+                        >
+                          {cell.date.getDate()}
+                        </span>
+                        {showLunar && (
+                          <span className={`text-[9px] leading-tight ${
+                            !cell.isCurrentMonth
+                              ? 'text-stone-300 dark:text-stone-600'
+                              : 'text-stone-400 dark:text-stone-500'
+                          }`}>
+                            {lunarDateMap.get(cell.date.getTime())}
+                          </span>
+                        )}
+                      </div>
 
                       {/* 멀티데이 lane 공간 확보용 spacer */}
                       <div aria-hidden="true" style={{ height: laneAreaHeight }} />
