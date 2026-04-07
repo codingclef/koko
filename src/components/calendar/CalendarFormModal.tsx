@@ -70,9 +70,13 @@ export function CalendarFormModal({
   const handleDelete = async () => {
     if (!onDelete) return
     setSaving(true)
+    setSaveError(null)
     try {
       await onDelete()
       onClose()
+    } catch (e) {
+      console.error('[CalendarFormModal] delete failed:', e)
+      setSaveError('삭제에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setSaving(false)
     }

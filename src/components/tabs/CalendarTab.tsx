@@ -60,6 +60,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const [calendarMemberIds, setCalendarMemberIds] = useState<string[]>([])
   const [showCalendarList, setShowCalendarList] = useState(false)
+  const [mutationError, setMutationError] = useState<string | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -106,6 +107,10 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     }
   }, [familyId, year, month, setEvents])
 
+  const reloadCalendarContext = useCallback(async () => {
+    await Promise.allSettled([reloadCalendars(), reloadFamilyMembers()])
+  }, [reloadCalendars, reloadFamilyMembers])
+
   const channelName = familyId ? `family_events_${familyId}_${year}_${month}` : null
   const broadcast = useRealtimeSync(channelName, refreshEvents, { refreshOnSubscribed: false })
 
@@ -148,9 +153,17 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
   }
 
   const openCalendarForm = async (calendar?: Calendar) => {
+    setMutationError(null)
+
     if (calendar) {
-      const members = await getCalendarMembers(calendar.id)
-      setCalendarMemberIds(members.map((m) => m.user_id))
+      try {
+        const members = await getCalendarMembers(calendar.id)
+        setCalendarMemberIds(members.map((m) => m.user_id))
+      } catch (e) {
+        console.error('[CalendarTab] getCalendarMembers failed:', e)
+        setMutationError('캘린더 멤버를 불러오지 못했어요')
+        return
+      }
     } else {
       setCalendarMemberIds([])
     }
@@ -159,24 +172,43 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const handleCalendarSave = async (name: string, color: string, memberUserIds: string[]) => {
     if (!familyId || !user) return
-    if (calendarForm?.calendar) {
-      await updateCalendar(calendarForm.calendar.id, { name, color })
-      await setCalendarMembers(calendarForm.calendar.id, user.id, memberUserIds)
-    } else {
-      await createCalendar(familyId, user.id, name, color, memberUserIds)
+    setMutationError(null)
+
+    try {
+      if (calendarForm?.calendar) {
+        await updateCalendar(calendarForm.calendar.id, { name, color })
+        await setCalendarMembers(calendarForm.calendar.id, user.id, memberUserIds)
+      } else {
+        await createCalendar(familyId, user.id, name, color, memberUserIds)
+      }
+
+      await reloadCalendarContext()
+    } catch (e) {
+      console.error('[CalendarTab] handleCalendarSave failed:', e)
+      setMutationError('캘린더를 저장하지 못했어요')
+      await reloadCalendarContext()
+      throw e
     }
-    reloadCalendars()
   }
 
   const handleCalendarDelete = async () => {
     if (!calendarForm?.calendar) return
-    await deleteCalendar(calendarForm.calendar.id)
-    setActiveIds((prev) => {
-      const next = new Set(prev)
-      next.delete(calendarForm.calendar!.id)
-      return next
-    })
-    reloadCalendars()
+    setMutationError(null)
+
+    try {
+      await deleteCalendar(calendarForm.calendar.id)
+      setActiveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(calendarForm.calendar!.id)
+        return next
+      })
+      await Promise.allSettled([reloadCalendarContext(), refreshEvents()])
+    } catch (e) {
+      console.error('[CalendarTab] handleCalendarDelete failed:', e)
+      setMutationError('캘린더를 삭제하지 못했어요')
+      await Promise.allSettled([reloadCalendarContext(), refreshEvents()])
+      throw e
+    }
   }
 
   const handleEventSave = async (params: {
@@ -189,41 +221,58 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     reminderMinutes: number[]
   }) => {
     if (!familyId || !user) return
+    setMutationError(null)
 
-    if (editingEvent?.event) {
-      await updateEvent(editingEvent.event.id, {
-        calendarId: params.calendarId,
-        title: params.title,
-        description: params.description,
-        startAt: params.startAt,
-        endAt: params.endAt,
-        isAllDay: params.isAllDay,
-      })
-      await setReminders(editingEvent.event.id, params.reminderMinutes)
-    } else {
-      const evt = await createEvent({
-        familyId,
-        userId: user.id,
-        calendarId: params.calendarId,
-        title: params.title,
-        description: params.description,
-        startAt: params.startAt,
-        endAt: params.endAt,
-        isAllDay: params.isAllDay,
-      })
-      await setReminders(evt.id, params.reminderMinutes)
+    try {
+      if (editingEvent?.event) {
+        await updateEvent(editingEvent.event.id, {
+          calendarId: params.calendarId,
+          title: params.title,
+          description: params.description,
+          startAt: params.startAt,
+          endAt: params.endAt,
+          isAllDay: params.isAllDay,
+        })
+        await setReminders(editingEvent.event.id, params.reminderMinutes)
+      } else {
+        const evt = await createEvent({
+          familyId,
+          userId: user.id,
+          calendarId: params.calendarId,
+          title: params.title,
+          description: params.description,
+          startAt: params.startAt,
+          endAt: params.endAt,
+          isAllDay: params.isAllDay,
+        })
+        await setReminders(evt.id, params.reminderMinutes)
+      }
+
+      await refreshEvents()
+      broadcast()
+    } catch (e) {
+      console.error('[CalendarTab] handleEventSave failed:', e)
+      setMutationError('일정을 저장하지 못했어요')
+      await refreshEvents()
+      throw e
     }
-
-    await refreshEvents()
-    broadcast()
   }
 
   const handleEventDelete = async () => {
     if (!selectedEvent) return
-    await deleteEvent(selectedEvent.id)
-    setSelectedEvent(null)
-    await refreshEvents()
-    broadcast()
+    setMutationError(null)
+
+    try {
+      await deleteEvent(selectedEvent.id)
+      setSelectedEvent(null)
+      await refreshEvents()
+      broadcast()
+    } catch (e) {
+      console.error('[CalendarTab] handleEventDelete failed:', e)
+      setMutationError('일정을 삭제하지 못했어요')
+      await refreshEvents()
+      throw e
+    }
   }
 
   const openEditEvent = async () => {
@@ -326,6 +375,12 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
             </svg>
           </button>
         </div>
+
+        {mutationError && (
+          <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
+            {mutationError}
+          </div>
+        )}
       </div>
 
       <div
