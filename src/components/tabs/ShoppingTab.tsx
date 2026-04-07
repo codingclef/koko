@@ -25,8 +25,7 @@ import { supabase } from '@/lib/supabase'
 import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
-// lastKnownLists는 familyId 미확정 상태에서도 즉시 초기값으로 사용하기 위해 별도 보관.
-const listsCache = new Map<string, ShoppingListWithPreview[]>()
+// familyId는 마운트 시점에 미확정이므로 keyed Map 대신 단순 변수로 보관.
 let lastKnownLists: ShoppingListWithPreview[] | null = null
 
 type Props = AuthState
@@ -53,17 +52,12 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     setLists((prev) => {
       const next = typeof value === 'function' ? value(prev) : value
       lastKnownLists = next
-      if (familyId) listsCache.set(familyId, next)
       return next
     })
   }
 
   useEffect(() => {
     if (!familyId) return
-
-    // 캐시가 있으면 즉시 표시 (stale-while-revalidate)
-    const cached = listsCache.get(familyId)
-    if (cached) setLists(cached)
 
     const refresh = () =>
       getShoppingListsWithPreviews(familyId)
