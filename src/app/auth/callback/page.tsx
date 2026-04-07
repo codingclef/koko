@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { parseInviteCodeFromNext } from '@/lib/auth'
+import { postJson } from '@/lib/api-client'
 
 function AuthCallbackInner() {
   const router = useRouter()
@@ -21,15 +22,11 @@ function AuthCallbackInner() {
 
       let allowed = false
       try {
-        const res = await fetch('/api/auth/check-allowed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, inviteCode }),
+        const body = await postJson<{ allowed: boolean }>('/api/auth/check-allowed', {
+          email,
+          inviteCode,
         })
-        if (res.ok) {
-          const body = await res.json()
-          allowed = body.allowed === true
-        }
+        allowed = body.allowed === true
       } catch (e) {
         console.error('[auth/callback] check-allowed failed:', e)
       }

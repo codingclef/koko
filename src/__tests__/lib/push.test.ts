@@ -3,10 +3,10 @@
  */
 import { registerPushSubscription } from '@/lib/push'
 
-const mockGetAuthHeaders = jest.fn()
+const mockPostJsonWithAuth = jest.fn()
 
 jest.mock('@/lib/api-client', () => ({
-  getAuthHeaders: (...args: unknown[]) => mockGetAuthHeaders(...args),
+  postJsonWithAuth: (...args: unknown[]) => mockPostJsonWithAuth(...args),
 }))
 
 const mockGetSubscription = jest.fn()
@@ -29,7 +29,7 @@ const mockRegistration = {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockGetAuthHeaders.mockResolvedValue({ Authorization: 'Bearer token' })
+  mockPostJsonWithAuth.mockResolvedValue(undefined)
 
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY =
     'BDiltY7dC3CnNxamlejehgdculV7iorzypDSV1a2GDFc2d2FQoYyXcl_6J76J3HT-kTqQ7zB5hSNoKeTHxw_KvY'
@@ -49,7 +49,6 @@ beforeEach(() => {
     configurable: true,
   })
 
-  global.fetch = jest.fn().mockResolvedValue({ ok: true })
 })
 
 describe('registerPushSubscription', () => {
@@ -60,14 +59,12 @@ describe('registerPushSubscription', () => {
     await registerPushSubscription('user-1')
 
     expect(mockSubscribe).not.toHaveBeenCalled()
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(mockPostJsonWithAuth).toHaveBeenCalledWith(
       '/api/push/subscribe',
       expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer token',
-        }),
+        endpoint: mockSubscriptionJSON.endpoint,
+        p256dh: mockSubscriptionJSON.keys.p256dh,
+        auth: mockSubscriptionJSON.keys.auth,
       })
     )
   })
@@ -82,7 +79,7 @@ describe('registerPushSubscription', () => {
     expect(mockSubscribe).toHaveBeenCalledWith(
       expect.objectContaining({ userVisibleOnly: true })
     )
-    expect(global.fetch).toHaveBeenCalled()
+    expect(mockPostJsonWithAuth).toHaveBeenCalled()
   })
 
   it('이미 알림이 허용되어 있으면 권한 요청 없이 서버로 전송한다', async () => {
@@ -98,7 +95,7 @@ describe('registerPushSubscription', () => {
     await registerPushSubscription('user-1')
 
     expect(requestPermission).not.toHaveBeenCalled()
-    expect(global.fetch).toHaveBeenCalled()
+    expect(mockPostJsonWithAuth).toHaveBeenCalled()
   })
 
   it('알림 권한 거부 시 fetch를 호출하지 않는다', async () => {
@@ -109,7 +106,7 @@ describe('registerPushSubscription', () => {
 
     await registerPushSubscription('user-1')
 
-    expect(global.fetch).not.toHaveBeenCalled()
+    expect(mockPostJsonWithAuth).not.toHaveBeenCalled()
   })
 
   it('Notification 미지원 환경에서는 아무것도 하지 않는다', async () => {
