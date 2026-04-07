@@ -1,4 +1,6 @@
-# Koko
+# 🏠 Koko — Family Hub
+
+[한국어](README.ko.md) | [日本語](README.ja.md) | **[English]**
 
 Koko is a family collaboration PWA built around one shared app shell.
 The current product surface is calendar, shopping lists, family invite/join, user preferences, and web-push reminders.
