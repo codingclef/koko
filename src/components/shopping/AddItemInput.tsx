@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 
 interface Props {
-  onAdd: (name: string) => Promise<void>
+  onAdd: (name: string) => Promise<boolean>
 }
 
 export function AddItemInput({ onAdd }: Props) {
@@ -15,9 +15,14 @@ export function AddItemInput({ onAdd }: Props) {
     e.preventDefault()
     if (!value.trim() || loading) return
     setLoading(true)
-    await onAdd(value.trim())
-    setValue('')
-    setLoading(false)
+    try {
+      const created = await onAdd(value.trim())
+      if (created) {
+        setValue('')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

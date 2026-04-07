@@ -39,6 +39,7 @@ export default function ShoppingDetailPage() {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [loading, setLoading] = useState(true)
+  const [mutationError, setMutationError] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -50,7 +51,9 @@ export default function ShoppingDetailPage() {
     getShoppingItems(id).then(setItems)
   }, [id])
 
-  const broadcast = useRealtimeSync(id ? `list_items_${id}` : null, refreshItems)
+  const broadcast = useRealtimeSync(id ? `list_items_${id}` : null, refreshItems, {
+    refreshOnSubscribed: false,
+  })
 
   useEffect(() => {
     if (!id) return
@@ -68,9 +71,10 @@ export default function ShoppingDetailPage() {
     init()
   }, [id])
 
-  const handleAdd = async (name: string) => {
-    if (!user) return
+  const handleAdd = async (name: string): Promise<boolean> => {
+    if (!user) return false
 
+    setMutationError(null)
     const optimisticItem: ShoppingItemType = {
       id: crypto.randomUUID(),
       list_id: id,
@@ -83,17 +87,28 @@ export default function ShoppingDetailPage() {
       created_at: new Date().toISOString(),
     }
     setItems((prev) => [...prev, optimisticItem])
-    const realItem = await addShoppingItem(id, user.id, name)
-    setItems((prev) => prev.map((i) => i.id === optimisticItem.id ? realItem : i))
-    broadcast()
+
+    try {
+      const realItem = await addShoppingItem(id, user.id, name)
+      setItems((prev) => prev.map((i) => i.id === optimisticItem.id ? realItem : i))
+      broadcast()
+      return true
+    } catch (e) {
+      console.error('[ShoppingDetailPage] addShoppingItem failed:', e)
+      setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id))
+      setMutationError('아이템을 저장하지 못했어요')
+      return false
+    }
   }
 
   const handleCheck = async (itemId: string, checked: boolean) => {
     if (!user) return
 
+    setMutationError(null)
+    const previousItems = items
+
     if (list?.type === 'delete' && checked) {
       setItems((prev) => prev.filter((i) => i.id !== itemId))
-      await deleteShoppingItem(itemId)
     } else {
       setItems((prev) =>
         prev.map((i) =>
@@ -102,38 +117,80 @@ export default function ShoppingDetailPage() {
             : i
         )
       )
-      await checkShoppingItem(itemId, user.id, checked)
     }
-    broadcast()
+
+    try {
+      if (list?.type === 'delete' && checked) {
+        await deleteShoppingItem(itemId)
+      } else {
+        await checkShoppingItem(itemId, user.id, checked)
+      }
+      broadcast()
+    } catch (e) {
+      console.error('[ShoppingDetailPage] checkShoppingItem failed:', e)
+      setItems(previousItems)
+      setMutationError(
+        list?.type === 'delete' && checked
+          ? '아이템을 삭제하지 못했어요'
+          : '체크 상태를 저장하지 못했어요'
+      )
+    }
   }
 
   const handleDelete = async (itemId: string) => {
+    setMutationError(null)
+    const previousItems = items
     setItems((prev) => prev.filter((i) => i.id !== itemId))
-    await deleteShoppingItem(itemId)
-    broadcast()
+
+    try {
+      await deleteShoppingItem(itemId)
+      broadcast()
+    } catch (e) {
+      console.error('[ShoppingDetailPage] deleteShoppingItem failed:', e)
+      setItems(previousItems)
+      setMutationError('아이템을 삭제하지 못했어요')
+    }
   }
 
   const handleRename = async (itemId: string, name: string) => {
+    setMutationError(null)
+    const previousItems = items
     setItems((prev) => prev.map((i) => i.id === itemId ? { ...i, name } : i))
-    await renameShoppingItem(itemId, name)
-    broadcast()
+
+    try {
+      await renameShoppingItem(itemId, name)
+      broadcast()
+    } catch (e) {
+      console.error('[ShoppingDetailPage] renameShoppingItem failed:', e)
+      setItems(previousItems)
+      setMutationError('아이템 이름을 저장하지 못했어요')
+    }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    setItems((prev) => {
-      const unchecked = prev.filter((i) => !i.is_checked)
-      const checked = prev.filter((i) => i.is_checked)
-      const oldIndex = unchecked.findIndex((i) => i.id === active.id)
-      const newIndex = unchecked.findIndex((i) => i.id === over.id)
-      const reordered = arrayMove(unchecked, oldIndex, newIndex)
-      const updates = reordered.map((i, idx) => ({ id: i.id, sort_order: idx }))
-      reorderShoppingItems(updates)
+    setMutationError(null)
+    const unchecked = items.filter((i) => !i.is_checked)
+    const checkedItems = items.filter((i) => i.is_checked)
+    const oldIndex = unchecked.findIndex((i) => i.id === active.id)
+    const newIndex = unchecked.findIndex((i) => i.id === over.id)
+    const reorderedUnchecked = arrayMove(unchecked, oldIndex, newIndex).map((i, idx) => ({
+      ...i,
+      sort_order: idx,
+    }))
+    const nextItems = [...reorderedUnchecked, ...checkedItems]
+    setItems(nextItems)
+
+    try {
+      await reorderShoppingItems(reorderedUnchecked.map(({ id, sort_order }) => ({ id, sort_order })))
       broadcast()
-      return [...reordered.map((i, idx) => ({ ...i, sort_order: idx })), ...checked]
-    })
+    } catch (e) {
+      console.error('[ShoppingDetailPage] reorderShoppingItems failed:', e)
+      setItems(items)
+      setMutationError('아이템 순서를 저장하지 못했어요')
+    }
   }
 
   const uncheckedItems = items.filter((i) => !i.is_checked)
@@ -172,6 +229,14 @@ export default function ShoppingDetailPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
+        {mutationError && (
+          <div className="px-4 pt-2">
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
+              {mutationError}
+            </div>
+          </div>
+        )}
+
         {uncheckedItems.length === 0 && checkedItems.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="text-5xl mb-4">📝</div>

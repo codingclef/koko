@@ -112,6 +112,19 @@ describe('reorderShoppingLists', () => {
     await reorderShoppingLists([])
     expect(mockFrom).not.toHaveBeenCalled()
   })
+
+  it('update 중 하나라도 error가 있으면 throw한다', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+      .mockReturnValueOnce(makeChain({ data: null, error: { message: 'reorder error' } }))
+
+    await expect(
+      reorderShoppingLists([
+        { id: 'list-1', sort_order: 0 },
+        { id: 'list-2', sort_order: 1 },
+      ])
+    ).rejects.toEqual({ message: 'reorder error' })
+  })
 })
 
 describe('getShoppingItems', () => {
@@ -200,5 +213,18 @@ describe('reorderShoppingItems', () => {
   it('빈 배열이면 아무것도 호출하지 않는다', async () => {
     await reorderShoppingItems([])
     expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('update 중 하나라도 error가 있으면 throw한다', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+      .mockReturnValueOnce(makeChain({ data: null, error: { message: 'reorder error' } }))
+
+    await expect(
+      reorderShoppingItems([
+        { id: 'item-1', sort_order: 0 },
+        { id: 'item-2', sort_order: 1 },
+      ])
+    ).rejects.toEqual({ message: 'reorder error' })
   })
 })

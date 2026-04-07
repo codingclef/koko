@@ -4,13 +4,17 @@ import { supabase } from '@/lib/supabase'
 /**
  * Supabase Realtime broadcast 구독을 관리하는 훅.
  * - channelName이 null이면 구독하지 않는다.
- * - SUBSCRIBED 시점과 broadcast 수신 시 onRefresh를 호출한다.
+ * - 기본적으로 SUBSCRIBED 시점과 broadcast 수신 시 onRefresh를 호출한다.
  * - broadcast()는 채널이 SUBSCRIBED 상태일 때만 전송한다 (PATTERNS.md 참조).
  */
 export function useRealtimeSync(
   channelName: string | null,
-  onRefresh: () => void
+  onRefresh: () => void,
+  options?: {
+    refreshOnSubscribed?: boolean
+  }
 ): () => void {
+  const refreshOnSubscribed = options?.refreshOnSubscribed ?? true
   const onRefreshRef = useRef(onRefresh)
   useEffect(() => {
     onRefreshRef.current = onRefresh
@@ -29,7 +33,9 @@ export function useRealtimeSync(
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           channelReadyRef.current = true
-          onRefreshRef.current()
+          if (refreshOnSubscribed) {
+            onRefreshRef.current()
+          }
         }
       })
     channelRef.current = channel
@@ -39,7 +45,7 @@ export function useRealtimeSync(
       channelRef.current = null
       supabase.removeChannel(channel)
     }
-  }, [channelName])
+  }, [channelName, refreshOnSubscribed])
 
   return useCallback(() => {
     if (channelReadyRef.current) {

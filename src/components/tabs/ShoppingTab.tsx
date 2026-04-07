@@ -25,55 +25,71 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
-// familyId는 마운트 시점에 미확정이므로 keyed Map 대신 단순 변수로 보관.
-let lastKnownLists: ShoppingListWithPreview[] | null = null
+const cachedListsByFamily = new Map<string, ShoppingListWithPreview[]>()
+
+function getCachedLists(familyId: string | null): ShoppingListWithPreview[] | null {
+  if (!familyId) return null
+  return cachedListsByFamily.get(familyId) ?? null
+}
+
+export function clearShoppingTabCache() {
+  cachedListsByFamily.clear()
+}
 
 type Props = AuthState
 
 export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const [lists, setLists] = useState<ShoppingListWithPreview[]>(
-    () => lastKnownLists ?? []
+    () => getCachedLists(familyId) ?? []
   )
   const [fetchError, setFetchError] = useState(false)
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
 
-  // lastKnownLists가 null이면 한 번도 로드된 적 없는 첫 진입 → 스피너 표시
-  // null이 아니면 캐시 데이터가 있으므로 auth 초기화 중에도 즉시 표시
-  const loading = isInitializing && lastKnownLists === null
+  // 현재 family 기준 캐시가 없으면 첫 진입으로 간주한다.
+  const loading = isInitializing && getCachedLists(familyId) === null
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
-  const updateLists = (value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
+  const updateLists = useCallback((value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
     setLists((prev) => {
-      const next = typeof value === 'function' ? value(prev) : value
-      lastKnownLists = next
+      const base = getCachedLists(familyId) ?? prev
+      const next = typeof value === 'function' ? value(base) : value
+      if (familyId) {
+        cachedListsByFamily.set(familyId, next)
+      }
       return next
     })
-  }
+  }, [familyId])
 
   const refresh = useCallback(() => {
     if (!familyId) return
     getShoppingListsWithPreviews(familyId)
-      .then(updateLists)
+      .then((nextLists) => {
+        updateLists(nextLists)
+        setFetchError(false)
+      })
       .catch((e) => {
         console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
         setFetchError(true)
       })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [familyId])
+  }, [familyId, updateLists])
 
-  const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh)
+  const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh, {
+    refreshOnSubscribed: false,
+  })
 
   useEffect(() => {
     refresh()
   }, [refresh])
 
-  const handleCreate = async (name: string, type: ListType) => {
-    if (!familyId || !user) return
+  const handleCreate = async (name: string, type: ListType): Promise<boolean> => {
+    if (!familyId || !user) return false
 
+    setMutationError(null)
     const optimisticList: ShoppingListWithPreview = {
       id: crypto.randomUUID(),
       family_id: familyId,
@@ -85,38 +101,69 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       previewItems: [],
     }
     updateLists((prev) => [optimisticList, ...prev])
-    setShowModal(false)
 
-    const realList = await createShoppingList(familyId, user.id, name, type)
-    updateLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
-    broadcast()
+    try {
+      const realList = await createShoppingList(familyId, user.id, name, type)
+      updateLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
+      setShowModal(false)
+      broadcast()
+      return true
+    } catch (e) {
+      console.error('[ShoppingTab] createShoppingList failed:', e)
+      updateLists((prev) => prev.filter((l) => l.id !== optimisticList.id))
+      setMutationError('목록을 저장하지 못했어요')
+      return false
+    }
   }
 
   const handleDelete = async (listId: string) => {
+    setMutationError(null)
+    const previousLists = lists
     updateLists((prev) => prev.filter((l) => l.id !== listId))
-    await deleteShoppingList(listId)
-    broadcast()
+
+    try {
+      await deleteShoppingList(listId)
+      broadcast()
+    } catch (e) {
+      console.error('[ShoppingTab] deleteShoppingList failed:', e)
+      updateLists(previousLists)
+      setMutationError('목록을 삭제하지 못했어요')
+    }
   }
 
   const handleRename = async (listId: string, name: string) => {
+    setMutationError(null)
+    const previousLists = lists
     updateLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
-    await renameShoppingList(listId, name)
-    broadcast()
+
+    try {
+      await renameShoppingList(listId, name)
+      broadcast()
+    } catch (e) {
+      console.error('[ShoppingTab] renameShoppingList failed:', e)
+      updateLists(previousLists)
+      setMutationError('목록 이름을 저장하지 못했어요')
+    }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    updateLists((prev) => {
-      const oldIndex = prev.findIndex((l) => l.id === active.id)
-      const newIndex = prev.findIndex((l) => l.id === over.id)
-      const reordered = arrayMove(prev, oldIndex, newIndex)
-      const updates = reordered.map((l, i) => ({ id: l.id, sort_order: i }))
-      reorderShoppingLists(updates)
+    setMutationError(null)
+    const oldIndex = lists.findIndex((l) => l.id === active.id)
+    const newIndex = lists.findIndex((l) => l.id === over.id)
+    const reordered = arrayMove(lists, oldIndex, newIndex).map((l, i) => ({ ...l, sort_order: i }))
+    updateLists(reordered)
+
+    try {
+      await reorderShoppingLists(reordered.map(({ id, sort_order }) => ({ id, sort_order })))
       broadcast()
-      return reordered.map((l, i) => ({ ...l, sort_order: i }))
-    })
+    } catch (e) {
+      console.error('[ShoppingTab] reorderShoppingLists failed:', e)
+      updateLists(lists)
+      setMutationError('목록 순서를 저장하지 못했어요')
+    }
   }
 
   if (loading) {
@@ -144,6 +191,12 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
           <Plus size={20} />
         </button>
       </div>
+
+      {mutationError && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
+          {mutationError}
+        </div>
+      )}
 
       {fetchError ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">

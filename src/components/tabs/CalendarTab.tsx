@@ -81,7 +81,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
   }, [familyId, year, month])
 
   const channelName = familyId ? `family_events_${familyId}_${year}_${month}` : null
-  const broadcast = useRealtimeSync(channelName, loadEvents)
+  const broadcast = useRealtimeSync(channelName, loadEvents, { refreshOnSubscribed: false })
 
   useEffect(() => {
     if (!familyId) return
