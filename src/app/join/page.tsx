@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
+import { getAuthHeaders } from '@/lib/api-client'
 
 function JoinInner() {
   const searchParams = useSearchParams()
@@ -29,18 +30,27 @@ function JoinInner() {
     setJoining(true)
     setError(null)
 
-    const res = await fetch('/api/family/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, inviteCode: joinCode.trim() }),
-    })
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/family/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ inviteCode: joinCode.trim() }),
+      })
 
-    if (!res.ok) {
-      const { error: errMsg } = await res.json()
-      setError(errMsg === 'Invalid invite code' ? '올바르지 않은 초대 코드예요' : '오류가 발생했어요')
+      if (!res.ok) {
+        const { error: errMsg } = await res.json()
+        setError(errMsg === 'Invalid invite code' ? '올바르지 않은 초대 코드예요' : '오류가 발생했어요')
+      } else {
+        router.replace('/shopping')
+      }
+    } catch {
+      setError('오류가 발생했어요')
+    } finally {
       setJoining(false)
-    } else {
-      router.replace('/shopping')
     }
   }
 

@@ -5,12 +5,17 @@ import { POST } from '@/app/api/family/route'
 import { NextRequest } from 'next/server'
 
 const mockRpc = jest.fn()
+const mockGetAuthenticatedUserId = jest.fn()
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ rpc: (...args: unknown[]) => mockRpc(...args) }),
 }))
 
-function makeRequest(body: object) {
+jest.mock('@/lib/api-auth', () => ({
+  getAuthenticatedUserId: (...args: unknown[]) => mockGetAuthenticatedUserId(...args),
+}))
+
+function makeRequest(body: object = {}) {
   return new NextRequest('http://localhost/api/family', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -20,21 +25,23 @@ function makeRequest(body: object) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockGetAuthenticatedUserId.mockResolvedValue('user-1')
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
 })
 
 describe('POST /api/family', () => {
-  it('userId가 없으면 400을 반환한다', async () => {
-    const res = await POST(makeRequest({}))
-    expect(res.status).toBe(400)
+  it('인증 사용자가 없으면 401을 반환한다', async () => {
+    mockGetAuthenticatedUserId.mockResolvedValue(null)
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(401)
     const body = await res.json()
-    expect(body.error).toBe('userId is required')
+    expect(body.error).toBe('Unauthorized')
   })
 
   it('RPC 성공 시 familyId를 반환한다', async () => {
     mockRpc.mockResolvedValue({ data: 'fam-1', error: null })
-    const res = await POST(makeRequest({ userId: 'user-1' }))
+    const res = await POST(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.familyId).toBe('fam-1')
@@ -43,13 +50,13 @@ describe('POST /api/family', () => {
 
   it('RPC 에러 발생 시 500을 반환한다', async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC error' } })
-    const res = await POST(makeRequest({ userId: 'user-1' }))
+    const res = await POST(makeRequest())
     expect(res.status).toBe(500)
   })
 
   it('familyId가 null이면 500을 반환한다', async () => {
     mockRpc.mockResolvedValue({ data: null, error: null })
-    const res = await POST(makeRequest({ userId: 'user-1' }))
+    const res = await POST(makeRequest())
     expect(res.status).toBe(500)
   })
 })

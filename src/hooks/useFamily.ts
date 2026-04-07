@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { getAuthHeaders } from '@/lib/api-client'
 
 export function useFamily(user: User | null) {
   const [familyId, setFamilyId] = useState<string | null>(null)
@@ -12,10 +13,13 @@ export function useFamily(user: User | null) {
 
     const initFamily = async () => {
       try {
+        const authHeaders = await getAuthHeaders()
         const res = await fetch('/api/family', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id }),
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
         })
 
         if (!res.ok) {

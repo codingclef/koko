@@ -6,12 +6,17 @@ import { NextRequest } from 'next/server'
 
 const mockUpsert: jest.Mock = jest.fn()
 const mockFrom: jest.Mock = jest.fn(() => ({ upsert: mockUpsert }))
+const mockGetAuthenticatedUserId = jest.fn()
 
 jest.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: { from: (arg: unknown) => mockFrom(arg) },
 }))
 
-function makeRequest(body: object) {
+jest.mock('@/lib/api-auth', () => ({
+  getAuthenticatedUserId: (...args: unknown[]) => mockGetAuthenticatedUserId(...args),
+}))
+
+function makeRequest(body: object = {}) {
   return new NextRequest('http://localhost/api/push/subscribe', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -21,20 +26,27 @@ function makeRequest(body: object) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockGetAuthenticatedUserId.mockResolvedValue('u1')
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
 })
 
 describe('POST /api/push/subscribe', () => {
+  it('인증 사용자가 없으면 401을 반환한다', async () => {
+    mockGetAuthenticatedUserId.mockResolvedValue(null)
+    const res = await POST(makeRequest({ endpoint: 'https://ep', p256dh: 'key', auth: 'auth' }))
+    expect(res.status).toBe(401)
+  })
+
   it('필수 필드가 없으면 400을 반환한다', async () => {
-    const res = await POST(makeRequest({ userId: 'u1' }))
+    const res = await POST(makeRequest())
     expect(res.status).toBe(400)
   })
 
   it('모든 필드가 있으면 upsert 후 ok: true를 반환한다', async () => {
     mockUpsert.mockResolvedValue({ error: null })
     const res = await POST(
-      makeRequest({ userId: 'u1', endpoint: 'https://ep', p256dh: 'key', auth: 'auth' })
+      makeRequest({ endpoint: 'https://ep', p256dh: 'key', auth: 'auth' })
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -49,7 +61,7 @@ describe('POST /api/push/subscribe', () => {
   it('DB 에러 발생 시 500을 반환한다', async () => {
     mockUpsert.mockResolvedValue({ error: { message: 'DB error' } })
     const res = await POST(
-      makeRequest({ userId: 'u1', endpoint: 'https://ep', p256dh: 'key', auth: 'auth' })
+      makeRequest({ endpoint: 'https://ep', p256dh: 'key', auth: 'auth' })
     )
     expect(res.status).toBe(500)
   })

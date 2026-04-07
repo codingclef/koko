@@ -1,3 +1,5 @@
+import { getAuthHeaders } from '@/lib/api-client'
+
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -35,11 +37,14 @@ export async function registerPushSubscription(userId: string): Promise<void> {
     keys: { p256dh: string; auth: string }
   }
 
+  const authHeaders = await getAuthHeaders()
   await fetch('/api/push/subscribe', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
     body: JSON.stringify({
-      userId,
       endpoint: json.endpoint,
       p256dh: json.keys.p256dh,
       auth: json.keys.auth,

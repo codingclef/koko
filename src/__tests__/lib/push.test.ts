@@ -3,6 +3,12 @@
  */
 import { registerPushSubscription } from '@/lib/push'
 
+const mockGetAuthHeaders = jest.fn()
+
+jest.mock('@/lib/api-client', () => ({
+  getAuthHeaders: (...args: unknown[]) => mockGetAuthHeaders(...args),
+}))
+
 const mockGetSubscription = jest.fn()
 const mockSubscribe = jest.fn()
 const mockRegister = jest.fn()
@@ -23,6 +29,7 @@ const mockRegistration = {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockGetAuthHeaders.mockResolvedValue({ Authorization: 'Bearer token' })
 
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY =
     'BDiltY7dC3CnNxamlejehgdculV7iorzypDSV1a2GDFc2d2FQoYyXcl_6J76J3HT-kTqQ7zB5hSNoKeTHxw_KvY'
@@ -55,7 +62,13 @@ describe('registerPushSubscription', () => {
     expect(mockSubscribe).not.toHaveBeenCalled()
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/push/subscribe',
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token',
+        }),
+      })
     )
   })
 

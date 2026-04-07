@@ -466,6 +466,14 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: string
       }
+      join_family_by_invite_code: {
+        Args: {
+          p_display_name?: string | null
+          p_invite_code: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_my_family_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]

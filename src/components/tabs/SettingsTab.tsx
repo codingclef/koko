@@ -6,6 +6,7 @@ import { LogOut, Share2, Check, Users, Pencil, X, Bell, BellOff } from 'lucide-r
 import { supabase } from '@/lib/supabase'
 import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
+import { getAuthHeaders } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState, Tab } from '@/types/tabs'
@@ -96,23 +97,31 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     setJoining(true)
     setJoinError(null)
 
-    const res = await fetch('/api/family/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        inviteCode: joinCode.trim(),
-        displayName: joinDisplayName.trim() || undefined,
-      }),
-    })
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/family/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({
+          inviteCode: joinCode.trim(),
+          displayName: joinDisplayName.trim() || undefined,
+        }),
+      })
 
-    if (!res.ok) {
-      const { error } = await res.json()
-      setJoinError(error === 'Invalid invite code' ? '올바르지 않은 초대 코드예요' : '오류가 발생했어요')
-    } else {
-      onNavigateToTab('shopping')
+      if (!res.ok) {
+        const { error } = await res.json()
+        setJoinError(error === 'Invalid invite code' ? '올바르지 않은 초대 코드예요' : '오류가 발생했어요')
+      } else {
+        onNavigateToTab('shopping')
+      }
+    } catch {
+      setJoinError('오류가 발생했어요')
+    } finally {
+      setJoining(false)
     }
-    setJoining(false)
   }
 
   const handleStartEditName = () => {
