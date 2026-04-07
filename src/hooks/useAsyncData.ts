@@ -4,6 +4,7 @@ interface UseAsyncDataOptions<T> {
   enabled: boolean
   initialValue: T
   load: () => Promise<T>
+  reloadKey?: unknown
   onSuccess?: (value: T) => void
   onError?: (error: unknown) => void
   keepLoadingWhenDisabled?: boolean
@@ -13,12 +14,14 @@ export function useAsyncData<T>({
   enabled,
   initialValue,
   load,
+  reloadKey,
   onSuccess,
   onError,
   keepLoadingWhenDisabled = true,
 }: UseAsyncDataOptions<T>) {
   const [value, setValue] = useState<T>(initialValue)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<unknown>(null)
   const requestIdRef = useRef(0)
   const initialValueRef = useRef(initialValue)
   const loadRef = useRef(load)
@@ -39,10 +42,12 @@ export function useAsyncData<T>({
     try {
       const nextValue = await loadRef.current()
       if (requestId !== requestIdRef.current) return
+      setError(null)
       setValue(nextValue)
       onSuccessRef.current?.(nextValue)
     } catch (error) {
       if (requestId !== requestIdRef.current) return
+      setError(error)
       setValue(initialValueRef.current)
       onErrorRef.current?.(error)
     } finally {
@@ -55,18 +60,21 @@ export function useAsyncData<T>({
   useEffect(() => {
     if (!enabled) {
       requestIdRef.current += 1
+      setError(null)
       setValue(initialValueRef.current)
       setLoading(keepLoadingWhenDisabled)
       return
     }
 
     run()
-  }, [enabled, keepLoadingWhenDisabled, run])
+  }, [enabled, keepLoadingWhenDisabled, reloadKey, run])
 
   return {
     value,
     setValue,
     loading,
+    error,
+    clearError: () => setError(null),
     reload: run,
   }
 }

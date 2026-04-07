@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useCalendars } from '@/hooks/useCalendars'
+import { useAsyncData } from '@/hooks/useAsyncData'
 import { useHolidays } from '@/hooks/useHolidays'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState } from '@/types/tabs'
@@ -22,7 +23,6 @@ import {
   setReminders,
   type CalendarEvent,
   type FamilyMember,
-  type CalendarMember,
 } from '@/lib/calendar'
 import { CalendarFilter } from '@/components/calendar/CalendarFilter'
 import { CalendarGrid } from '@/components/calendar/CalendarGrid'
@@ -39,14 +39,18 @@ interface Props extends AuthState {
 }
 
 export function CalendarTab({ preferences, user, familyId, isInitializing }: Props) {
-  const { calendars, loading: calLoading, reload: reloadCalendars } = useCalendars(familyId)
+  const {
+    calendars,
+    loading: calLoading,
+    error: calendarsError,
+    reload: reloadCalendars,
+  } = useCalendars(familyId)
 
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
 
   const holidays = useHolidays(year, month, preferences?.holiday_countries ?? [])
-  const [events, setEvents] = useState<CalendarEvent[]>([])
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -54,7 +58,6 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
   const [editingEvent, setEditingEvent] = useState<{ event?: CalendarEvent; date?: Date } | null>(null)
   const [calendarForm, setCalendarForm] = useState<{ calendar?: Calendar } | null>(null)
 
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [calendarMemberIds, setCalendarMemberIds] = useState<string[]>([])
   const [showCalendarList, setShowCalendarList] = useState(false)
 
@@ -65,28 +68,46 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const isModalOpen = selectedDate !== null || selectedEvent !== null || editingEvent !== null || calendarForm !== null
 
-  useEffect(() => {
-    if (!familyId) return
-    getFamilyMembers(familyId)
-      .then(setFamilyMembers)
-      .catch((e) => console.error('[CalendarTab] getFamilyMembers failed:', e))
-  }, [familyId])
+  const {
+    value: familyMembers,
+    loading: familyMembersLoading,
+    error: familyMembersError,
+    reload: reloadFamilyMembers,
+  } = useAsyncData<FamilyMember[]>({
+    enabled: Boolean(familyId),
+    initialValue: [],
+    reloadKey: familyId,
+    load: () => getFamilyMembers(familyId!),
+    onError: (e) => console.error('[CalendarTab] getFamilyMembers failed:', e),
+  })
 
+  const {
+    value: events,
+    setValue: setEvents,
+    loading: eventsLoading,
+    error: eventsError,
+    reload: reloadEvents,
+  } = useAsyncData<CalendarEvent[]>({
+    enabled: Boolean(familyId),
+    initialValue: [],
+    reloadKey: `${familyId ?? 'none'}:${year}:${month}`,
+    load: () => getEventsByMonth(familyId!, year, month),
+    onError: (e) => console.error('[CalendarTab] loadEvents failed:', e),
+  })
 
-  const loadEvents = useCallback(() => {
+  const refreshEvents = useCallback(async () => {
     if (!familyId) return
-    getEventsByMonth(familyId, year, month)
-      .then(setEvents)
-      .catch((e) => console.error('[CalendarTab] loadEvents failed:', e))
-  }, [familyId, year, month])
+
+    try {
+      const nextEvents = await getEventsByMonth(familyId, year, month)
+      setEvents(nextEvents)
+    } catch (e) {
+      console.error('[CalendarTab] refreshEvents failed:', e)
+    }
+  }, [familyId, year, month, setEvents])
 
   const channelName = familyId ? `family_events_${familyId}_${year}_${month}` : null
-  const broadcast = useRealtimeSync(channelName, loadEvents, { refreshOnSubscribed: false })
-
-  useEffect(() => {
-    if (!familyId) return
-    loadEvents()
-  }, [familyId, year, month, loadEvents])
+  const broadcast = useRealtimeSync(channelName, refreshEvents, { refreshOnSubscribed: false })
 
   const prevMonth = () => {
     setSlideDir('right')
@@ -193,7 +214,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
       await setReminders(evt.id, params.reminderMinutes)
     }
 
-    await loadEvents()
+    await refreshEvents()
     broadcast()
   }
 
@@ -201,7 +222,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     if (!selectedEvent) return
     await deleteEvent(selectedEvent.id)
     setSelectedEvent(null)
-    await loadEvents()
+    await refreshEvents()
     broadcast()
   }
 
@@ -211,12 +232,49 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setSelectedEvent(null)
   }
 
-  const loading = isInitializing || calLoading
+  const loading = isInitializing || calLoading || familyMembersLoading || eventsLoading
+  const fetchError = calendarsError || familyMembersError || eventsError
+
+  const handleRetry = async () => {
+    await Promise.all([reloadCalendars(), reloadFamilyMembers(), reloadEvents()])
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="w-full min-h-screen flex flex-col bg-white dark:bg-stone-950">
+        <div className="px-4 pt-8 pb-2 shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
+              <ChevronLeft size={20} />
+            </button>
+            <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
+              {year}년 {month + 1}월
+            </h1>
+            <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="text-5xl mb-4">📡</div>
+          <p className="text-stone-600 dark:text-stone-300 font-medium">캘린더를 불러오지 못했어요</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">잠시 후 다시 시도해주세요</p>
+          <button
+            onClick={handleRetry}
+            className="mt-6 px-4 py-2.5 rounded-xl bg-accent-400 hover:bg-accent-500 text-white font-semibold text-sm transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
       </div>
     )
   }

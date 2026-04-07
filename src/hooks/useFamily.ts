@@ -8,6 +8,7 @@ export function useFamily(user: User | null) {
   const { value: familyId, loading } = useAsyncData<string | null>({
     enabled: Boolean(user),
     initialValue: null,
+    reloadKey: user?.id,
     load: async () => {
       const { familyId } = await postJsonWithAuth<{ familyId: string }>('/api/family')
       return familyId
