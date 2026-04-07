@@ -1,19 +1,16 @@
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
+import { getFamilyInviteCode } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import type { User } from '@supabase/supabase-js'
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: { invite_code: 'ABC123' } }),
-    })),
     auth: { signOut: jest.fn() },
   },
 }))
 jest.mock('@/lib/family', () => ({
+  getFamilyInviteCode: jest.fn().mockResolvedValue('ABC123'),
   getMyFamilyMember: jest.fn().mockResolvedValue({ display_name: '테스트' }),
   updateMyDisplayName: jest.fn(),
 }))
@@ -36,6 +33,7 @@ const defaultProps = {
 describe('SettingsTab 알림 섹션', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    ;(getFamilyInviteCode as jest.Mock).mockResolvedValue('ABC123')
   })
 
   it('권한이 default일 때 "알림 허용하기" 버튼이 표시된다', async () => {

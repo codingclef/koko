@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut, Share2, Check, Users, Pencil, X, Bell, BellOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { getFamilyInviteCode, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import { getAuthHeaders } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
@@ -49,12 +49,9 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
 
   useEffect(() => {
     if (!familyId) return
-    supabase
-      .from('families')
-      .select('invite_code')
-      .eq('id', familyId)
-      .single()
-      .then(({ data }) => setInviteCode(data?.invite_code ?? null))
+    getFamilyInviteCode(familyId)
+      .then(setInviteCode)
+      .catch((e) => console.error('[SettingsTab] getFamilyInviteCode failed:', e))
   }, [familyId])
 
   useEffect(() => {

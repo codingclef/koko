@@ -14,6 +14,7 @@ import {
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useAuth } from '@/hooks/useAuth'
 import {
+  getShoppingList,
   getShoppingItems,
   addShoppingItem,
   checkShoppingItem,
@@ -23,7 +24,6 @@ import {
 } from '@/lib/shopping'
 import { ShoppingItem } from '@/components/shopping/ShoppingItem'
 import { AddItemInput } from '@/components/shopping/AddItemInput'
-import { supabase } from '@/lib/supabase'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { ShoppingItem as ShoppingItemType, ShoppingList } from '@/lib/shopping'
 
@@ -58,12 +58,8 @@ export default function ShoppingDetailPage() {
   useEffect(() => {
     if (!id) return
     const init = async () => {
-      const { data } = await supabase
-        .from('shopping_lists')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
-      setList(data)
+      const shoppingList = await getShoppingList(id)
+      setList(shoppingList)
       const fetchedItems = await getShoppingItems(id)
       setItems(fetchedItems)
       setLoading(false)

@@ -13,27 +13,13 @@ jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, loading: false }),
 }))
 
-jest.mock('@/lib/shopping', () => ({
-  getShoppingItems: jest.fn().mockResolvedValue([]),
+jest.mock('@/hooks/useRealtimeSync', () => ({
+  useRealtimeSync: () => jest.fn(),
 }))
 
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () =>
-            Promise.resolve({ data: { id: 'list-1', name: '이마트', type: 'strikethrough' } }),
-        }),
-      }),
-    }),
-    channel: () => ({
-      on: function () { return this },
-      subscribe: (cb: (s: string) => void) => { cb('SUBSCRIBED'); return this },
-      send: jest.fn(),
-    }),
-    removeChannel: jest.fn(),
-  },
+jest.mock('@/lib/shopping', () => ({
+  getShoppingList: jest.fn().mockResolvedValue({ id: 'list-1', name: '이마트', type: 'strikethrough' }),
+  getShoppingItems: jest.fn().mockResolvedValue([]),
 }))
 
 jest.mock('@dnd-kit/core', () => ({
