@@ -1,75 +1,12 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is kept only for compatibility with tools that still look for `CLAUDE.md`.
 
-# Koko - Family Hub App
+Primary docs:
 
-## Project Stack
-- **Frontend**: Next.js (TypeScript, Tailwind CSS, App Router)
-- **Backend**: Supabase (PostgreSQL, Realtime, Auth)
-- **Deployment**: Vercel (web), PWA for mobile
+1. `AGENTS.md` — working rules for AI agents
+2. `PROJECT_MAP.md` — feature map, ownership map, ERD-level summary
+3. `PATTERNS.md` — implementation conventions
+4. `CHALLENGES.md` — past issues and design decisions
 
-## Git Rules
-1. Always work on a `feature/*` branch → PR → merge to main
-2. Commit at each unit of work (do NOT batch commits)
-3. Commit messages and PR titles must be written in English
-4. Direct push to main is prohibited (branch protection enabled)
-5. After a PR is merged, delete the feature branch immediately
-
-## ⚠️ Before Any Action — MANDATORY, NO EXCEPTIONS
-> These rules apply to EVERY task without exception. Skipping them is not allowed under any circumstances.
-
-1. **Before starting any task** (investigation, analysis, or implementation), confirm understanding by explaining back what the user is asking. Keep re-explaining until the user explicitly confirms there is no problem — do not proceed after just one explanation.
-2. **No action of any kind begins before the user's explicit approval** — this includes reading files, investigating, executing commands, and writing code. Nothing starts until the user confirms.
-
-## Development Rules
-1. When asking the user to run a command or tool, always include a Korean explanation
-2. Whenever code is written or modified, unit tests must also be written or modified
-3. After writing or modifying code, always run `npx tsc --noEmit` to verify no TypeScript errors before committing
-4. Use GitHub Actions CI — tests must pass before merging
-5. Items requiring manual visual verification by the user must be listed as checkboxes in the PR (exclude automated test items)
-6. Before adding or modifying features, read PATTERNS.md first
-
-## Behavior Rules
-
-1. **Systematic Debugging** (`/superpowers:systematic-debugging`): When an error occurs, do not simply patch a single line of code. Instead, logically trace the root cause from a system-wide perspective and resolve it at its source.
-2. **Simplify** (`/simplify`): Write code as concisely and readably as possible. Avoid complex logic and always favor maintainability.
-3. **Verification Before Completion** (`/superpowers:verification-before-completion`): Before marking any task as done, self-verify that the code works correctly and is implemented as intended.
-
-## Commands
-
-```bash
-npm run dev          # dev server (localhost:3000)
-npm run build        # production build
-npm run lint         # ESLint
-npm run test         # run all tests
-npm run test -- --testPathPattern=<path>  # run single test file
-npm run test:watch   # watch mode
-```
-
-## Architecture
-
-### Layer Pipeline
-
-```
-DB migration → src/types/database.ts → src/lib/ → src/hooks/ (shared only) → app/page → components/
-```
-
-Each layer depends only on the layer below it. Real-time subscription is managed only at the page layer.
-
-### Tab Structure (CSS Keep-Alive)
-
-`/calendar` is the single entry point; `/shopping` and `/settings` redirect here.
-`TabsShell` keeps all three tabs permanently mounted and toggles visibility with `display: contents` / `display: none` — prevents re-fetch and spinner on tab switch.
-
-### Real-time Sync
-
-Uses Supabase Realtime **Broadcast** channel (not `postgres_changes`).
-After any mutation, manually call `channel.send()` to broadcast a refresh event to other devices.
-Only send after the channel is `SUBSCRIBED` — track readiness with `channelReadyRef`.
-
-### Auth Flow
-
-Email allowlist is stored in the `allowed_emails` DB table (not env vars — avoids Vercel redeployment on member changes).
-OAuth: Supabase auto-exchanges the code → `onAuthStateChange('SIGNED_IN')` → check allowlist → allow or sign out.
-Do **not** call `exchangeCodeForSession` manually; it conflicts with Supabase's automatic exchange.
+Use `AGENTS.md` as the canonical agent guide.
