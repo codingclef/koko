@@ -42,12 +42,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const [lists, setLists] = useState<ShoppingListWithPreview[]>(
     () => getCachedLists(familyId) ?? []
   )
-  const [listsFamilyId, setListsFamilyId] = useState<string | null>(familyId)
   const [fetchError, setFetchError] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
-
-  const visibleLists = listsFamilyId === familyId ? lists : getCachedLists(familyId) ?? []
 
   // 현재 family 기준 캐시가 없으면 첫 진입으로 간주한다.
   const loading = isInitializing && getCachedLists(familyId) === null
@@ -59,22 +56,13 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   const updateLists = useCallback((value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
     setLists((prev) => {
-      const base = listsFamilyId === familyId ? prev : getCachedLists(familyId) ?? []
+      const base = getCachedLists(familyId) ?? prev
       const next = typeof value === 'function' ? value(base) : value
       if (familyId) {
         cachedListsByFamily.set(familyId, next)
       }
       return next
     })
-    setListsFamilyId(familyId)
-  }, [familyId, listsFamilyId])
-
-  useEffect(() => {
-    const cached = getCachedLists(familyId)
-    setLists(cached ?? [])
-    setListsFamilyId(familyId)
-    setFetchError(false)
-    setMutationError(null)
   }, [familyId])
 
   const refresh = useCallback(() => {
@@ -130,7 +118,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   const handleDelete = async (listId: string) => {
     setMutationError(null)
-    const previousLists = visibleLists
+    const previousLists = lists
     updateLists((prev) => prev.filter((l) => l.id !== listId))
 
     try {
@@ -145,7 +133,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   const handleRename = async (listId: string, name: string) => {
     setMutationError(null)
-    const previousLists = visibleLists
+    const previousLists = lists
     updateLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
 
     try {
@@ -163,9 +151,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     if (!over || active.id === over.id) return
 
     setMutationError(null)
-    const oldIndex = visibleLists.findIndex((l) => l.id === active.id)
-    const newIndex = visibleLists.findIndex((l) => l.id === over.id)
-    const reordered = arrayMove(visibleLists, oldIndex, newIndex).map((l, i) => ({ ...l, sort_order: i }))
+    const oldIndex = lists.findIndex((l) => l.id === active.id)
+    const newIndex = lists.findIndex((l) => l.id === over.id)
+    const reordered = arrayMove(lists, oldIndex, newIndex).map((l, i) => ({ ...l, sort_order: i }))
     updateLists(reordered)
 
     try {
@@ -173,7 +161,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       broadcast()
     } catch (e) {
       console.error('[ShoppingTab] reorderShoppingLists failed:', e)
-      updateLists(visibleLists)
+      updateLists(lists)
       setMutationError('목록 순서를 저장하지 못했어요')
     }
   }
@@ -192,7 +180,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
-            {visibleLists.length > 0 ? `${visibleLists.length}개의 목록` : '장바구니를 만들어보세요'}
+            {lists.length > 0 ? `${lists.length}개의 목록` : '장바구니를 만들어보세요'}
           </p>
         </div>
         <button
@@ -216,7 +204,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
           <p className="text-stone-500 dark:text-stone-400 font-medium">목록을 불러오지 못했어요</p>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">잠시 후 다시 시도해주세요</p>
         </div>
-      ) : visibleLists.length === 0 ? (
+      ) : lists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <ShoppingCart size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
           <p className="text-stone-500 dark:text-stone-400 font-medium">아직 장바구니가 없어요</p>
@@ -224,9 +212,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         </div>
       ) : (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <SortableContext items={visibleLists.map((l) => l.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={lists.map((l) => l.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {visibleLists.map((list) => (
+              {lists.map((list) => (
                 <ShoppingListCard
                   key={list.id}
                   list={list}
