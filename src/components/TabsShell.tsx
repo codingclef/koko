@@ -11,6 +11,7 @@ import { useFamily } from '@/hooks/useFamily'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { registerPushSubscription } from '@/lib/push'
 import { type Tab, TABS } from '@/types/tabs'
+import { AppSplash } from '@/components/AppSplash'
 
 export function TabsShell() {
   const searchParams = useSearchParams()
@@ -38,6 +39,9 @@ export function TabsShell() {
       document.documentElement.setAttribute('data-theme', preferences.app_theme)
     }
   }, [preferences?.app_theme])
+
+  if (authLoading) return <AppSplash />
+  if (!user) return null
 
   const handleTabChange = (tab: Tab) => {
     router.replace(tab === 'calendar' ? '/calendar' : `/calendar?tab=${tab}`)

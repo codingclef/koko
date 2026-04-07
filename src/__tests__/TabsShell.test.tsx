@@ -3,6 +3,8 @@ import { TabsShell } from '@/components/TabsShell'
 
 const mockReplace = jest.fn()
 let mockTabParam: string | null = null
+let mockAuthLoading = false
+let mockAuthUser: { id: string } | null = { id: 'user-1' }
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
@@ -10,11 +12,11 @@ jest.mock('next/navigation', () => ({
 }))
 
 jest.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ user: null, loading: true }),
+  useAuth: () => ({ user: mockAuthUser, loading: mockAuthLoading }),
 }))
 
 jest.mock('@/hooks/useFamily', () => ({
-  useFamily: () => ({ familyId: null, loading: true }),
+  useFamily: () => ({ familyId: null, loading: false }),
 }))
 
 jest.mock('@/hooks/useUserPreferences', () => ({
@@ -26,7 +28,11 @@ jest.mock('@/lib/supabase', () => ({
 }))
 
 jest.mock('@/lib/push', () => ({
-  registerPushSubscription: jest.fn(),
+  registerPushSubscription: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock('@/components/AppSplash', () => ({
+  AppSplash: () => <div data-testid="app-splash" />,
 }))
 
 jest.mock('@/components/tabs/CalendarTab', () => ({
@@ -49,6 +55,22 @@ describe('TabsShell', () => {
   beforeEach(() => {
     mockReplace.mockClear()
     mockTabParam = null
+    mockAuthLoading = false
+    mockAuthUser = { id: 'user-1' }
+  })
+
+  it('인증 로딩 중에는 AppSplash를 표시한다', () => {
+    mockAuthLoading = true
+    mockAuthUser = null
+    render(<TabsShell />)
+    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
+    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
+  })
+
+  it('미인증 상태에서는 탭을 렌더링하지 않는다', () => {
+    mockAuthUser = null
+    render(<TabsShell />)
+    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
   })
 
   it('?tab 파라미터가 없으면 캘린더 탭이 표시된다', () => {
