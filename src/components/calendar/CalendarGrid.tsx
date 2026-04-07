@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
@@ -88,15 +89,18 @@ export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[])
     })
   }
 
+  // Precompute sort keys to avoid repeated dateOnly() calls inside comparator
+  const sortKeys = new Map(multiDayEvents.map((e) => {
+    const start = dateOnly(new Date(e.start_at)).getTime()
+    const dur = e.end_at ? dateOnly(new Date(e.end_at)).getTime() - start : 0
+    return [e.id, { start, dur }]
+  }))
+
   // Stable sort: start asc → duration desc → id asc
   segments.sort((a, b) => {
-    const aStart = dateOnly(new Date(a.event.start_at)).getTime()
-    const bStart = dateOnly(new Date(b.event.start_at)).getTime()
-    if (aStart !== bStart) return aStart - bStart
-    const aDur = dateOnly(new Date(a.event.end_at!)).getTime() - aStart
-    const bDur = dateOnly(new Date(b.event.end_at!)).getTime() - bStart
-    if (aDur !== bDur) return bDur - aDur
-    return a.event.id.localeCompare(b.event.id)
+    const ak = sortKeys.get(a.event.id)!
+    const bk = sortKeys.get(b.event.id)!
+    return ak.start - bk.start || bk.dur - ak.dur || a.event.id.localeCompare(b.event.id)
   })
 
   // Greedy lane assignment
@@ -135,23 +139,48 @@ export function CalendarGrid({
   year, month, events, calendars, activeIds,
   holidays = [], selectedDate, onSelectDate, className,
 }: Props) {
-  const cells = buildGrid(year, month)
-  const today = new Date()
-  const calendarMap = new Map(calendars.map((c) => [c.id, c]))
+  const cells = useMemo(() => buildGrid(year, month), [year, month])
+  const today = useMemo(() => new Date(), [])
+  const calendarMap = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
 
-  const visibleEvents = events.filter(
-    (e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)
+  const visibleEvents = useMemo(
+    () => events.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)),
+    [events, activeIds]
   )
-  const multiDayEvents = visibleEvents.filter(isMultiDayAllDay)
-  const singleDayEvents = visibleEvents.filter((e) => !isMultiDayAllDay(e))
+
+  // Single pass: avoids calling isMultiDayAllDay twice per event
+  const { multiDayEvents, singleDayEvents } = useMemo(() => {
+    const multi: CalendarEvent[] = []
+    const single: CalendarEvent[] = []
+    for (const e of visibleEvents) {
+      if (isMultiDayAllDay(e)) multi.push(e)
+      else single.push(e)
+    }
+    return { multiDayEvents: multi, singleDayEvents: single }
+  }, [visibleEvents])
+
+  // Map for O(1) lookup instead of O(n) filter per cell
+  const singleEventsByDate = useMemo(() => {
+    const map = new Map<number, CalendarEvent[]>()
+    for (const e of singleDayEvents) {
+      const key = dateOnly(new Date(e.start_at)).getTime()
+      const arr = map.get(key)
+      if (arr) arr.push(e)
+      else map.set(key, [e])
+    }
+    return map
+  }, [singleDayEvents])
 
   const getEventColor = (event: CalendarEvent): string => {
     if (!event.calendar_id) return '#94a3b8'
     return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
   }
 
-  const rows: DayCell[][] = []
-  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7))
+  const rows = useMemo(() => {
+    const result: DayCell[][] = []
+    for (let i = 0; i < cells.length; i += 7) result.push(cells.slice(i, i + 7))
+    return result
+  }, [cells])
 
   return (
     <div className={`flex flex-col w-full ${className ?? ''}`}>
@@ -173,7 +202,7 @@ export function CalendarGrid({
       <div className="flex flex-col flex-1">
         {rows.map((row, rowIdx) => {
           const segments = computeSegments(row, multiDayEvents)
-          const laneCount = segments.length > 0 ? Math.max(...segments.map((s) => s.lane)) + 1 : 0
+          const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
           const laneAreaHeight = laneCount * LANE_HEIGHT
 
           return (
@@ -181,9 +210,7 @@ export function CalendarGrid({
               {/* 날짜 셀 그리드 */}
               <div className="grid grid-cols-7 h-full">
                 {row.map((cell, colIdx) => {
-                  const daySingleEvents = singleDayEvents.filter((e) =>
-                    isSameDay(new Date(e.start_at), cell.date)
-                  )
+                  const daySingleEvents = singleEventsByDate.get(cell.date.getTime()) ?? []
                   const dayHolidays = getHolidaysForDay(cell.date, holidays)
                   const isToday = isSameDay(cell.date, today)
                   const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
