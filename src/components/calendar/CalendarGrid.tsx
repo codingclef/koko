@@ -6,8 +6,9 @@ import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
-const DATE_HEADER_HEIGHT = 28 // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28
-const LANE_HEIGHT = 18        // px – bar (16) + gap (2)
+const DATE_HEADER_HEIGHT = 28  // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28
+const LUNAR_DATE_HEIGHT = 12   // px – text-[9px] leading-tight (9 × 1.25 ≈ 12)
+const LANE_HEIGHT = 18         // px – bar (16) + gap (2)
 
 interface DayCell {
   date: Date
@@ -206,6 +207,8 @@ export function CalendarGrid({
     return result
   }, [cells])
 
+  const effectiveDateHeaderHeight = DATE_HEADER_HEIGHT + (showLunar ? LUNAR_DATE_HEIGHT : 0)
+
   return (
     <div className={`flex flex-col w-full ${className ?? ''}`}>
       {/* 요일 헤더 */}
@@ -332,7 +335,7 @@ export function CalendarGrid({
                 <div
                   aria-hidden="true"
                   className="absolute inset-x-0 pointer-events-none"
-                  style={{ top: DATE_HEADER_HEIGHT }}
+                  style={{ top: effectiveDateHeaderHeight }}
                 >
                   {segments.map((seg) => {
                     const color = getEventColor(seg.event)
