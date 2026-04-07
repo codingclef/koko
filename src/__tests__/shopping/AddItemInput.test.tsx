@@ -17,7 +17,7 @@ describe('AddItemInput', () => {
   })
 
   it('값 입력 후 제출하면 onAdd가 호출되고 입력창이 초기화된다', async () => {
-    const onAdd = jest.fn().mockResolvedValue(undefined)
+    const onAdd = jest.fn().mockResolvedValue(true)
     const user = userEvent.setup()
     render(<AddItemInput onAdd={onAdd} />)
 
@@ -27,6 +27,20 @@ describe('AddItemInput', () => {
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledWith('우유')
       expect(screen.getByPlaceholderText('아이템 추가...')).toHaveValue('')
+    })
+  })
+
+  it('onAdd 실패 시 입력값을 유지하고 다시 제출 가능하다', async () => {
+    const onAdd = jest.fn().mockResolvedValueOnce(false)
+    const user = userEvent.setup()
+    render(<AddItemInput onAdd={onAdd} />)
+
+    await user.type(screen.getByPlaceholderText('아이템 추가...'), '우유')
+    await user.click(screen.getByLabelText('추가'))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('아이템 추가...')).toHaveValue('우유')
+      expect(screen.getByLabelText('추가')).not.toBeDisabled()
     })
   })
 })

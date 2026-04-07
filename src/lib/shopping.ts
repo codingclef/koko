@@ -127,19 +127,25 @@ export async function renameShoppingItem(itemId: string, name: string): Promise<
 export async function reorderShoppingLists(
   updates: { id: string; sort_order: number }[]
 ): Promise<void> {
-  await Promise.all(
+  const results = await Promise.all(
     updates.map(({ id, sort_order }) =>
       supabase.from('shopping_lists').update({ sort_order }).eq('id', id)
     )
   )
+
+  const failed = results.find(({ error }) => error)
+  if (failed?.error) throw failed.error
 }
 
 export async function reorderShoppingItems(
   updates: { id: string; sort_order: number }[]
 ): Promise<void> {
-  await Promise.all(
+  const results = await Promise.all(
     updates.map(({ id, sort_order }) =>
       supabase.from('shopping_items').update({ sort_order }).eq('id', id)
     )
   )
+
+  const failed = results.find(({ error }) => error)
+  if (failed?.error) throw failed.error
 }

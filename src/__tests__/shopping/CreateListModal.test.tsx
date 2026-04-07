@@ -21,7 +21,7 @@ describe('CreateListModal', () => {
   })
 
   it('폼 제출 시 onCreate가 호출된다', async () => {
-    const onCreate = jest.fn().mockResolvedValue(undefined)
+    const onCreate = jest.fn().mockResolvedValue(true)
     render(<CreateListModal onClose={jest.fn()} onCreate={onCreate} />)
 
     fireEvent.change(screen.getByPlaceholderText('예: 이마트, 코스트코'), {
@@ -40,5 +40,20 @@ describe('CreateListModal', () => {
     // backdrop click to close
     fireEvent.click(document.querySelector('.absolute.inset-0')!)
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('onCreate 실패 시 로딩 상태가 복구되고 다시 제출 가능하다', async () => {
+    const onCreate = jest.fn().mockResolvedValueOnce(false)
+    render(<CreateListModal onClose={jest.fn()} onCreate={onCreate} />)
+
+    fireEvent.change(screen.getByPlaceholderText('예: 이마트, 코스트코'), {
+      target: { value: '이마트' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '만들기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '만들기' })).not.toBeDisabled()
+      expect(screen.getByPlaceholderText('예: 이마트, 코스트코')).toHaveValue('이마트')
+    })
   })
 })

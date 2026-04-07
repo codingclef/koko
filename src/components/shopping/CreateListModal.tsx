@@ -6,7 +6,7 @@ import type { ListType } from '@/lib/shopping'
 
 interface Props {
   onClose: () => void
-  onCreate: (name: string, type: ListType) => Promise<void>
+  onCreate: (name: string, type: ListType) => Promise<boolean>
 }
 
 export function CreateListModal({ onClose, onCreate }: Props) {
@@ -18,8 +18,14 @@ export function CreateListModal({ onClose, onCreate }: Props) {
     e.preventDefault()
     if (!name.trim()) return
     setLoading(true)
-    await onCreate(name.trim(), type)
-    setLoading(false)
+    try {
+      const created = await onCreate(name.trim(), type)
+      if (created) {
+        setName('')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
