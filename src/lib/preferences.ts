@@ -12,6 +12,7 @@ export const APP_THEMES = [
 
 export type AppTheme = typeof APP_THEMES[number]['key']
 export const DEFAULT_THEME: AppTheme = 'tangerine'
+export const THEME_STORAGE_KEY = 'koko_theme'
 
 export type UserPreferences = Database['public']['Tables']['user_preferences']['Row']
 

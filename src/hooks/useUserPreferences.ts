@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { getUserPreferences, upsertUserPreferences, type UserPreferences } from '@/lib/preferences'
+import { getUserPreferences, upsertUserPreferences, THEME_STORAGE_KEY, type UserPreferences } from '@/lib/preferences'
 
 export function useUserPreferences(user: User | null) {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
@@ -10,6 +10,7 @@ export function useUserPreferences(user: User | null) {
     try {
       const data = await getUserPreferences(userId)
       setPreferences(data)
+      if (data?.app_theme) localStorage.setItem(THEME_STORAGE_KEY, data.app_theme)
     } catch {
       setPreferences(null)
     } finally {
@@ -27,6 +28,7 @@ export function useUserPreferences(user: User | null) {
       if (!user) return
       const updated = await upsertUserPreferences(user.id, updates)
       setPreferences(updated)
+      if (updated.app_theme) localStorage.setItem(THEME_STORAGE_KEY, updated.app_theme)
     },
     [user]
   )

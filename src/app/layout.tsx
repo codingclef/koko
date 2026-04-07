@@ -29,6 +29,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t=localStorage.getItem('koko_theme');if(t){document.documentElement.setAttribute('data-theme',t)}})()` }} />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
