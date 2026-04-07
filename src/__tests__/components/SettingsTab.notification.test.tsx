@@ -81,7 +81,7 @@ describe('SettingsTab 알림 섹션', () => {
       fireEvent.click(screen.getByText('알림 허용하기'))
     })
 
-    expect(registerPushSubscription).toHaveBeenCalledWith('user-1')
+    expect(registerPushSubscription).toHaveBeenCalled()
   })
 
   it('Notification 미지원 환경에서는 알림 섹션이 표시되지 않는다', async () => {

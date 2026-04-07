@@ -1,4 +1,3 @@
-import { useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { getUserPreferences, upsertUserPreferences, persistTheme, type AppTheme, type UserPreferences } from '@/lib/preferences'
 import { useAsyncData } from '@/hooks/useAsyncData'
@@ -17,15 +16,14 @@ export function useUserPreferences(user: User | null) {
     },
   })
 
-  const updatePreferences = useCallback(
-    async (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => {
-      if (!user) return
-      const updated = await upsertUserPreferences(user.id, updates)
-      setPreferences(updated)
-      if (updated.app_theme) persistTheme(updated.app_theme as AppTheme)
-    },
-    [user]
-  )
+  async function updatePreferences(
+    updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>
+  ) {
+    if (!user) return
+    const updated = await upsertUserPreferences(user.id, updates)
+    setPreferences(updated)
+    if (updated.app_theme) persistTheme(updated.app_theme as AppTheme)
+  }
 
   return { preferences, loading, updatePreferences }
 }

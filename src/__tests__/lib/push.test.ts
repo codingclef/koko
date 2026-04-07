@@ -56,7 +56,7 @@ describe('registerPushSubscription', () => {
     const mockSub = { toJSON: () => mockSubscriptionJSON }
     mockGetSubscription.mockResolvedValue(mockSub)
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockSubscribe).not.toHaveBeenCalled()
     expect(mockPostJsonWithAuth).toHaveBeenCalledWith(
@@ -74,7 +74,7 @@ describe('registerPushSubscription', () => {
     const mockSub = { toJSON: () => mockSubscriptionJSON }
     mockSubscribe.mockResolvedValue(mockSub)
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockSubscribe).toHaveBeenCalledWith(
       expect.objectContaining({ userVisibleOnly: true })
@@ -92,7 +92,7 @@ describe('registerPushSubscription', () => {
       configurable: true,
     })
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(requestPermission).not.toHaveBeenCalled()
     expect(mockPostJsonWithAuth).toHaveBeenCalled()
@@ -104,7 +104,7 @@ describe('registerPushSubscription', () => {
       configurable: true,
     })
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockPostJsonWithAuth).not.toHaveBeenCalled()
   })
@@ -113,7 +113,7 @@ describe('registerPushSubscription', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).Notification
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockRegister).not.toHaveBeenCalled()
   })
@@ -122,7 +122,7 @@ describe('registerPushSubscription', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).PushManager
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockRegister).not.toHaveBeenCalled()
   })

@@ -12,7 +12,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return buffer
 }
 
-export async function registerPushSubscription(userId: string): Promise<void> {
+export async function registerPushSubscription(): Promise<void> {
   if (typeof window === 'undefined') return
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return
 

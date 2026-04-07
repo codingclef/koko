@@ -65,7 +65,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     if (!user) return
     setEnablingNotif(true)
     try {
-      await registerPushSubscription(user.id)
+      await registerPushSubscription()
       setNotifPermission(Notification.permission)
     } finally {
       setEnablingNotif(false)
