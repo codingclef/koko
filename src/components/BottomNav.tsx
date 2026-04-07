@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CalendarDays, ShoppingCart, Settings } from 'lucide-react'
+import type { Tab } from '@/types/tabs'
 
 const navItems = [
   { href: '/calendar', icon: CalendarDays, label: '캘린더' },
@@ -11,8 +12,8 @@ const navItems = [
 ]
 
 interface Props {
-  activeTab?: string
-  onTabChange?: (tab: string) => void
+  activeTab?: Tab
+  onTabChange?: (tab: Tab) => void
 }
 
 export function BottomNav({ activeTab, onTabChange }: Props) {
@@ -35,7 +36,7 @@ export function BottomNav({ activeTab, onTabChange }: Props) {
           return tabMode ? (
             <button
               key={href}
-              onClick={() => onTabChange(tabId)}
+              onClick={() => onTabChange(tabId as Tab)}
               className={className}
             >
               <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />

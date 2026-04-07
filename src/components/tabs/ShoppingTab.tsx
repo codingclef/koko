@@ -24,27 +24,43 @@ import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { supabase } from '@/lib/supabase'
 import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
 
+// 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
+// familyId는 마운트 시점에 미확정이므로 keyed Map 대신 단순 변수로 보관.
+let lastKnownLists: ShoppingListWithPreview[] | null = null
+
 type Props = AuthState
 
 export function ShoppingTab({ user, familyId, isInitializing }: Props) {
-  const [lists, setLists] = useState<ShoppingListWithPreview[]>([])
+  const [lists, setLists] = useState<ShoppingListWithPreview[]>(
+    () => lastKnownLists ?? []
+  )
   const [fetchError, setFetchError] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  const loading = isInitializing
+  // lastKnownLists가 null이면 한 번도 로드된 적 없는 첫 진입 → 스피너 표시
+  // null이 아니면 캐시 데이터가 있으므로 auth 초기화 중에도 즉시 표시
+  const loading = isInitializing && lastKnownLists === null
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
+  const updateLists = (value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
+    setLists((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value
+      lastKnownLists = next
+      return next
+    })
+  }
+
   useEffect(() => {
     if (!familyId) return
 
     const refresh = () =>
       getShoppingListsWithPreviews(familyId)
-        .then(setLists)
+        .then(updateLists)
         .catch((e) => {
           console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
           setFetchError(true)
@@ -80,22 +96,22 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       created_at: new Date().toISOString(),
       previewItems: [],
     }
-    setLists((prev) => [optimisticList, ...prev])
+    updateLists((prev) => [optimisticList, ...prev])
     setShowModal(false)
 
     const realList = await createShoppingList(familyId, user.id, name, type)
-    setLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
+    updateLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
     broadcast()
   }
 
   const handleDelete = async (listId: string) => {
-    setLists((prev) => prev.filter((l) => l.id !== listId))
+    updateLists((prev) => prev.filter((l) => l.id !== listId))
     await deleteShoppingList(listId)
     broadcast()
   }
 
   const handleRename = async (listId: string, name: string) => {
-    setLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
+    updateLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
     await renameShoppingList(listId, name)
     broadcast()
   }
@@ -104,7 +120,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    setLists((prev) => {
+    updateLists((prev) => {
       const oldIndex = prev.findIndex((l) => l.id === active.id)
       const newIndex = prev.findIndex((l) => l.id === over.id)
       const reordered = arrayMove(prev, oldIndex, newIndex)

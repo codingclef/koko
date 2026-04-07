@@ -8,7 +8,7 @@ import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
-import type { AuthState } from '@/types/tabs'
+import type { AuthState, Tab } from '@/types/tabs'
 
 const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'KR', label: '🇰🇷 한국' },
@@ -18,7 +18,7 @@ const SUPPORTED_HOLIDAY_COUNTRIES = [
 
 
 interface Props extends AuthState {
-  onNavigateToTab: (tab: 'calendar' | 'shopping' | 'settings') => void
+  onNavigateToTab: (tab: Tab) => void
   preferences: UserPreferences | null
   updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
 }

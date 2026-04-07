@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 import { ShoppingTab } from '@/components/tabs/ShoppingTab'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
@@ -11,16 +11,18 @@ import { useFamily } from '@/hooks/useFamily'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { DEFAULT_THEME } from '@/lib/preferences'
 import { registerPushSubscription } from '@/lib/push'
-
-type Tab = 'calendar' | 'shopping' | 'settings'
+import { type Tab, TABS } from '@/types/tabs'
 
 export function TabsShell() {
-  const [activeTab, setActiveTab] = useState<Tab>('calendar')
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const { familyId, loading: familyLoading } = useFamily(user)
   const { preferences, updatePreferences } = useUserPreferences(user)
   const isInitializing = authLoading || familyLoading
+
+  const tabParam = searchParams.get('tab')
+  const activeTab: Tab = tabParam && TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'calendar'
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
@@ -33,6 +35,10 @@ export function TabsShell() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', preferences?.app_theme ?? DEFAULT_THEME)
   }, [preferences?.app_theme])
+
+  const handleTabChange = (tab: Tab) => {
+    router.replace(tab === 'calendar' ? '/calendar' : `/calendar?tab=${tab}`)
+  }
 
   return (
     <>
@@ -53,7 +59,7 @@ export function TabsShell() {
       </div>
       <div style={{ display: activeTab === 'settings' ? 'contents' : 'none' }}>
         <SettingsTab
-          onNavigateToTab={setActiveTab}
+          onNavigateToTab={handleTabChange}
           preferences={preferences}
           updatePreferences={updatePreferences}
           user={user}
@@ -61,7 +67,7 @@ export function TabsShell() {
           isInitializing={isInitializing}
         />
       </div>
-      <BottomNav activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as Tab)} />
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </>
   )
 }

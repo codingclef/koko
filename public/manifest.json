@@ -2,7 +2,7 @@
   "name": "Koko - 패밀리 허브",
   "short_name": "Koko",
   "description": "가족과 함께하는 패밀리 허브",
-  "start_url": "/shopping",
+  "start_url": "/calendar",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#fb923c",
