@@ -1,24 +1,25 @@
 'use client'
 
+import { useMemo } from 'react'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
+const DATE_HEADER_HEIGHT = 28 // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28
+const LANE_HEIGHT = 20        // px – bar (16) + gap (4)
 
 interface DayCell {
   date: Date
   isCurrentMonth: boolean
 }
 
-function buildGrid(year: number, month: number): { cells: DayCell[]; rows: number } {
+function buildGrid(year: number, month: number): DayCell[] {
   const firstDay = new Date(year, month, 1)
   const startDow = firstDay.getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const prevMonthLastDay = new Date(year, month, 0).getDate()
-
   const rows = Math.ceil((startDow + daysInMonth) / 7)
   const totalCells = rows * 7
-
   const cells: DayCell[] = []
 
   for (let i = startDow - 1; i >= 0; i--) {
@@ -27,21 +28,94 @@ function buildGrid(year: number, month: number): { cells: DayCell[]; rows: numbe
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ date: new Date(year, month, d), isCurrentMonth: true })
   }
-  const remaining = totalCells - cells.length
-  for (let d = 1; d <= remaining; d++) {
+  for (let d = 1; d <= totalCells - cells.length; d++) {
     cells.push({ date: new Date(year, month + 1, d), isCurrentMonth: false })
   }
-  return { cells, rows }
+  return cells
 }
 
 function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() &&
+  return (
+    a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
+  )
 }
 
-function getEventsForDay(date: Date, events: CalendarEvent[]): CalendarEvent[] {
-  return events.filter((e) => isSameDay(new Date(e.start_at), date))
+function dateOnly(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+export function isMultiDayAllDay(event: CalendarEvent): boolean {
+  if (!event.is_all_day || !event.end_at) return false
+  return dateOnly(new Date(event.end_at)) > dateOnly(new Date(event.start_at))
+}
+
+interface EventSegment {
+  event: CalendarEvent
+  colStart: number // 0–6 within this row
+  colSpan: number  // 1–7
+  lane: number
+  isStart: boolean // first visible segment of the event
+  isEnd: boolean   // last visible segment of the event
+}
+
+export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[]): EventSegment[] {
+  if (multiDayEvents.length === 0 || row.length < 7) return []
+  const rowStart = dateOnly(row[0].date)
+  const rowEnd = dateOnly(row[6].date)
+
+  const segments: EventSegment[] = []
+
+  for (const event of multiDayEvents) {
+    const eventStart = dateOnly(new Date(event.start_at))
+    const eventEnd = dateOnly(new Date(event.end_at!))
+
+    if (eventEnd < rowStart || eventStart > rowEnd) continue
+
+    // Clamp to row bounds
+    const segStart = eventStart < rowStart ? rowStart : eventStart
+    const segEnd = eventEnd > rowEnd ? rowEnd : eventEnd
+    const colStart = segStart.getDay()
+    const colSpan = segEnd.getDay() - colStart + 1
+
+    segments.push({
+      event,
+      colStart,
+      colSpan,
+      lane: 0,
+      isStart: isSameDay(segStart, eventStart),
+      isEnd: isSameDay(segEnd, eventEnd),
+    })
+  }
+
+  // Precompute sort keys to avoid repeated dateOnly() calls inside comparator
+  const sortKeys = new Map(multiDayEvents.map((e) => {
+    const start = dateOnly(new Date(e.start_at)).getTime()
+    const dur = e.end_at ? dateOnly(new Date(e.end_at)).getTime() - start : 0
+    return [e.id, { start, dur }]
+  }))
+
+  // Stable sort: start asc → duration desc → id asc
+  segments.sort((a, b) => {
+    const ak = sortKeys.get(a.event.id)!
+    const bk = sortKeys.get(b.event.id)!
+    return ak.start - bk.start || bk.dur - ak.dur || a.event.id.localeCompare(b.event.id)
+  })
+
+  // Greedy lane assignment
+  const laneEndCol: number[] = []
+  for (const seg of segments) {
+    let lane = laneEndCol.findIndex((end) => end < seg.colStart)
+    if (lane === -1) {
+      lane = laneEndCol.length
+      laneEndCol.push(-1)
+    }
+    seg.lane = lane
+    laneEndCol[lane] = seg.colStart + seg.colSpan - 1
+  }
+
+  return segments
 }
 
 function getHolidaysForDay(date: Date, holidays: Holiday[]): Holiday[] {
@@ -61,21 +135,52 @@ interface Props {
   className?: string
 }
 
-export function CalendarGrid({ year, month, events, calendars, activeIds, holidays = [], selectedDate, onSelectDate, className }: Props) {
-  const { cells, rows } = buildGrid(year, month)
-  const today = new Date()
+export function CalendarGrid({
+  year, month, events, calendars, activeIds,
+  holidays = [], selectedDate, onSelectDate, className,
+}: Props) {
+  const cells = useMemo(() => buildGrid(year, month), [year, month])
+  const today = useMemo(() => new Date(), [])
+  const calendarMap = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
 
-  const calendarMap = new Map(calendars.map((c) => [c.id, c]))
-
-  // activeIds가 빈 Set이면 전체 표시
-  const visibleEvents = events.filter(
-    (e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)
+  const visibleEvents = useMemo(
+    () => events.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)),
+    [events, activeIds]
   )
+
+  // Single pass: avoids calling isMultiDayAllDay twice per event
+  const { multiDayEvents, singleDayEvents } = useMemo(() => {
+    const multi: CalendarEvent[] = []
+    const single: CalendarEvent[] = []
+    for (const e of visibleEvents) {
+      if (isMultiDayAllDay(e)) multi.push(e)
+      else single.push(e)
+    }
+    return { multiDayEvents: multi, singleDayEvents: single }
+  }, [visibleEvents])
+
+  // Map for O(1) lookup instead of O(n) filter per cell
+  const singleEventsByDate = useMemo(() => {
+    const map = new Map<number, CalendarEvent[]>()
+    for (const e of singleDayEvents) {
+      const key = dateOnly(new Date(e.start_at)).getTime()
+      const arr = map.get(key)
+      if (arr) arr.push(e)
+      else map.set(key, [e])
+    }
+    return map
+  }, [singleDayEvents])
 
   const getEventColor = (event: CalendarEvent): string => {
     if (!event.calendar_id) return '#94a3b8'
     return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
   }
+
+  const rows = useMemo(() => {
+    const result: DayCell[][] = []
+    for (let i = 0; i < cells.length; i += 7) result.push(cells.slice(i, i + 7))
+    return result
+  }, [cells])
 
   return (
     <div className={`flex flex-col w-full ${className ?? ''}`}>
@@ -93,79 +198,146 @@ export function CalendarGrid({ year, month, events, calendars, activeIds, holida
         ))}
       </div>
 
-      {/* 날짜 그리드 — 행 수만큼만 생성 */}
-      <div className="grid grid-cols-7 flex-1" style={{ gridTemplateRows: `repeat(${rows}, 1fr)` }}>
-        {cells.map((cell, idx) => {
-          const dayEvents = getEventsForDay(cell.date, visibleEvents)
-          const dayHolidays = getHolidaysForDay(cell.date, holidays)
-          const isToday = isSameDay(cell.date, today)
-          const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
-          const dow = cell.date.getDay()
-          const isSun = dow === 0
-          const isSat = dow === 6
+      {/* 주 단위 행 */}
+      <div className="flex flex-col flex-1">
+        {rows.map((row, rowIdx) => {
+          const segments = computeSegments(row, multiDayEvents)
+          const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
+          const laneAreaHeight = laneCount * LANE_HEIGHT
 
           return (
-            <button
-              key={idx}
-              onClick={() => onSelectDate(cell.date)}
-              className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
-                isSelected
-                  ? 'bg-accent-50 dark:bg-accent-950/30'
-                  : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'
-              } border-stone-100 dark:border-stone-800`}
-            >
-              {/* 날짜 숫자 */}
-              <span
-                className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mx-auto mb-0.5 ${
-                  isToday
-                    ? 'bg-accent-400 text-white font-bold'
-                    : isSelected
-                    ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
-                        !cell.isCurrentMonth ? 'text-stone-300 dark:text-stone-600'
-                        : isSun ? 'text-red-400'
-                        : isSat ? 'text-blue-400'
-                        : 'text-stone-700 dark:text-stone-200'
-                      )
-                    : !cell.isCurrentMonth
-                    ? 'text-stone-300 dark:text-stone-600'
-                    : isSun
-                    ? 'text-red-400 dark:text-red-400'
-                    : isSat
-                    ? 'text-blue-400 dark:text-blue-400'
-                    : 'text-stone-700 dark:text-stone-200'
-                }`}
-              >
-                {cell.date.getDate()}
-              </span>
+            <div key={rowIdx} className="relative flex-1">
+              {/* 날짜 셀 그리드 */}
+              <div className="grid grid-cols-7 h-full">
+                {row.map((cell, colIdx) => {
+                  const daySingleEvents = singleEventsByDate.get(cell.date.getTime()) ?? []
+                  const dayHolidays = getHolidaysForDay(cell.date, holidays)
+                  const isToday = isSameDay(cell.date, today)
+                  const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
+                  const dow = cell.date.getDay()
+                  const isSun = dow === 0
+                  const isSat = dow === 6
 
-              {/* 공휴일 chips */}
-              <div className="w-full space-y-0.5 px-0.5">
-                {dayHolidays.map((h) => (
-                  <div
-                    key={`${h.countryCode}-${h.date}`}
-                    className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 truncate bg-red-400"
-                  >
-                    {h.localName}
-                  </div>
-                ))}
+                  return (
+                    <button
+                      key={colIdx}
+                      onClick={() => onSelectDate(cell.date)}
+                      className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
+                        isSelected
+                          ? 'bg-accent-50 dark:bg-accent-950/30'
+                          : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'
+                      } border-stone-100 dark:border-stone-800`}
+                    >
+                      {/* 날짜 숫자 */}
+                      <span
+                        className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mx-auto mb-0.5 ${
+                          isToday
+                            ? 'bg-accent-400 text-white font-bold'
+                            : isSelected
+                            ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
+                                !cell.isCurrentMonth
+                                  ? 'text-stone-300 dark:text-stone-600'
+                                  : isSun
+                                  ? 'text-red-400'
+                                  : isSat
+                                  ? 'text-blue-400'
+                                  : 'text-stone-700 dark:text-stone-200'
+                              )
+                            : !cell.isCurrentMonth
+                            ? 'text-stone-300 dark:text-stone-600'
+                            : isSun
+                            ? 'text-red-400 dark:text-red-400'
+                            : isSat
+                            ? 'text-blue-400 dark:text-blue-400'
+                            : 'text-stone-700 dark:text-stone-200'
+                        }`}
+                      >
+                        {cell.date.getDate()}
+                      </span>
+
+                      {/* 멀티데이 lane 공간 확보용 spacer */}
+                      <div aria-hidden="true" style={{ height: laneAreaHeight }} />
+
+                      {/* 공휴일 chips */}
+                      <div className="w-full space-y-0.5 px-0.5">
+                        {dayHolidays.map((h) => (
+                          <div
+                            key={`${h.countryCode}-${h.date}`}
+                            className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap bg-red-400"
+                          >
+                            {h.localName}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 단일 일정 pills */}
+                      <div className="w-full space-y-0.5 px-0.5">
+                        {daySingleEvents.slice(0, 3).map((evt) => (
+                          <div
+                            key={evt.id}
+                            className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap"
+                            style={{ backgroundColor: getEventColor(evt) }}
+                          >
+                            {evt.title}
+                          </div>
+                        ))}
+                        {daySingleEvents.length > 3 && (
+                          <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium px-1">
+                            +{daySingleEvents.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
 
-              {/* 일정 pills */}
-              <div className="w-full space-y-0.5 px-0.5">
-                {dayEvents.slice(0, 3).map((evt) => (
-                  <div
-                    key={evt.id}
-                    className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 truncate"
-                    style={{ backgroundColor: getEventColor(evt) }}
-                  >
-                    {evt.title}
-                  </div>
-                ))}
-                {dayEvents.length > 3 && (
-                  <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium px-1">+{dayEvents.length - 3}</div>
-                )}
-              </div>
-            </button>
+              {/* 멀티데이 이벤트 overlay */}
+              {segments.length > 0 && (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-x-0 pointer-events-none"
+                  style={{ top: DATE_HEADER_HEIGHT }}
+                >
+                  {segments.map((seg) => {
+                    const color = getEventColor(seg.event)
+                    const s = seg.isStart ? '4px' : '0'
+                    const e = seg.isEnd ? '4px' : '0'
+                    const borderRadius = `${s} ${e} ${e} ${s}`
+
+                    return (
+                      <div
+                        key={`${seg.event.id}-row${rowIdx}`}
+                        className="absolute px-0.5 pointer-events-none"
+                        style={{
+                          left: `${(seg.colStart / 7) * 100}%`,
+                          width: `${(seg.colSpan / 7) * 100}%`,
+                          top: seg.lane * LANE_HEIGHT,
+                          height: 16,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          title={seg.event.title}
+                          className="w-full h-full flex items-center justify-center gap-0.5 text-white text-[10px] overflow-hidden whitespace-nowrap pointer-events-auto"
+                          style={{
+                            backgroundColor: color,
+                            borderRadius,
+                            paddingLeft: seg.isStart ? 4 : 0,
+                            paddingRight: seg.isEnd ? 4 : 0,
+                          }}
+                          onClick={() => onSelectDate(dateOnly(new Date(seg.event.start_at)))}
+                        >
+                          {!seg.isStart && <span className="shrink-0 opacity-70">‹</span>}
+                          <span className="overflow-hidden min-w-0">{seg.event.title}</span>
+                          {!seg.isEnd && <span className="shrink-0 opacity-70">›</span>}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )
         })}
       </div>
