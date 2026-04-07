@@ -59,6 +59,7 @@ export function TabsShell() {
       </div>
       <div style={{ display: activeTab === 'shopping' ? 'contents' : 'none' }}>
         <ShoppingTab
+          key={familyId ?? 'no-family'}
           user={user}
           familyId={familyId}
           isInitializing={isInitializing}
