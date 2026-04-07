@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(req: NextRequest) {
-  const { userId, endpoint, p256dh, auth } = await req.json()
+  const userId = await getAuthenticatedUserId(req)
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
-  if (!userId || !endpoint || !p256dh || !auth) {
+  const { endpoint, p256dh, auth } = await req.json()
+
+  if (!endpoint || !p256dh || !auth) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 

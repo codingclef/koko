@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(req: NextRequest) {
-  const { userId } = await req.json()
-
+  const userId = await getAuthenticatedUserId(req)
   if (!userId) {
-    return NextResponse.json({ error: 'userId is required' }, { status: 400 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   // DB 함수로 원자적 처리 — race condition 방지

@@ -3,9 +3,15 @@ import { useFamily } from '@/hooks/useFamily'
 import type { User } from '@supabase/supabase-js'
 
 const mockUser = { id: 'user-1', email: 'test@example.com' } as User
+const mockGetAuthHeaders = jest.fn()
+
+jest.mock('@/lib/api-client', () => ({
+  getAuthHeaders: (...args: unknown[]) => mockGetAuthHeaders(...args),
+}))
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockGetAuthHeaders.mockResolvedValue({ Authorization: 'Bearer token' })
 })
 
 describe('useFamily', () => {
@@ -27,7 +33,10 @@ describe('useFamily', () => {
     expect(result.current.familyId).toBe('fam-1')
     expect(global.fetch).toHaveBeenCalledWith('/api/family', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ userId: 'user-1' }),
+      headers: expect.objectContaining({
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer token',
+      }),
     }))
   })
 
