@@ -1,90 +1,185 @@
-# 🏠 Koko — Family Hub
+# Koko
 
-[한국어](README.ko.md) | [日本語](README.ja.md) | **[English]**
+Koko is a family collaboration PWA built around one shared app shell.
+The current product surface is calendar, shopping lists, family invite/join, user preferences, and web-push reminders.
 
-A real-time family collaboration app that brings together your calendar, shopping list, and memos in one place.
-Accessible from any device — iOS, Android, and web — with instant sync across all family members.
+## Current Scope
 
----
+- Google OAuth login gated by an email allowlist
+- Automatic family bootstrap and invite-code based family join
+- Calendar with family-wide events and calendar-specific visibility
+- Event reminders delivered through Web Push
+- Shopping lists with realtime sync and drag-and-drop ordering
+- User preferences for theme, holiday countries, and lunar date display
+- Installable PWA experience on mobile and desktop
 
-## Features
+Not implemented in the current UI:
 
-| Feature | Description |
-|---------|-------------|
-| Calendar | Create and manage family events, set reminders with push notifications |
-| Shopping List | Add items, check them off in real time, strike through completed items |
-| Memo | Shared family notes, accessible by everyone instantly |
-| Event Voting | Poll family members on availability before scheduling |
-| Real-time Sync | All changes reflected instantly across every device |
-| PWA Support | Install on iPhone / Android home screen — works like a native app |
+- Memos
+- Event voting
 
----
+Those tables exist in the schema and generated types, but not in the active frontend flow.
 
-## How It Works
+## Runtime Shape
 
-```
-Family Member Action
-(Add event · Check item · Write memo · Cast vote)
-    │
-    ▼
-Supabase Realtime
-    Change detected via PostgreSQL logical replication
-    → WebSocket broadcast to all connected devices
-    │
-    ▼
-All Devices Updated
-    Calendar / Shopping List / Memo refreshed instantly
-    │
-    ▼
-Push Notification (if applicable)
-    Firebase Cloud Messaging → iOS & Android
-```
+The app uses a single mounted family shell:
 
----
+- `/calendar` is the only live tab entry route
+- `/shopping` and `/settings` redirect back to `/calendar`
+- `TabsShell` keeps calendar, shopping, and settings mounted, then toggles visibility with a keep-alive pattern
+- `src/app/shopping/[id]/page.tsx` is the main exception and remains a standalone detail route
+
+This structure avoids tab reload spinners and preserves state while switching between tabs.
+
+## Realtime Model
+
+Koko uses Supabase Realtime Broadcast, not `postgres_changes`.
+
+The pattern is:
+
+1. Perform a mutation.
+2. Refresh local state as needed.
+3. Send a manual `refresh` broadcast after the channel reaches `SUBSCRIBED`.
+
+This is used for:
+
+- Family-scoped shopping list refresh
+- Shopping-item refresh inside a specific list
+- Month-scoped calendar event refresh
+
+## Auth And Family Model
+
+- Login is Google OAuth only.
+- Supabase performs the OAuth code exchange automatically.
+- The callback page validates the signed-in email against `allowed_emails`.
+- A valid invite code can auto-allow a first-time email during callback validation.
+- `/api/family` calls a DB RPC to atomically get or create the user family.
+- `/api/family/join` calls a DB RPC to move the user into another family by invite code.
+
+The active family is the tenant boundary for calendars, shopping lists, and family membership data.
 
 ## Tech Stack
 
 | Category | Technology |
-|----------|------------|
-| Frontend | Next.js 16 (TypeScript, Tailwind CSS, App Router) |
-| Backend / DB | Supabase (PostgreSQL, Realtime, Auth) |
-| Push Notifications | PWA Web Push (iOS 16.4+, Android) |
-| CI/CD | GitHub Actions |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript |
+| Styling | Tailwind CSS v4 |
+| Backend / DB | Supabase Auth, PostgreSQL, Realtime Broadcast |
+| Notifications | Web Push + service worker |
 | Hosting | Vercel |
-
----
+| Testing | Jest + Testing Library |
 
 ## Project Structure
 
-```
-koko/
-├── src/
-│   ├── app/                # Next.js App Router pages
-│   ├── components/         # Shared UI components
-│   ├── lib/                # Supabase client, utilities
-│   └── types/              # TypeScript type definitions
-├── public/                 # Static assets, PWA manifest
-├── .github/workflows/      # GitHub Actions CI
-└── CLAUDE.md               # AI coding agent instructions
+```text
+src/
+  app/                Route entry points and API routes
+  components/         UI composition and tab containers
+  hooks/              Shared client hooks
+  lib/                Supabase CRUD, API helpers, utilities
+  types/              Generated database and shared app types
+  __tests__/          API, lib, hook, component, and feature regression tests
+public/
+  manifest.json       PWA manifest
+  sw.js               Service worker for push notifications
+supabase/
+  migrations/         Schema, RLS, RPCs, operational fixes
 ```
 
----
+Start with these repo docs when changing the project:
 
-## Getting Started
+1. `AGENTS.md`
+2. `PROJECT_MAP.md`
+3. `PATTERNS.md`
+4. `CHALLENGES.md`
+
+## Key Directories
+
+- [`src/components/TabsShell.tsx`](/Users/codingclef/workspace/koko/src/components/TabsShell.tsx): keep-alive app shell
+- [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/CalendarTab.tsx): calendar runtime container
+- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/ShoppingTab.tsx): shopping overview container
+- [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/SettingsTab.tsx): settings and family actions
+- [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace/koko/src/hooks/useRealtimeSync.ts): shared broadcast subscription pattern
+- [`src/app/api/family/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/route.ts): atomic family bootstrap
+- [`src/app/api/family/join/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/join/route.ts): invite-based family join
+- [`src/app/api/cron/send-reminders/route.ts`](/Users/codingclef/workspace/koko/src/app/api/cron/send-reminders/route.ts): scheduled reminder delivery
+
+## Environment Variables
+
+Create `.env.local` with at least:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+CRON_SECRET=
+```
+
+What they are used for:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: shared Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: browser client auth and normal data access
+- `SUPABASE_SERVICE_ROLE_KEY`: server-side admin client for RPCs and protected tables
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: browser push subscription registration
+- `VAPID_PRIVATE_KEY`: server-side push sending
+- `CRON_SECRET`: protects the reminder cron endpoint
+
+## Local Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open `http://localhost:3000`.
 
-### Environment Variables
+Recommended daily commands:
 
-Create a `.env.local` file in the project root:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```bash
+npm run lint
+npm run test
+npx tsc --noEmit
 ```
 
+## Testing
+
+The repo already includes regression coverage for:
+
+- API routes
+- Supabase-facing `lib/*` modules
+- Shared hooks
+- Calendar, shopping, settings, and shell UI behavior
+
+When changing code, update the relevant tests and run `npx tsc --noEmit` before considering the work complete.
+
+## Database Notes
+
+Schema and RLS live in `supabase/migrations`.
+
+Important current tables:
+
+- `families`
+- `family_members`
+- `allowed_emails`
+- `user_preferences`
+- `calendars`
+- `calendar_members`
+- `events`
+- `event_reminders`
+- `shopping_lists`
+- `shopping_items`
+- `push_subscriptions`
+
+Important current RPC and migration-driven behavior:
+
+- Atomic family creation
+- Atomic family join by invite code
+- Reminder selection and sent-at marking
+- RLS fixes for family, shopping, and calendar membership flows
+
+## Documentation Notes
+
+`PATTERNS.md` captures the implementation rules that should be preserved.
+`CHALLENGES.md` records the bugs and regressions that produced those rules.
