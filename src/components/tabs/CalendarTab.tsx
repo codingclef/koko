@@ -38,6 +38,24 @@ interface Props extends AuthState {
   preferences: UserPreferences | null
 }
 
+const MAX_MONTH_EVENT_CACHE = 12
+
+function getMonthEventsKey(familyId: string, year: number, month: number) {
+  return `${familyId}:${year}:${month}`
+}
+
+function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
+  if (delta === -1) {
+    return month === 0
+      ? { year: year - 1, month: 11 }
+      : { year, month: month - 1 }
+  }
+
+  return month === 11
+    ? { year: year + 1, month: 0 }
+    : { year, month: month + 1 }
+}
+
 export function CalendarTab({ preferences, user, familyId, isInitializing }: Props) {
   const {
     calendars,
@@ -82,30 +100,189 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     onError: (e) => console.error('[CalendarTab] getFamilyMembers failed:', e),
   })
 
-  const {
-    value: events,
-    setValue: setEvents,
-    loading: eventsLoading,
-    error: eventsError,
-    reload: reloadEvents,
-  } = useAsyncData<CalendarEvent[]>({
-    enabled: Boolean(familyId),
-    initialValue: [],
-    reloadKey: `${familyId ?? 'none'}:${year}:${month}`,
-    load: () => getEventsByMonth(familyId!, year, month),
-    onError: (e) => console.error('[CalendarTab] loadEvents failed:', e),
-  })
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsError, setEventsError] = useState<unknown>(null)
+  const [hasLoadedEvents, setHasLoadedEvents] = useState(false)
+  const monthEventsCacheRef = useRef(new Map<string, CalendarEvent[]>())
+  const monthEventsRequestsRef = useRef(new Map<string, Promise<CalendarEvent[]>>())
+  const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
+  const visibleMonthKeyRef = useRef<string | null>(familyId ? getMonthEventsKey(familyId, year, month) : null)
+
+  const storeMonthEvents = useCallback((key: string, nextEvents: CalendarEvent[]) => {
+    const cache = monthEventsCacheRef.current
+    if (cache.has(key)) cache.delete(key)
+    cache.set(key, nextEvents)
+
+    while (cache.size > MAX_MONTH_EVENT_CACHE) {
+      const oldestKey = cache.keys().next().value
+      if (!oldestKey) break
+      cache.delete(oldestKey)
+    }
+  }, [])
+
+  const clearFamilyMonthEventsCache = useCallback((targetFamilyId: string) => {
+    const prefix = `${targetFamilyId}:`
+
+    for (const key of monthEventsCacheRef.current.keys()) {
+      if (key.startsWith(prefix)) monthEventsCacheRef.current.delete(key)
+    }
+
+    for (const key of monthEventsRequestsRef.current.keys()) {
+      if (key.startsWith(prefix)) monthEventsRequestsRef.current.delete(key)
+    }
+  }, [])
+
+  const fetchMonthEvents = useCallback(async (
+    targetFamilyId: string,
+    targetYear: number,
+    targetMonth: number,
+    options: { force?: boolean } = {}
+  ) => {
+    const key = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
+
+    if (!options.force) {
+      const cached = monthEventsCacheRef.current.get(key)
+      if (cached) return cached
+
+      const inFlight = monthEventsRequestsRef.current.get(key)
+      if (inFlight) return inFlight
+    }
+
+    const request = getEventsByMonth(targetFamilyId, targetYear, targetMonth)
+      .then((nextEvents) => {
+        storeMonthEvents(key, nextEvents)
+        monthEventsRequestsRef.current.delete(key)
+        return nextEvents
+      })
+      .catch((error) => {
+        monthEventsRequestsRef.current.delete(key)
+        throw error
+      })
+
+    monthEventsRequestsRef.current.set(key, request)
+    return request
+  }, [storeMonthEvents])
+
+  const prefetchAdjacentMonths = useCallback((targetFamilyId: string, targetYear: number, targetMonth: number) => {
+    const prev = getAdjacentMonth(targetYear, targetMonth, -1)
+    const next = getAdjacentMonth(targetYear, targetMonth, 1)
+
+    void fetchMonthEvents(targetFamilyId, prev.year, prev.month).catch(() => {})
+    void fetchMonthEvents(targetFamilyId, next.year, next.month).catch(() => {})
+  }, [fetchMonthEvents])
+
+  const loadMonthEvents = useCallback(async ({
+    targetFamilyId,
+    targetYear,
+    targetMonth,
+    force = false,
+    silent = false,
+    throwOnError = false,
+  }: {
+    targetFamilyId: string
+    targetYear: number
+    targetMonth: number
+    force?: boolean
+    silent?: boolean
+    throwOnError?: boolean
+  }) => {
+    const key = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
+    const cached = !force ? monthEventsCacheRef.current.get(key) : undefined
+    const isVisibleMonth = () => visibleMonthKeyRef.current === key
+    const applyMonthState = (nextEvents: CalendarEvent[], nextError: unknown = null) => {
+      if (!isVisibleMonth()) return
+      setEvents(nextEvents)
+      setEventsError(nextError)
+      setEventsLoading(false)
+      if (nextError === null) setHasLoadedEvents(true)
+    }
+
+    if (cached) {
+      applyMonthState(cached)
+      prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
+      return cached
+    }
+
+    if (!silent && isVisibleMonth()) {
+      setEvents([])
+      setEventsLoading(true)
+    }
+    if (isVisibleMonth()) setEventsError(null)
+
+    try {
+      const nextEvents = await fetchMonthEvents(targetFamilyId, targetYear, targetMonth, { force })
+      applyMonthState(nextEvents)
+      prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
+      return nextEvents
+    } catch (error) {
+      console.error('[CalendarTab] loadEvents failed:', error)
+      if (isVisibleMonth()) {
+        setEvents([])
+        setEventsError(error)
+        setEventsLoading(false)
+      }
+      if (throwOnError) throw error
+      return []
+    }
+  }, [fetchMonthEvents, prefetchAdjacentMonths])
+
+  useEffect(() => {
+    visibleMonthKeyRef.current = familyId ? getMonthEventsKey(familyId, year, month) : null
+
+    if (!familyId) {
+      queueMicrotask(() => {
+        setEvents([])
+        setEventsError(null)
+        setEventsLoading(false)
+        setHasLoadedEvents(false)
+      })
+      previousFamilyIdRef.current = null
+      return
+    }
+
+    const familyChanged = previousFamilyIdRef.current !== familyId
+    previousFamilyIdRef.current = familyId
+
+    if (familyChanged) {
+      queueMicrotask(() => {
+        setEvents([])
+        setEventsError(null)
+        setEventsLoading(true)
+        setHasLoadedEvents(false)
+      })
+    }
+
+    queueMicrotask(() => {
+      void loadMonthEvents({
+        targetFamilyId: familyId,
+        targetYear: year,
+        targetMonth: month,
+      })
+    })
+  }, [familyId, year, month, loadMonthEvents])
+
+  const reloadEvents = useCallback(async () => {
+    if (!familyId) return
+    await loadMonthEvents({
+      targetFamilyId: familyId,
+      targetYear: year,
+      targetMonth: month,
+      force: true,
+      throwOnError: true,
+    })
+  }, [familyId, year, month, loadMonthEvents])
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
-
-    try {
-      const nextEvents = await getEventsByMonth(familyId, year, month)
-      setEvents(nextEvents)
-    } catch (e) {
-      console.error('[CalendarTab] refreshEvents failed:', e)
-    }
-  }, [familyId, year, month, setEvents])
+    await loadMonthEvents({
+      targetFamilyId: familyId,
+      targetYear: year,
+      targetMonth: month,
+      force: true,
+      silent: true,
+    })
+  }, [familyId, year, month, loadMonthEvents])
 
   const reloadCalendarContext = useCallback(async () => {
     await Promise.allSettled([reloadCalendars(), reloadFamilyMembers()])
@@ -193,9 +370,11 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const handleCalendarDelete = async () => {
     if (!calendarForm?.calendar) return
+    if (!familyId) return
     setMutationError(null)
 
     try {
+      clearFamilyMonthEventsCache(familyId)
       await deleteCalendar(calendarForm.calendar.id)
       setActiveIds((prev) => {
         const next = new Set(prev)
@@ -224,6 +403,8 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setMutationError(null)
 
     try {
+      clearFamilyMonthEventsCache(familyId)
+
       if (editingEvent?.event) {
         await updateEvent(editingEvent.event.id, {
           calendarId: params.calendarId,
@@ -260,9 +441,11 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const handleEventDelete = async () => {
     if (!selectedEvent) return
+    if (!familyId) return
     setMutationError(null)
 
     try {
+      clearFamilyMonthEventsCache(familyId)
       await deleteEvent(selectedEvent.id)
       setSelectedEvent(null)
       await refreshEvents()
@@ -281,7 +464,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setSelectedEvent(null)
   }
 
-  const loading = isInitializing || calLoading || familyMembersLoading || eventsLoading
+  const loading = isInitializing || calLoading || familyMembersLoading || (!hasLoadedEvents && eventsLoading)
   const fetchError = calendarsError || familyMembersError || eventsError
 
   const handleRetry = async () => {
@@ -302,12 +485,14 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
         <div className="px-4 pt-8 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-2">
             <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
+              <span className="sr-only">이전 달</span>
               <ChevronLeft size={20} />
             </button>
             <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
               {year}년 {month + 1}월
             </h1>
             <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
+              <span className="sr-only">다음 달</span>
               <ChevronRight size={20} />
             </button>
           </div>
@@ -340,12 +525,14 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
       <div className="px-4 pt-8 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
+            <span className="sr-only">이전 달</span>
             <ChevronLeft size={20} />
           </button>
           <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
             {year}년 {month + 1}월
           </h1>
           <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
+            <span className="sr-only">다음 달</span>
             <ChevronRight size={20} />
           </button>
         </div>
