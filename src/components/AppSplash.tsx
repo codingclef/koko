@@ -6,7 +6,7 @@ export function AppSplash() {
       <div className="rounded-full bg-[var(--surface-overlay)] ring-1 ring-[var(--surface-ring)] p-6">
         <Image
           src="/logo.webp"
-          alt="Koko"
+          alt=""
           width={96}
           height={96}
           priority
