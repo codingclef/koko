@@ -125,7 +125,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
         className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-accent-200 dark:hover:border-accent-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-1"
       >
         <div className="flex items-center gap-2 mb-3">
-          <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
             {editing ? (
               <input
                 autoFocus
@@ -156,6 +156,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
           {!editing && (
             <button
               onClick={handleDeleteClick}
+              onPointerDown={(e) => e.stopPropagation()}
               className="flex-shrink-0 p-2 -mr-1 rounded-lg text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
               aria-label="삭제"
             >
