@@ -108,11 +108,6 @@ describe('ShoppingListCard', () => {
     expect(screen.getByText('이마트')).toBeInTheDocument()
   })
 
-  it('드래그 핸들이 렌더링된다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
-    expect(screen.getByLabelText('드래그 핸들')).toBeInTheDocument()
-  })
-
   it('previewItems가 없으면 빈 상태 텍스트가 렌더링된다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
     expect(screen.getByText('아이템 없음')).toBeInTheDocument()
@@ -160,6 +155,18 @@ describe('ShoppingListCard', () => {
     const cardBody = screen.getByLabelText('이마트 장바구니 열기')
     fireEvent.keyDown(cardBody, { key: 'Enter' })
     expect(mockPush).toHaveBeenCalledWith('/shopping/list-1')
+  })
+
+  it('삭제 버튼 클릭 시 카드 네비게이션이 발생하지 않는다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByLabelText('삭제'))
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('이름 영역 클릭 시 카드 네비게이션이 발생하지 않는다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByText('이마트'))
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('이름에서 Enter 키 입력 시 인라인 편집 입력창이 나타난다', () => {
