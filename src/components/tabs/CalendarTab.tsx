@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useCalendars } from '@/hooks/useCalendars'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { useHolidays } from '@/hooks/useHolidays'
@@ -31,6 +31,7 @@ import { DayEventsSheet } from '@/components/calendar/DayEventsSheet'
 import { EventDetailSheet } from '@/components/calendar/EventDetailSheet'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
+import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { Calendar } from '@/lib/calendar'
 
@@ -78,14 +79,16 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const [calendarMemberIds, setCalendarMemberIds] = useState<string[]>([])
   const [showCalendarList, setShowCalendarList] = useState(false)
+  const [showYearMonthPicker, setShowYearMonthPicker] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const yearMonthButtonRef = useRef<HTMLButtonElement>(null)
 
   const [slideKey, setSlideKey] = useState(0)
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
 
-  const isModalOpen = selectedDate !== null || selectedEvent !== null || editingEvent !== null || calendarForm !== null
+  const isModalOpen = selectedDate !== null || selectedEvent !== null || editingEvent !== null || calendarForm !== null || showYearMonthPicker
 
   const {
     value: familyMembers,
@@ -307,6 +310,18 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setSelectedDate(null)
   }
 
+  const closeYearMonthPicker = () => setShowYearMonthPicker(false)
+
+  const handleYearMonthConfirm = (nextYear: number, nextMonth: number) => {
+    setShowYearMonthPicker(false)
+    if (nextYear === year && nextMonth === month) return
+    setSlideKey((k) => k + 1)
+    setSlideDir(null)
+    setYear(nextYear)
+    setMonth(nextMonth)
+    setSelectedDate(null)
+  }
+
   const { onTouchStart, onTouchEnd } = useSwipe({
     onSwipeLeft: nextMonth,
     onSwipeRight: prevMonth,
@@ -488,9 +503,9 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
               <span className="sr-only">이전 달</span>
               <ChevronLeft size={20} />
             </button>
-            <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
+            <span className="text-lg font-bold text-stone-800 dark:text-stone-100">
               {year}년 {month + 1}월
-            </h1>
+            </span>
             <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
               <span className="sr-only">다음 달</span>
               <ChevronRight size={20} />
@@ -528,9 +543,17 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
             <span className="sr-only">이전 달</span>
             <ChevronLeft size={20} />
           </button>
-          <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
+          <button
+            ref={yearMonthButtonRef}
+            onClick={() => setShowYearMonthPicker((v) => !v)}
+            className="flex items-center gap-1 text-lg font-bold text-stone-800 dark:text-stone-100"
+          >
             {year}년 {month + 1}월
-          </h1>
+            <ChevronDown
+              size={16}
+              className={`transition-transform duration-200 ${showYearMonthPicker ? 'rotate-180' : ''}`}
+            />
+          </button>
           <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
             <span className="sr-only">다음 달</span>
             <ChevronRight size={20} />
@@ -627,6 +650,16 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
           calendars={calendars}
           onClose={() => setEditingEvent(null)}
           onSave={handleEventSave}
+        />
+      )}
+
+      {showYearMonthPicker && (
+        <YearMonthPickerSheet
+          year={year}
+          month={month}
+          anchorRef={yearMonthButtonRef}
+          onConfirm={handleYearMonthConfirm}
+          onClose={closeYearMonthPicker}
         />
       )}
 
