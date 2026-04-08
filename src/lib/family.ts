@@ -2,16 +2,16 @@ import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 
 export type FamilyMember = Database['public']['Tables']['family_members']['Row']
-type FamilyInviteCode = Pick<Database['public']['Tables']['families']['Row'], 'invite_code'>
+export type FamilyInfo = Pick<Database['public']['Tables']['families']['Row'], 'name' | 'invite_code'>
 
-export async function getFamilyInviteCode(familyId: string): Promise<string | null> {
+export async function getFamilyInfo(familyId: string): Promise<FamilyInfo | null> {
   const { data, error } = await supabase
     .from('families')
-    .select('invite_code')
+    .select('name, invite_code')
     .eq('id', familyId)
-    .single<FamilyInviteCode>()
+    .single<FamilyInfo>()
   if (error) throw error
-  return data?.invite_code ?? null
+  return data
 }
 
 export async function getMyFamilyMember(userId: string): Promise<FamilyMember | null> {
