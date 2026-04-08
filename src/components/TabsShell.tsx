@@ -44,7 +44,7 @@ export function TabsShell() {
     }
   }, [preferences?.app_theme])
 
-  if (authLoading) return <AppSplash />
+  if (isInitializing) return <AppSplash />
   if (!user) return null
   if (needsFamilyOnboarding) return null
 

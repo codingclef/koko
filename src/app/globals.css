@@ -5,6 +5,8 @@
 :root {
   --background: #fafaf9;
   --foreground: #1c1917;
+  --surface-overlay: rgba(245, 245, 244, 0.8);
+  --surface-ring: rgba(0, 0, 0, 0.05);
 
   /* Default theme: tangerine (orange) */
   --accent-50: #fff7ed;
@@ -21,6 +23,8 @@
 .dark {
   --background: #0f0e0d;
   --foreground: #f5f4f2;
+  --surface-overlay: rgba(255, 255, 255, 0.1);
+  --surface-ring: rgba(255, 255, 255, 0.1);
 }
 
 /* Theme: sage (teal) */

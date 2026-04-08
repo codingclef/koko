@@ -5,6 +5,7 @@ import { registerPushSubscription } from '@/lib/push'
 const mockReplace = jest.fn()
 let mockTabParam: string | null = null
 let mockAuthLoading = false
+let mockFamilyLoading = false
 let mockAuthUser: { id: string } | null = { id: 'user-1' }
 
 jest.mock('next/navigation', () => ({
@@ -17,7 +18,7 @@ jest.mock('@/hooks/useAuth', () => ({
 }))
 
 jest.mock('@/hooks/useFamily', () => ({
-  useFamily: () => ({ familyId: 'fam-1', appRole: 'member', loading: false }),
+  useFamily: () => ({ familyId: 'fam-1', appRole: 'member', loading: mockFamilyLoading }),
 }))
 
 jest.mock('@/hooks/useUserPreferences', () => ({
@@ -57,12 +58,21 @@ describe('TabsShell', () => {
     mockReplace.mockClear()
     mockTabParam = null
     mockAuthLoading = false
+    mockFamilyLoading = false
     mockAuthUser = { id: 'user-1' }
   })
 
   it('인증 로딩 중에는 AppSplash를 표시한다', () => {
     mockAuthLoading = true
     mockAuthUser = null
+    render(<TabsShell />)
+    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
+    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
+  })
+
+  it('인증 완료 후 가족 데이터 로딩 중에도 AppSplash를 표시한다', () => {
+    mockAuthLoading = false
+    mockFamilyLoading = true
     render(<TabsShell />)
     expect(screen.getByTestId('app-splash')).toBeInTheDocument()
     expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
