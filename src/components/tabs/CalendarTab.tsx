@@ -310,9 +310,9 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setSelectedDate(null)
   }
 
-  const closeYearMonthPicker = useCallback(() => setShowYearMonthPicker(false), [])
+  const closeYearMonthPicker = () => setShowYearMonthPicker(false)
 
-  const handleYearMonthConfirm = useCallback((nextYear: number, nextMonth: number) => {
+  const handleYearMonthConfirm = (nextYear: number, nextMonth: number) => {
     setShowYearMonthPicker(false)
     if (nextYear === year && nextMonth === month) return
     setSlideKey((k) => k + 1)
@@ -320,7 +320,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setYear(nextYear)
     setMonth(nextMonth)
     setSelectedDate(null)
-  }, [year, month])
+  }
 
   const { onTouchStart, onTouchEnd } = useSwipe({
     onSwipeLeft: nextMonth,

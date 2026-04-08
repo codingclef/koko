@@ -17,7 +17,6 @@ interface Props {
 export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClose }: Props) {
   const [pickedYear, setPickedYear] = useState(year)
   const [pickedMonth, setPickedMonth] = useState(month)
-  const [panelTop, setPanelTop] = useState(FALLBACK_TOP)
 
   const baseYear = year - 10
   const years = useMemo(
@@ -36,8 +35,9 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
 
   useLayoutEffect(() => {
+    if (!panelRef.current) return
     const bottom = anchorRef.current?.getBoundingClientRect().bottom ?? FALLBACK_TOP
-    setPanelTop(bottom + 8)
+    panelRef.current.style.top = `${bottom + 8}px`
   }, [anchorRef])
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
         aria-modal="true"
         aria-label="연월 선택"
         className="fixed left-4 right-4 rounded-2xl overflow-hidden bg-white dark:bg-stone-900 shadow-xl"
-        style={{ top: panelTop }}
+        style={{ top: FALLBACK_TOP }}
       >
         <div className="flex">
           <WheelPickerColumn
