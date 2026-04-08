@@ -113,6 +113,24 @@ jest.mock('@/components/calendar/CalendarFormModal', () => ({
 jest.mock('@/components/calendar/CalendarListSheet', () => ({
   CalendarListSheet: () => <div />,
 }))
+jest.mock('@/components/calendar/YearMonthPickerSheet', () => ({
+  YearMonthPickerSheet: ({
+    onConfirm,
+    onClose,
+    year,
+    month,
+  }: {
+    onConfirm: (year: number, month: number) => void
+    onClose: () => void
+    year: number
+    month: number
+  }) => (
+    <div data-testid="year-month-picker">
+      <button data-testid="picker-confirm" onClick={() => onConfirm(year + 1, month)}>확인</button>
+      <button data-testid="picker-cancel" onClick={onClose}>취소</button>
+    </div>
+  ),
+}))
 
 const mockGetEventsByMonth = getEventsByMonth as jest.MockedFunction<typeof getEventsByMonth>
 const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getFamilyMembers>
@@ -217,6 +235,84 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(await screen.findByTestId('calendar-filter-edit'))
 
     expect(await screen.findByText('캘린더 멤버를 불러오지 못했어요')).toBeInTheDocument()
+  })
+
+  it('연월 헤더 버튼 클릭 시 YearMonthPickerSheet가 열린다', async () => {
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+    await act(async () => {})
+
+    const today = new Date()
+    const headerButton = screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) })
+    fireEvent.click(headerButton)
+
+    expect(screen.getByTestId('year-month-picker')).toBeInTheDocument()
+  })
+
+  it('피커 취소 시 연월이 변경되지 않고 피커가 닫힌다', async () => {
+    const today = new Date()
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
+    expect(screen.getByTestId('year-month-picker')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('picker-cancel'))
+
+    expect(screen.queryByTestId('year-month-picker')).not.toBeInTheDocument()
+    expect(screen.getByText(`${today.getFullYear()}년 ${today.getMonth() + 1}월`)).toBeInTheDocument()
+  })
+
+  it('피커 확인 시 선택한 연월로 이동하고 피커가 닫힌다', async () => {
+    const today = new Date()
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
+    fireEvent.click(screen.getByTestId('picker-confirm'))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('year-month-picker')).not.toBeInTheDocument()
+      expect(screen.getByText(`${today.getFullYear() + 1}년 ${today.getMonth() + 1}월`)).toBeInTheDocument()
+    })
+  })
+
+  it('피커가 열린 상태에서 isModalOpen이 true가 되어 touch-action이 auto로 바뀐다', async () => {
+    const today = new Date()
+    const { container } = render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
+
+    const wrapper = container.firstChild as HTMLElement
+    expect(wrapper.style.touchAction).toBe('auto')
   })
 
   it('월 이동 중에도 전체 스피너 대신 캘린더 그리드를 유지한다', async () => {
