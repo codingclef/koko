@@ -41,6 +41,11 @@ interface Props extends AuthState {
 const monthEventsCache = new Map<string, CalendarEvent[]>()
 const monthEventsRequests = new Map<string, Promise<CalendarEvent[]>>()
 
+export function clearMonthEventsCacheForTests() {
+  monthEventsCache.clear()
+  monthEventsRequests.clear()
+}
+
 function getMonthEventsKey(familyId: string, year: number, month: number) {
   return `${familyId}:${year}:${month}`
 }

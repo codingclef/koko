@@ -1,6 +1,6 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
-import { CalendarTab } from '@/components/tabs/CalendarTab'
+import { CalendarTab, clearMonthEventsCacheForTests } from '@/components/tabs/CalendarTab'
 import { getCalendarMembers, getEventsByMonth, getFamilyMembers } from '@/lib/calendar'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
@@ -130,6 +130,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    clearMonthEventsCacheForTests()
     mockUseCalendars.mockReturnValue({
       calendars: [{
         id: 'cal-1',
