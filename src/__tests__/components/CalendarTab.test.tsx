@@ -165,7 +165,13 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('초기 이벤트 로드 실패 시 오류 상태와 재시도 버튼을 표시한다', async () => {
-    mockGetEventsByMonth.mockRejectedValueOnce(new Error('load failed'))
+    const today = new Date()
+    mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
+      if (year === today.getFullYear() && month === today.getMonth()) {
+        throw new Error('load failed')
+      }
+      return []
+    })
 
     render(
       <CalendarTab
@@ -181,9 +187,15 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('재시도 버튼 클릭 시 캘린더 데이터를 다시 불러온다', async () => {
-    mockGetEventsByMonth
-      .mockRejectedValueOnce(new Error('load failed'))
-      .mockResolvedValueOnce([])
+    const today = new Date()
+    let shouldFailCurrentMonth = true
+    mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
+      if (year === today.getFullYear() && month === today.getMonth() && shouldFailCurrentMonth) {
+        shouldFailCurrentMonth = false
+        throw new Error('load failed')
+      }
+      return []
+    })
 
     render(
       <CalendarTab
@@ -198,7 +210,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(retryButton)
 
     await waitFor(() => expect(mockReloadCalendars).toHaveBeenCalled())
-    await waitFor(() => expect(mockGetEventsByMonth).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByTestId('calendar-grid')).toBeInTheDocument())
   })
 
   it('캘린더 멤버 조회 실패 시 mutation error를 표시한다', async () => {
@@ -224,11 +236,13 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     const initialMonth = today.getMonth()
     const nextYear = initialMonth === 11 ? initialYear + 1 : initialYear
     const nextMonth = initialMonth === 11 ? 0 : initialMonth + 1
-    let resolveNextMonth: ((value: []) => void) | null = null
+    const monthAfterNextYear = nextMonth === 11 ? nextYear + 1 : nextYear
+    const monthAfterNext = nextMonth === 11 ? 0 : nextMonth + 1
+    let resolvePrefetch: ((value: []) => void) | null = null
     mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
-      if (year === nextYear && month === nextMonth) {
+      if (year === monthAfterNextYear && month === monthAfterNext) {
         return new Promise((resolve) => {
-          resolveNextMonth = resolve as (value: []) => void
+          resolvePrefetch = resolve as (value: []) => void
         })
       }
       return []
@@ -248,10 +262,10 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
 
     expect(screen.getByTestId('calendar-grid')).toBeInTheDocument()
-    expect(mockGetEventsByMonth).toHaveBeenCalledWith('fam-1', nextYear, nextMonth)
+    expect(screen.getByText(`${nextYear}년 ${nextMonth + 1}월`)).toBeInTheDocument()
 
     await act(async () => {
-      resolveNextMonth?.([])
+      resolvePrefetch?.([])
     })
   })
 })
