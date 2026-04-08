@@ -79,7 +79,6 @@ describe('DayEventsSheet', () => {
 
   it('닫기 버튼 클릭 시 onClose가 호출된다', () => {
     render(<DayEventsSheet {...defaultProps} events={[]} />)
-    const closeBtn = screen.getByRole('button', { name: '' })
     // X 버튼은 lucide icon만 있음 — 마지막 버튼
     const buttons = screen.getAllByRole('button')
     fireEvent.click(buttons[buttons.length - 1])
