@@ -217,4 +217,41 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
     expect(await screen.findByText('캘린더 멤버를 불러오지 못했어요')).toBeInTheDocument()
   })
+
+  it('월 이동 중에도 전체 스피너 대신 캘린더 그리드를 유지한다', async () => {
+    const today = new Date()
+    const initialYear = today.getFullYear()
+    const initialMonth = today.getMonth()
+    const nextYear = initialMonth === 11 ? initialYear + 1 : initialYear
+    const nextMonth = initialMonth === 11 ? 0 : initialMonth + 1
+    let resolveNextMonth: ((value: []) => void) | null = null
+    mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
+      if (year === nextYear && month === nextMonth) {
+        return new Promise((resolve) => {
+          resolveNextMonth = resolve as (value: []) => void
+        })
+      }
+      return []
+    })
+
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+
+    expect(await screen.findByTestId('calendar-grid')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
+
+    expect(screen.getByTestId('calendar-grid')).toBeInTheDocument()
+    expect(mockGetEventsByMonth).toHaveBeenCalledWith('fam-1', nextYear, nextMonth)
+
+    await act(async () => {
+      resolveNextMonth?.([])
+    })
+  })
 })

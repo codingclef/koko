@@ -38,6 +38,68 @@ interface Props extends AuthState {
   preferences: UserPreferences | null
 }
 
+const monthEventsCache = new Map<string, CalendarEvent[]>()
+const monthEventsRequests = new Map<string, Promise<CalendarEvent[]>>()
+
+function getMonthEventsKey(familyId: string, year: number, month: number) {
+  return `${familyId}:${year}:${month}`
+}
+
+function clearFamilyMonthEventsCache(familyId: string) {
+  const prefix = `${familyId}:`
+
+  for (const key of monthEventsCache.keys()) {
+    if (key.startsWith(prefix)) monthEventsCache.delete(key)
+  }
+
+  for (const key of monthEventsRequests.keys()) {
+    if (key.startsWith(prefix)) monthEventsRequests.delete(key)
+  }
+}
+
+function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
+  if (delta === -1) {
+    return month === 0
+      ? { year: year - 1, month: 11 }
+      : { year, month: month - 1 }
+  }
+
+  return month === 11
+    ? { year: year + 1, month: 0 }
+    : { year, month: month + 1 }
+}
+
+async function fetchMonthEvents(
+  familyId: string,
+  year: number,
+  month: number,
+  options: { force?: boolean } = {}
+) {
+  const key = getMonthEventsKey(familyId, year, month)
+
+  if (!options.force) {
+    const cached = monthEventsCache.get(key)
+    if (cached) return cached
+
+    const inFlight = monthEventsRequests.get(key)
+    if (inFlight) return inFlight
+  }
+
+  const request = getEventsByMonth(familyId, year, month)
+    .then((nextEvents) => {
+      monthEventsCache.set(key, nextEvents)
+      monthEventsRequests.delete(key)
+      return nextEvents
+    })
+    .catch((error) => {
+      monthEventsRequests.delete(key)
+      throw error
+    })
+
+  monthEventsRequests.set(key, request)
+  return request
+}
+
 export function CalendarTab({ preferences, user, familyId, isInitializing }: Props) {
   const {
     calendars,
@@ -82,26 +144,103 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     onError: (e) => console.error('[CalendarTab] getFamilyMembers failed:', e),
   })
 
-  const {
-    value: events,
-    setValue: setEvents,
-    loading: eventsLoading,
-    error: eventsError,
-    reload: reloadEvents,
-  } = useAsyncData<CalendarEvent[]>({
-    enabled: Boolean(familyId),
-    initialValue: [],
-    reloadKey: `${familyId ?? 'none'}:${year}:${month}`,
-    load: () => getEventsByMonth(familyId!, year, month),
-    onError: (e) => console.error('[CalendarTab] loadEvents failed:', e),
-  })
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsError, setEventsError] = useState<unknown>(null)
+  const [hasLoadedEvents, setHasLoadedEvents] = useState(false)
+
+  const prefetchAdjacentMonths = useCallback((targetYear: number, targetMonth: number) => {
+    if (!familyId) return
+
+    const prev = getAdjacentMonth(targetYear, targetMonth, -1)
+    const next = getAdjacentMonth(targetYear, targetMonth, 1)
+
+    void fetchMonthEvents(familyId, prev.year, prev.month).catch(() => {})
+    void fetchMonthEvents(familyId, next.year, next.month).catch(() => {})
+  }, [familyId])
+
+  useEffect(() => {
+    setEvents([])
+    setEventsError(null)
+    setEventsLoading(true)
+    setHasLoadedEvents(false)
+  }, [familyId])
+
+  useEffect(() => {
+    if (!familyId) {
+      setEvents([])
+      setEventsError(null)
+      setEventsLoading(false)
+      return
+    }
+
+    const key = getMonthEventsKey(familyId, year, month)
+    const cached = monthEventsCache.get(key)
+    let cancelled = false
+
+    if (cached) {
+      setEvents(cached)
+      setEventsError(null)
+      setEventsLoading(false)
+      setHasLoadedEvents(true)
+      prefetchAdjacentMonths(year, month)
+      return
+    }
+
+    setEvents([])
+    setEventsError(null)
+    setEventsLoading(true)
+
+    void fetchMonthEvents(familyId, year, month)
+      .then((nextEvents) => {
+        if (cancelled) return
+        setEvents(nextEvents)
+        setEventsError(null)
+        setEventsLoading(false)
+        setHasLoadedEvents(true)
+        prefetchAdjacentMonths(year, month)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error('[CalendarTab] loadEvents failed:', error)
+        setEvents([])
+        setEventsError(error)
+        setEventsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [familyId, month, prefetchAdjacentMonths, year])
+
+  const reloadEvents = useCallback(async () => {
+    if (!familyId) return
+
+    setEventsLoading(true)
+    try {
+      const nextEvents = await fetchMonthEvents(familyId, year, month, { force: true })
+      setEvents(nextEvents)
+      setEventsError(null)
+      setHasLoadedEvents(true)
+      prefetchAdjacentMonths(year, month)
+    } catch (error) {
+      console.error('[CalendarTab] loadEvents failed:', error)
+      setEvents([])
+      setEventsError(error)
+      throw error
+    } finally {
+      setEventsLoading(false)
+    }
+  }, [familyId, month, prefetchAdjacentMonths, year])
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
 
     try {
-      const nextEvents = await getEventsByMonth(familyId, year, month)
+      const nextEvents = await fetchMonthEvents(familyId, year, month, { force: true })
       setEvents(nextEvents)
+      setEventsError(null)
+      setHasLoadedEvents(true)
     } catch (e) {
       console.error('[CalendarTab] refreshEvents failed:', e)
     }
@@ -224,6 +363,8 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setMutationError(null)
 
     try {
+      clearFamilyMonthEventsCache(familyId)
+
       if (editingEvent?.event) {
         await updateEvent(editingEvent.event.id, {
           calendarId: params.calendarId,
@@ -260,9 +401,11 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const handleEventDelete = async () => {
     if (!selectedEvent) return
+    if (!familyId) return
     setMutationError(null)
 
     try {
+      clearFamilyMonthEventsCache(familyId)
       await deleteEvent(selectedEvent.id)
       setSelectedEvent(null)
       await refreshEvents()
@@ -281,7 +424,7 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setSelectedEvent(null)
   }
 
-  const loading = isInitializing || calLoading || familyMembersLoading || eventsLoading
+  const loading = isInitializing || calLoading || familyMembersLoading || (!hasLoadedEvents && eventsLoading)
   const fetchError = calendarsError || familyMembersError || eventsError
 
   const handleRetry = async () => {
@@ -302,12 +445,14 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
         <div className="px-4 pt-8 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-2">
             <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
+              <span className="sr-only">이전 달</span>
               <ChevronLeft size={20} />
             </button>
             <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
               {year}년 {month + 1}월
             </h1>
             <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
+              <span className="sr-only">다음 달</span>
               <ChevronRight size={20} />
             </button>
           </div>
@@ -340,12 +485,14 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
       <div className="px-4 pt-8 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
+            <span className="sr-only">이전 달</span>
             <ChevronLeft size={20} />
           </button>
           <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100">
             {year}년 {month + 1}월
           </h1>
           <button onClick={nextMonth} className="p-2 text-stone-400 hover:text-stone-600">
+            <span className="sr-only">다음 달</span>
             <ChevronRight size={20} />
           </button>
         </div>
