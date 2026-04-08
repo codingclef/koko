@@ -198,7 +198,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(retryButton)
 
     await waitFor(() => expect(mockReloadCalendars).toHaveBeenCalled())
-    await waitFor(() => expect(mockGetEventsByMonth).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mockGetEventsByMonth).toHaveBeenCalledTimes(4))
     await waitFor(() => expect(screen.getByTestId('calendar-grid')).toBeInTheDocument())
   })
 
