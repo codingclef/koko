@@ -1,6 +1,7 @@
 import { createRef } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
+import { WheelPickerColumn } from '@/components/calendar/WheelPickerColumn'
 
 function renderPicker(overrides?: {
   year?: number
@@ -80,7 +81,6 @@ describe('YearMonthPickerSheet', () => {
       />
     )
 
-    // 오버레이(루트 div) 직접 클릭
     fireEvent.click(container.firstChild as HTMLElement)
 
     expect(onClose).toHaveBeenCalled()
@@ -90,10 +90,114 @@ describe('YearMonthPickerSheet', () => {
     const onClose = jest.fn()
     renderPicker({ onClose })
 
-    // 패널 내부의 확인 버튼 클릭 — 오버레이 닫힘이 발생하면 안 됨
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
 
-    // onClose는 취소 버튼으로만 호출됨
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('Escape 키 입력 시 onClose가 호출된다', () => {
+    const onClose = jest.fn()
+    renderPicker({ onClose })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('열릴 때 연도 컬럼(첫 번째 포커스 대상)이 포커스를 받는다', () => {
+    renderPicker()
+
+    const [yearListbox] = screen.getAllByRole('listbox')
+    expect(document.activeElement).toBe(yearListbox)
+  })
+
+  it('dialog role과 aria-modal이 선언되어 있다', () => {
+    renderPicker()
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('aria-label', '연월 선택')
+  })
+})
+
+describe('WheelPickerColumn — 키보드 방향키 탐색', () => {
+  it('ArrowDown 키로 다음 항목이 선택된다', () => {
+    const onSelect = jest.fn()
+    render(
+      <WheelPickerColumn
+        values={['2024년', '2025년', '2026년']}
+        selected={1}
+        onSelect={onSelect}
+        label="연도"
+      />
+    )
+
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' })
+
+    expect(onSelect).toHaveBeenCalledWith(2)
+  })
+
+  it('ArrowUp 키로 이전 항목이 선택된다', () => {
+    const onSelect = jest.fn()
+    render(
+      <WheelPickerColumn
+        values={['2024년', '2025년', '2026년']}
+        selected={1}
+        onSelect={onSelect}
+        label="연도"
+      />
+    )
+
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowUp' })
+
+    expect(onSelect).toHaveBeenCalledWith(0)
+  })
+
+  it('첫 번째 항목에서 ArrowUp은 범위를 벗어나지 않는다', () => {
+    const onSelect = jest.fn()
+    render(
+      <WheelPickerColumn
+        values={['2024년', '2025년']}
+        selected={0}
+        onSelect={onSelect}
+        label="연도"
+      />
+    )
+
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowUp' })
+
+    expect(onSelect).toHaveBeenCalledWith(0)
+  })
+
+  it('마지막 항목에서 ArrowDown은 범위를 벗어나지 않는다', () => {
+    const onSelect = jest.fn()
+    render(
+      <WheelPickerColumn
+        values={['2024년', '2025년']}
+        selected={1}
+        onSelect={onSelect}
+        label="연도"
+      />
+    )
+
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' })
+
+    expect(onSelect).toHaveBeenCalledWith(1)
+  })
+
+  it('선택된 항목에 aria-selected="true"가 적용된다', () => {
+    render(
+      <WheelPickerColumn
+        values={['2024년', '2025년', '2026년']}
+        selected={1}
+        onSelect={jest.fn()}
+        label="연도"
+      />
+    )
+
+    const options = screen.getAllByRole('option')
+    expect(options[1]).toHaveAttribute('aria-selected', 'true')
+    expect(options[0]).toHaveAttribute('aria-selected', 'false')
+    expect(options[2]).toHaveAttribute('aria-selected', 'false')
   })
 })

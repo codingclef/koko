@@ -5,6 +5,7 @@ import { WheelPickerColumn } from '@/components/calendar/WheelPickerColumn'
 
 const FALLBACK_TOP = 80
 const YEAR_COUNT = 21
+const FOCUSABLE = '[tabindex="0"], button:not([disabled])'
 
 interface Props {
   year: number
@@ -32,7 +33,6 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
   const monthIdx = pickedMonth
 
   const panelRef = useRef<HTMLDivElement>(null)
-  const confirmButtonRef = useRef<HTMLButtonElement>(null)
 
   useLayoutEffect(() => {
     if (!panelRef.current) return
@@ -40,9 +40,11 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
     panelRef.current.style.top = `${bottom + 8}px`
   }, [anchorRef])
 
+  // 열릴 때 연도 컬럼(첫 번째 포커스 대상)으로 포커스, 닫힐 때 트리거로 복원
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
-    confirmButtonRef.current?.focus()
+    const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)
+    first?.focus()
     return () => { prev?.focus() }
   }, [])
 
@@ -53,6 +55,26 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
+
+  // Tab 포커스 트랩: 패널 안에서만 순환
+  const handlePanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return
+    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE)
+    if (!focusable || focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+  }
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
@@ -70,6 +92,7 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
         role="dialog"
         aria-modal="true"
         aria-label="연월 선택"
+        onKeyDown={handlePanelKeyDown}
         className="fixed left-4 right-4 rounded-2xl overflow-hidden bg-white dark:bg-stone-900 shadow-xl"
         style={{ top: FALLBACK_TOP }}
       >
@@ -96,7 +119,6 @@ export function YearMonthPickerSheet({ year, month, anchorRef, onConfirm, onClos
             취소
           </button>
           <button
-            ref={confirmButtonRef}
             onClick={() => onConfirm(pickedYear, pickedMonth)}
             className="ml-2 px-5 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 text-white text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2"
           >
