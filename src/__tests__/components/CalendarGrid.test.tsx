@@ -395,6 +395,19 @@ describe('CalendarGrid', () => {
     expect(screen.queryByText('4/20')).not.toBeInTheDocument()
   })
 
+  it('공휴일 chip 래퍼에 px-0.5 패딩이 없다 (멀티데이 bar와 수평 정렬 유지)', () => {
+    const holidays: Holiday[] = [{ date: '2025-06-06', localName: '현충일', countryCode: 'KR' }]
+    render(<CalendarGrid {...defaultProps} holidays={holidays} />)
+    const chip = screen.getByText('현충일')
+    expect(chip.parentElement).not.toHaveClass('px-0.5')
+  })
+
+  it('단일 일정 pill 래퍼에 px-0.5 패딩이 없다 (멀티데이 bar와 수평 정렬 유지)', () => {
+    render(<CalendarGrid {...defaultProps} />)
+    const pill = screen.getByText('생일파티')
+    expect(pill.parentElement).not.toHaveClass('px-0.5')
+  })
+
   it('멀티데이 이벤트 bar 클릭 시 이벤트 시작일로 onSelectDate가 호출된다', () => {
     const multiEvent = makeEvent({
       id: 'multi-click',
