@@ -157,6 +157,18 @@ describe('ShoppingListCard', () => {
     expect(mockPush).toHaveBeenCalledWith('/shopping/list-1')
   })
 
+  it('삭제 버튼 클릭 시 카드 네비게이션이 발생하지 않는다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByLabelText('삭제'))
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('이름 영역 클릭 시 카드 네비게이션이 발생하지 않는다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByText('이마트'))
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
   it('이름에서 Enter 키 입력 시 인라인 편집 입력창이 나타난다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
     const nameBtn = screen.getByRole('button', { name: '이마트' })
