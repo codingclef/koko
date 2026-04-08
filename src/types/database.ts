@@ -507,6 +507,10 @@ export type Database = {
         Args: { p_user_id: string; p_name: string }
         Returns: string
       }
+      consume_app_invite: {
+        Args: { p_code: string; p_email: string }
+        Returns: boolean
+      }
       join_family_by_invite_code: {
         Args: {
           p_display_name?: string | null

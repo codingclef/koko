@@ -43,9 +43,12 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - Supabase 자동 세션 교환 후 `getSession()` 또는 `onAuthStateChange()`에서 이메일 허용 목록을 검사한다.
 - 허용 목록은 `allowed_emails` 테이블이 source of truth다.
 - 초대 코드로 진입한 신규 사용자는 `/api/auth/check-allowed`에서 허용 목록에 추가될 수 있다.
-- 로그인 직후 가족 보장은 `/api/family` -> `get_or_create_family` RPC 흐름으로 처리한다.
+- 로그인 직후 가족 조회는 `/api/family/me` -> `get_my_family` RPC(조회 전용)로 처리한다.
 - 가족 합류는 `/api/family/join` -> `join_family_by_invite_code` RPC 흐름으로 처리한다.
+- 가족 직접 생성은 `/api/family/create` -> `create_family_with_name` RPC로 처리한다.
 - "가족이 없으면 클라이언트에서 select 후 insert" 같은 다중 요청 패턴은 레이스 컨디션을 만든다. 사용하지 않는다.
+- 앱 초대 코드 소비는 `consume_app_invite(code, email)` RPC 한 번으로 원자 처리한다. 조회 → insert → update를 분리하면 동시 요청 시 코드가 두 번 소비된다.
+- **온보딩 접근 정책**: 가족이 없는 allowed user는 초대 경로(앱 초대 vs 가족 초대)와 무관하게 `/onboarding`에서 가족을 생성할 수 있다. 앱 초대는 이 상태에 도달하는 대표 경로일 뿐, 온보딩 접근의 유일한 자격 조건은 아니다.
 
 ## 5. Realtime Pattern
 

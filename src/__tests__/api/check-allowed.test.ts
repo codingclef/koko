@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server'
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
   const chain: Record<string, unknown> = {}
-  ;['select', 'insert', 'eq', 'ilike', 'update'].forEach((m) => {
+  ;['select', 'insert', 'eq', 'ilike'].forEach((m) => {
     chain[m] = jest.fn().mockReturnValue(chain)
   })
   chain.maybeSingle = jest.fn().mockReturnValue(p)
@@ -17,9 +17,13 @@ function makeChain(result: { data: unknown; error: unknown }) {
 }
 
 const mockFrom = jest.fn()
+const mockRpc = jest.fn()
 
 jest.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ from: (...args: unknown[]) => mockFrom(...args) }),
+  createClient: () => ({
+    from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
+  }),
 }))
 
 function makeRequest(body: object) {
@@ -62,9 +66,9 @@ describe('POST /api/auth/check-allowed', () => {
 
   it('유효한 inviteCode로 요청 시 allowed_emails에 추가하고 needsOnboarding: false를 반환한다', async () => {
     mockFrom
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))           // allowed_emails select
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))            // allowed_emails select
       .mockReturnValueOnce(makeChain({ data: { id: 'fam-1' }, error: null })) // families select
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))            // allowed_emails insert
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))             // allowed_emails insert
 
     const res = await POST(makeRequest({ email: 'new@example.com', inviteCode: 'ABC123' }))
     const body = await res.json()
@@ -74,57 +78,43 @@ describe('POST /api/auth/check-allowed', () => {
 
   it('잘못된 inviteCode이면 allowed: false를 반환한다', async () => {
     mockFrom
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // allowed_emails select
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // families select → null
+      .mockReturnValueOnce(makeChain({ data: null, error: null })) // allowed_emails select
+      .mockReturnValueOnce(makeChain({ data: null, error: null })) // families select → null
 
     const res = await POST(makeRequest({ email: 'new@example.com', inviteCode: 'INVALID' }))
     const body = await res.json()
     expect(body.allowed).toBe(false)
   })
 
-  it('유효한 appInviteCode로 요청 시 allowed_emails에 추가하고 needsOnboarding: true를 반환한다', async () => {
-    const futureDate = new Date(Date.now() + 86400000).toISOString()
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // allowed_emails select
-      .mockReturnValueOnce(makeChain({                               // app_invites select
-        data: { id: 'inv-1', expires_at: futureDate, used_at: null },
-        error: null,
-      }))
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // allowed_emails insert
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // app_invites update
+  it('유효한 appInviteCode로 요청 시 consume_app_invite RPC를 호출하고 needsOnboarding: true를 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null })) // allowed_emails select
+    mockRpc.mockResolvedValue({ data: true, error: null })
 
     const res = await POST(makeRequest({ email: 'new@example.com', appInviteCode: 'ABCD1234' }))
     const body = await res.json()
     expect(body.allowed).toBe(true)
     expect(body.needsOnboarding).toBe(true)
+    expect(mockRpc).toHaveBeenCalledWith('consume_app_invite', {
+      p_code: 'ABCD1234',
+      p_email: 'new@example.com',
+    })
   })
 
-  it('만료된 appInviteCode이면 allowed: false를 반환한다', async () => {
-    const pastDate = new Date(Date.now() - 86400000).toISOString()
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // allowed_emails select
-      .mockReturnValueOnce(makeChain({                               // app_invites select
-        data: { id: 'inv-1', expires_at: pastDate, used_at: null },
-        error: null,
-      }))
+  it('이미 사용되었거나 만료된 appInviteCode이면 RPC가 false를 반환하고 allowed: false가 된다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null })) // allowed_emails select
+    mockRpc.mockResolvedValue({ data: false, error: null })
 
     const res = await POST(makeRequest({ email: 'new@example.com', appInviteCode: 'EXPIRED1' }))
     const body = await res.json()
     expect(body.allowed).toBe(false)
   })
 
-  it('이미 사용된 appInviteCode이면 allowed: false를 반환한다', async () => {
-    const futureDate = new Date(Date.now() + 86400000).toISOString()
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))  // allowed_emails select
-      .mockReturnValueOnce(makeChain({                               // app_invites select
-        data: { id: 'inv-1', expires_at: futureDate, used_at: '2026-01-01T00:00:00Z' },
-        error: null,
-      }))
+  it('consume_app_invite RPC 에러 시 500을 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null })) // allowed_emails select
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC error' } })
 
-    const res = await POST(makeRequest({ email: 'new@example.com', appInviteCode: 'USED1234' }))
-    const body = await res.json()
-    expect(body.allowed).toBe(false)
+    const res = await POST(makeRequest({ email: 'new@example.com', appInviteCode: 'ABCD1234' }))
+    expect(res.status).toBe(500)
   })
 
   it('DB 에러 발생 시 500을 반환한다', async () => {

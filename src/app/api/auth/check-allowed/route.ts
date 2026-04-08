@@ -30,25 +30,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ allowed: true, needsOnboarding: false })
   }
 
-  // 2. 앱 초대 코드로 진입한 경우 → allowed_emails에 추가 후 온보딩으로 안내
+  // 2. 앱 초대 코드로 진입한 경우 → DB 함수로 원자 소비 (동시 요청 방지)
   if (appInviteCode) {
-    const now = new Date().toISOString()
-    const { data: invite } = await supabaseAdmin
-      .from('app_invites')
-      .select('id, expires_at, used_at')
-      .eq('code', appInviteCode.toUpperCase())
-      .maybeSingle()
+    const { data: consumed, error: rpcError } = await supabaseAdmin.rpc('consume_app_invite', {
+      p_code: appInviteCode,
+      p_email: normalizedEmail,
+    })
 
-    if (invite && !invite.used_at && invite.expires_at > now) {
-      await supabaseAdmin
-        .from('allowed_emails')
-        .insert({ email: normalizedEmail })
+    if (rpcError) {
+      console.error('[check-allowed] consume_app_invite error:', rpcError)
+      return NextResponse.json({ error: 'DB error', allowed: false }, { status: 500 })
+    }
 
-      await supabaseAdmin
-        .from('app_invites')
-        .update({ used_by_email: normalizedEmail, used_at: now })
-        .eq('id', invite.id)
-
+    if (consumed) {
       return NextResponse.json({ allowed: true, needsOnboarding: true })
     }
   }
