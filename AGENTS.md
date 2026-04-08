@@ -25,6 +25,13 @@ Read this first, then follow the linked project documents before making changes.
 - Stack: Next.js 16, React 19, TypeScript, Tailwind CSS v4, Supabase, Web Push
 - Deployment target: Vercel web app + installable PWA
 
+## Before Any Action
+
+These rules apply to every task without exception.
+
+1. Before starting any task, including investigation, analysis, or implementation, confirm understanding by explaining back what the user is asking.
+2. No action begins before the user's explicit approval. This includes reading files, investigating, executing commands, and writing code.
+
 ## Git Rules
 
 1. Always work on a `feature/*` branch, then open a PR into `main`.
