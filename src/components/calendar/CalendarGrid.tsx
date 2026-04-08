@@ -297,7 +297,7 @@ export function CalendarGrid({
                       <div aria-hidden="true" style={{ height: laneAreaHeight }} />
 
                       {/* 공휴일 chips */}
-                      <div className="w-full space-y-0.5 px-0.5">
+                      <div className="w-full space-y-0.5">
                         {dayHolidays.map((h) => (
                           <div
                             key={`${h.countryCode}-${h.date}`}
@@ -309,7 +309,7 @@ export function CalendarGrid({
                       </div>
 
                       {/* 단일 일정 pills */}
-                      <div className="w-full space-y-0.5 px-0.5">
+                      <div className="w-full space-y-0.5">
                         {daySingleEvents.slice(0, 3).map((evt) => (
                           <div
                             key={evt.id}
