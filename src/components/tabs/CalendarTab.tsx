@@ -253,10 +253,12 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
       })
     }
 
-    void loadMonthEvents({
-      targetFamilyId: familyId,
-      targetYear: year,
-      targetMonth: month,
+    queueMicrotask(() => {
+      void loadMonthEvents({
+        targetFamilyId: familyId,
+        targetYear: year,
+        targetMonth: month,
+      })
     })
   }, [familyId, year, month, loadMonthEvents])
 
