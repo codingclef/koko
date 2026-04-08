@@ -53,4 +53,20 @@ describe('useCalendars', () => {
     await waitFor(() => expect(result.current.calendars).toHaveLength(1))
     expect(mockGetCalendars).toHaveBeenCalledTimes(2)
   })
+
+  it('familyId가 사라지면 캘린더를 초기화한다', async () => {
+    const mockData = [{ id: 'cal-1', name: '가족', color: '#f97316', family_id: 'fam-1', created_by: 'user-1', created_at: '', updated_at: '' }]
+    mockGetCalendars.mockResolvedValue(mockData)
+
+    const { result, rerender } = renderHook(({ familyId }) => useCalendars(familyId), {
+      initialProps: { familyId: 'fam-1' as string | null },
+    })
+
+    await waitFor(() => expect(result.current.calendars).toEqual(mockData))
+
+    rerender({ familyId: null })
+
+    expect(result.current.calendars).toEqual([])
+    expect(result.current.loading).toBe(true)
+  })
 })

@@ -1,10 +1,35 @@
-import { render, act } from '@testing-library/react'
+import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
+import { getCalendarMembers, getEventsByMonth, getFamilyMembers } from '@/lib/calendar'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
+const mockReloadCalendars = jest.fn()
+const mockUseCalendars = jest.fn<
+  {
+    calendars: {
+      id: string
+      family_id: string
+      created_by: string
+      name: string
+      color: string
+      created_at: string
+      updated_at: string
+    }[]
+    loading: false
+    error: null
+    reload: typeof mockReloadCalendars
+  },
+  [string | null]
+>(() => ({
+  calendars: [],
+  loading: false,
+  error: null,
+  reload: mockReloadCalendars,
+}))
+
 jest.mock('@/hooks/useCalendars', () => ({
-  useCalendars: () => ({ calendars: [], loading: false, reload: jest.fn() }),
+  useCalendars: (familyId: string | null) => mockUseCalendars(familyId),
 }))
 jest.mock('@/hooks/useUserPreferences', () => ({
   useUserPreferences: () => ({ preferences: null, loading: false, updatePreferences: jest.fn() }),
@@ -43,7 +68,32 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }))
 jest.mock('@/components/calendar/CalendarFilter', () => ({
-  CalendarFilter: () => <div data-testid="calendar-filter" />,
+  CalendarFilter: ({ onEdit }: {
+    onEdit: (calendar: {
+      id: string
+      family_id: string
+      created_by: string
+      name: string
+      color: string
+      created_at: string
+      updated_at: string
+    }) => void
+  }) => (
+    <button
+      data-testid="calendar-filter-edit"
+      onClick={() => onEdit({
+        id: 'cal-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족',
+        color: '#f97316',
+        created_at: '',
+        updated_at: '',
+      })}
+    >
+      edit
+    </button>
+  ),
 }))
 jest.mock('@/components/calendar/CalendarGrid', () => ({
   CalendarGrid: () => <div data-testid="calendar-grid" />,
@@ -64,7 +114,41 @@ jest.mock('@/components/calendar/CalendarListSheet', () => ({
   CalendarListSheet: () => <div />,
 }))
 
+const mockGetEventsByMonth = getEventsByMonth as jest.MockedFunction<typeof getEventsByMonth>
+const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getFamilyMembers>
+const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof getCalendarMembers>
+let consoleErrorSpy: jest.SpyInstance
+
 describe('CalendarTab — touch-action 스크롤 차단', () => {
+  beforeAll(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore()
+  })
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockUseCalendars.mockReturnValue({
+      calendars: [{
+        id: 'cal-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족',
+        color: '#f97316',
+        created_at: '',
+        updated_at: '',
+      }],
+      loading: false,
+      error: null,
+      reload: mockReloadCalendars,
+    })
+    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetFamilyMembers.mockResolvedValue([])
+    mockGetCalendarMembers.mockResolvedValue([])
+  })
+
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
     const { container } = render(
       <CalendarTab
@@ -78,5 +162,59 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
     const wrapper = container.firstChild as HTMLElement
     expect(wrapper.style.touchAction).toBe('none')
+  })
+
+  it('초기 이벤트 로드 실패 시 오류 상태와 재시도 버튼을 표시한다', async () => {
+    mockGetEventsByMonth.mockRejectedValueOnce(new Error('load failed'))
+
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+
+    expect(await screen.findByText('캘린더를 불러오지 못했어요')).toBeInTheDocument()
+    expect(screen.getByText('다시 시도')).toBeInTheDocument()
+  })
+
+  it('재시도 버튼 클릭 시 캘린더 데이터를 다시 불러온다', async () => {
+    mockGetEventsByMonth
+      .mockRejectedValueOnce(new Error('load failed'))
+      .mockResolvedValueOnce([])
+
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+
+    const retryButton = await screen.findByText('다시 시도')
+    fireEvent.click(retryButton)
+
+    await waitFor(() => expect(mockReloadCalendars).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetEventsByMonth).toHaveBeenCalledTimes(2))
+  })
+
+  it('캘린더 멤버 조회 실패 시 mutation error를 표시한다', async () => {
+    mockGetCalendarMembers.mockRejectedValueOnce(new Error('members failed'))
+
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+
+    fireEvent.click(await screen.findByTestId('calendar-filter-edit'))
+
+    expect(await screen.findByText('캘린더 멤버를 불러오지 못했어요')).toBeInTheDocument()
   })
 })

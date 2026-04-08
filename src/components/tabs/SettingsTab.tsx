@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut, Share2, Check, Users, Pencil, X, Bell, BellOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { getFamilyInviteCode, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
-import { getAuthHeaders } from '@/lib/api-client'
+import { ApiClientError, postJsonWithAuth } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState, Tab } from '@/types/tabs'
@@ -49,12 +49,9 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
 
   useEffect(() => {
     if (!familyId) return
-    supabase
-      .from('families')
-      .select('invite_code')
-      .eq('id', familyId)
-      .single()
-      .then(({ data }) => setInviteCode(data?.invite_code ?? null))
+    getFamilyInviteCode(familyId)
+      .then(setInviteCode)
+      .catch((e) => console.error('[SettingsTab] getFamilyInviteCode failed:', e))
   }, [familyId])
 
   useEffect(() => {
@@ -68,7 +65,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     if (!user) return
     setEnablingNotif(true)
     try {
-      await registerPushSubscription(user.id)
+      await registerPushSubscription()
       setNotifPermission(Notification.permission)
     } finally {
       setEnablingNotif(false)
@@ -98,27 +95,17 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     setJoinError(null)
 
     try {
-      const authHeaders = await getAuthHeaders()
-      const res = await fetch('/api/family/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({
-          inviteCode: joinCode.trim(),
-          displayName: joinDisplayName.trim() || undefined,
-        }),
+      await postJsonWithAuth('/api/family/join', {
+        inviteCode: joinCode.trim(),
+        displayName: joinDisplayName.trim() || undefined,
       })
-
-      if (!res.ok) {
-        const { error } = await res.json()
-        setJoinError(error === 'Invalid invite code' ? '올바르지 않은 초대 코드예요' : '오류가 발생했어요')
-      } else {
-        onNavigateToTab('shopping')
-      }
-    } catch {
-      setJoinError('오류가 발생했어요')
+      onNavigateToTab('shopping')
+    } catch (e) {
+      setJoinError(
+        e instanceof ApiClientError && e.message === 'Invalid invite code'
+          ? '올바르지 않은 초대 코드예요'
+          : '오류가 발생했어요'
+      )
     } finally {
       setJoining(false)
     }

@@ -90,6 +90,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
     new Set(initialReminderMinutes)
   )
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const titleInputRef = useRef<HTMLInputElement>(null)
 
@@ -179,6 +180,7 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
     if (new Date(endAt) < new Date(startAt)) return
 
     setSaving(true)
+    setSaveError(null)
     try {
       await onSave({
         calendarId,
@@ -190,6 +192,9 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
         reminderMinutes: Array.from(reminderMinutes),
       })
       onClose()
+    } catch (e) {
+      console.error('[EventFormModal] save failed:', e)
+      setSaveError('저장에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setSaving(false)
     }
@@ -246,6 +251,10 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           placeholder="제목"
           className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 text-base"
         />
+
+        {saveError && (
+          <p className="text-xs text-red-500 -mt-2">{saveError}</p>
+        )}
 
         {/* 종일 토글 */}
         <div className="flex items-center justify-between">

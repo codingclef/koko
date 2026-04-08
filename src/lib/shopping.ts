@@ -59,6 +59,17 @@ export async function deleteShoppingList(listId: string): Promise<void> {
   if (error) throw error
 }
 
+export async function getShoppingList(listId: string): Promise<ShoppingList | null> {
+  const { data, error } = await supabase
+    .from('shopping_lists')
+    .select('*')
+    .eq('id', listId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
 export async function getShoppingItems(listId: string): Promise<ShoppingItem[]> {
   const { data, error } = await supabase
     .from('shopping_items')

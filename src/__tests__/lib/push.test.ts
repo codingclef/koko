@@ -3,10 +3,10 @@
  */
 import { registerPushSubscription } from '@/lib/push'
 
-const mockGetAuthHeaders = jest.fn()
+const mockPostJsonWithAuth = jest.fn()
 
 jest.mock('@/lib/api-client', () => ({
-  getAuthHeaders: (...args: unknown[]) => mockGetAuthHeaders(...args),
+  postJsonWithAuth: (...args: unknown[]) => mockPostJsonWithAuth(...args),
 }))
 
 const mockGetSubscription = jest.fn()
@@ -29,7 +29,7 @@ const mockRegistration = {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockGetAuthHeaders.mockResolvedValue({ Authorization: 'Bearer token' })
+  mockPostJsonWithAuth.mockResolvedValue(undefined)
 
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY =
     'BDiltY7dC3CnNxamlejehgdculV7iorzypDSV1a2GDFc2d2FQoYyXcl_6J76J3HT-kTqQ7zB5hSNoKeTHxw_KvY'
@@ -45,11 +45,10 @@ beforeEach(() => {
   Object.defineProperty(window, 'PushManager', { value: class {}, configurable: true })
 
   Object.defineProperty(window, 'Notification', {
-    value: { requestPermission: jest.fn().mockResolvedValue('granted') },
+    value: { permission: 'default', requestPermission: jest.fn().mockResolvedValue('granted') },
     configurable: true,
   })
 
-  global.fetch = jest.fn().mockResolvedValue({ ok: true })
 })
 
 describe('registerPushSubscription', () => {
@@ -57,17 +56,15 @@ describe('registerPushSubscription', () => {
     const mockSub = { toJSON: () => mockSubscriptionJSON }
     mockGetSubscription.mockResolvedValue(mockSub)
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockSubscribe).not.toHaveBeenCalled()
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(mockPostJsonWithAuth).toHaveBeenCalledWith(
       '/api/push/subscribe',
       expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer token',
-        }),
+        endpoint: mockSubscriptionJSON.endpoint,
+        p256dh: mockSubscriptionJSON.keys.p256dh,
+        auth: mockSubscriptionJSON.keys.auth,
       })
     )
   })
@@ -77,30 +74,55 @@ describe('registerPushSubscription', () => {
     const mockSub = { toJSON: () => mockSubscriptionJSON }
     mockSubscribe.mockResolvedValue(mockSub)
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockSubscribe).toHaveBeenCalledWith(
       expect.objectContaining({ userVisibleOnly: true })
     )
-    expect(global.fetch).toHaveBeenCalled()
+    expect(mockPostJsonWithAuth).toHaveBeenCalled()
+  })
+
+  it('이미 알림이 허용되어 있으면 권한 요청 없이 서버로 전송한다', async () => {
+    const mockSub = { toJSON: () => mockSubscriptionJSON }
+    mockGetSubscription.mockResolvedValue(mockSub)
+    const requestPermission = jest.fn()
+
+    Object.defineProperty(window, 'Notification', {
+      value: { permission: 'granted', requestPermission },
+      configurable: true,
+    })
+
+    await registerPushSubscription()
+
+    expect(requestPermission).not.toHaveBeenCalled()
+    expect(mockPostJsonWithAuth).toHaveBeenCalled()
   })
 
   it('알림 권한 거부 시 fetch를 호출하지 않는다', async () => {
     Object.defineProperty(window, 'Notification', {
-      value: { requestPermission: jest.fn().mockResolvedValue('denied') },
+      value: { permission: 'default', requestPermission: jest.fn().mockResolvedValue('denied') },
       configurable: true,
     })
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
-    expect(global.fetch).not.toHaveBeenCalled()
+    expect(mockPostJsonWithAuth).not.toHaveBeenCalled()
+  })
+
+  it('Notification 미지원 환경에서는 아무것도 하지 않는다', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (window as any).Notification
+
+    await registerPushSubscription()
+
+    expect(mockRegister).not.toHaveBeenCalled()
   })
 
   it('PushManager 미지원 환경에서는 아무것도 하지 않는다', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).PushManager
 
-    await registerPushSubscription('user-1')
+    await registerPushSubscription()
 
     expect(mockRegister).not.toHaveBeenCalled()
   })

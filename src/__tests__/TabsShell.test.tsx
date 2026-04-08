@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { TabsShell } from '@/components/TabsShell'
+import { registerPushSubscription } from '@/lib/push'
 
 const mockReplace = jest.fn()
 let mockTabParam: string | null = null
@@ -91,5 +92,10 @@ describe('TabsShell', () => {
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
     expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
+  })
+
+  it('초기 진입 시 자동으로 푸시 구독을 요청하지 않는다', () => {
+    render(<TabsShell />)
+    expect(registerPushSubscription).not.toHaveBeenCalled()
   })
 })
