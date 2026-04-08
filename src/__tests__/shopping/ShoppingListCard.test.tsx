@@ -191,4 +191,12 @@ describe('ShoppingListCard', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('편집 모드 input은 text-base 클래스를 가진다 (iOS Safari zoom 방지)', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    fireEvent.click(screen.getByText('이마트'))
+    const input = screen.getByLabelText('목록 이름 수정')
+    expect(input).toHaveClass('text-base')
+    expect(input).not.toHaveClass('text-sm')
+  })
 })

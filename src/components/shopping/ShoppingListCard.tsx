@@ -137,7 +137,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
                 }}
                 onBlur={commitEdit}
                 onKeyDown={handleInputKeyDown}
-                className="w-full font-semibold text-sm text-stone-800 dark:text-stone-100 bg-transparent border-b border-accent-400 outline-none"
+                className="w-full font-semibold text-base text-stone-800 dark:text-stone-100 bg-transparent border-b border-accent-400 outline-none"
                 aria-label="목록 이름 수정"
               />
             ) : (
