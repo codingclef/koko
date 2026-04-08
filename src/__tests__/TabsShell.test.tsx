@@ -17,7 +17,7 @@ jest.mock('@/hooks/useAuth', () => ({
 }))
 
 jest.mock('@/hooks/useFamily', () => ({
-  useFamily: () => ({ familyId: null, loading: false }),
+  useFamily: () => ({ familyId: 'fam-1', appRole: 'member', loading: false }),
 }))
 
 jest.mock('@/hooks/useUserPreferences', () => ({

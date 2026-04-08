@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { patchJsonWithAuth } from '@/lib/api-client'
 import type { Database } from '@/types/database'
 
 export type FamilyMember = Database['public']['Tables']['family_members']['Row']
@@ -30,4 +31,8 @@ export async function updateMyDisplayName(userId: string, displayName: string): 
     .update({ display_name: displayName.trim() })
     .eq('user_id', userId)
   if (error) throw error
+}
+
+export async function updateFamilyName(familyId: string, name: string): Promise<void> {
+  await patchJsonWithAuth('/api/family/name', { familyId, name })
 }

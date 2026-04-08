@@ -92,3 +92,22 @@ export async function postJsonWithAuth<TResponse>(
     },
   })
 }
+
+export async function patchJsonWithAuth<TResponse>(
+  input: string,
+  body?: unknown,
+  init?: Omit<RequestInit, 'body' | 'method'>
+): Promise<TResponse> {
+  const authHeaders = await getAuthHeaders()
+
+  return requestJson<TResponse>(input, {
+    ...init,
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+      ...authHeaders,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}

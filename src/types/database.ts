@@ -18,13 +18,46 @@ export type Database = {
         Row: {
           email: string
           created_at: string
+          app_role: 'admin' | 'member'
         }
         Insert: {
           email: string
           created_at?: string
+          app_role?: 'admin' | 'member'
         }
         Update: {
           email?: string
+          created_at?: string
+          app_role?: 'admin' | 'member'
+        }
+        Relationships: []
+      }
+      app_invites: {
+        Row: {
+          id: string
+          code: string
+          created_by: string | null
+          used_by_email: string | null
+          used_at: string | null
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          created_by?: string | null
+          used_by_email?: string | null
+          used_at?: string | null
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          created_by?: string | null
+          used_by_email?: string | null
+          used_at?: string | null
+          expires_at?: string
           created_at?: string
         }
         Relationships: []
@@ -465,6 +498,18 @@ export type Database = {
       get_or_create_family: {
         Args: { p_user_id: string }
         Returns: string
+      }
+      get_my_family: {
+        Args: { p_user_id: string }
+        Returns: string | null
+      }
+      create_family_with_name: {
+        Args: { p_user_id: string; p_name: string }
+        Returns: string
+      }
+      consume_app_invite: {
+        Args: { p_code: string; p_email: string }
+        Returns: boolean
       }
       join_family_by_invite_code: {
         Args: {

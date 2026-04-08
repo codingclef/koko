@@ -18,15 +18,22 @@ function AuthCallbackInner() {
       handledRef.current = true
 
       const next = searchParams.get('next') ?? '/calendar'
+      const isAppInvite = next.startsWith('/join-app')
       const inviteCode = parseInviteCodeFromNext(next)
 
       let allowed = false
+      let needsOnboarding = false
       try {
-        const body = await postJson<{ allowed: boolean }>('/api/auth/check-allowed', {
-          email,
-          inviteCode,
-        })
+        const body = await postJson<{ allowed: boolean; needsOnboarding?: boolean }>(
+          '/api/auth/check-allowed',
+          {
+            email,
+            inviteCode: isAppInvite ? undefined : inviteCode,
+            appInviteCode: isAppInvite ? inviteCode : undefined,
+          }
+        )
         allowed = body.allowed === true
+        needsOnboarding = body.needsOnboarding === true
       } catch (e) {
         console.error('[auth/callback] check-allowed failed:', e)
       }
@@ -34,6 +41,8 @@ function AuthCallbackInner() {
       if (!allowed) {
         await supabase.auth.signOut()
         router.replace('/login?error=unauthorized')
+      } else if (needsOnboarding) {
+        router.replace('/onboarding')
       } else {
         router.replace(next)
       }

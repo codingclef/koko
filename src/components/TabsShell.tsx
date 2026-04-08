@@ -16,9 +16,14 @@ export function TabsShell() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { familyId, loading: familyLoading } = useFamily(user)
+  const { familyId, appRole, loading: familyLoading, error: familyError } = useFamily(user)
   const { preferences, updatePreferences } = useUserPreferences(user)
   const isInitializing = authLoading || familyLoading
+
+  // 인증됨 + 앱 접근권 있음 + 아직 가족 없음 → 온보딩 필요
+  // familyError가 있으면 DB 장애로 판단, 온보딩으로 잘못 보내지 않는다
+  const needsFamilyOnboarding =
+    !authLoading && !familyLoading && !familyError && Boolean(user) && familyId === null
 
   const tabParam = searchParams.get('tab')
   const activeTab: Tab = tabParam && TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'calendar'
@@ -26,6 +31,10 @@ export function TabsShell() {
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
   }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (needsFamilyOnboarding) router.replace('/onboarding')
+  }, [needsFamilyOnboarding, router])
 
   useEffect(() => {
     if (!preferences?.app_theme) return
@@ -37,6 +46,7 @@ export function TabsShell() {
 
   if (authLoading) return <AppSplash />
   if (!user) return null
+  if (needsFamilyOnboarding) return null
 
   const handleTabChange = (tab: Tab) => {
     router.replace(tab === 'calendar' ? '/calendar' : `/calendar?tab=${tab}`)
@@ -67,6 +77,7 @@ export function TabsShell() {
           updatePreferences={updatePreferences}
           user={user}
           familyId={familyId}
+          appRole={appRole}
           isInitializing={isInitializing}
         />
       </div>
