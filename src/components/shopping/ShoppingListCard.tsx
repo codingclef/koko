@@ -116,13 +116,13 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
       <div
         ref={setNodeRef}
         style={style}
+        {...attributes}
+        {...listeners}
         tabIndex={confirming || editing ? -1 : 0}
         aria-label={`${list.name} 장바구니 열기`}
         onClick={() => !confirming && !editing && router.push(`/shopping/${list.id}`)}
         onKeyDown={handleCardKeyDown}
         className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-accent-200 dark:hover:border-accent-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-1"
-        {...attributes}
-        {...listeners}
       >
         {/* Header row: name + delete */}
         <div className="flex items-center gap-2 mb-3">
