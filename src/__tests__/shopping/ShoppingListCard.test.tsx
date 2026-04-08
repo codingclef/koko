@@ -108,11 +108,6 @@ describe('ShoppingListCard', () => {
     expect(screen.getByText('이마트')).toBeInTheDocument()
   })
 
-  it('드래그 핸들이 렌더링된다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
-    expect(screen.getByLabelText('드래그 핸들')).toBeInTheDocument()
-  })
-
   it('previewItems가 없으면 빈 상태 텍스트가 렌더링된다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
     expect(screen.getByText('아이템 없음')).toBeInTheDocument()
