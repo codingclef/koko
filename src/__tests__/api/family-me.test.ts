@@ -63,6 +63,12 @@ describe('POST /api/family/me', () => {
     expect(body.familyId).toBeNull()
   })
 
+  it('get_my_family RPC 에러 시 500을 반환한다', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC error' } })
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(500)
+  })
+
   it('allowed_emails에 admin이면 appRole이 admin이다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: { app_role: 'admin' }, error: null }))
     const res = await POST(makeRequest())

@@ -47,13 +47,14 @@ describe('useFamily', () => {
     expect(result.current.familyId).toBeNull()
   })
 
-  it('API 응답이 ok가 아니면 familyId는 null이다', async () => {
+  it('API 응답이 ok가 아니면 familyId는 null이고 error가 설정된다', async () => {
     mockPostJsonWithAuth.mockRejectedValue(new Error('Internal Server Error'))
 
     const { result } = renderHook(() => useFamily(mockUser))
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.familyId).toBeNull()
+    expect(result.current.error).toBeTruthy()
   })
 
   it('fetch 예외 발생 시 familyId는 null이다', async () => {
