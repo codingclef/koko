@@ -1,6 +1,6 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
-import { CalendarTab, clearMonthEventsCacheForTests } from '@/components/tabs/CalendarTab'
+import { CalendarTab } from '@/components/tabs/CalendarTab'
 import { getCalendarMembers, getEventsByMonth, getFamilyMembers } from '@/lib/calendar'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
@@ -130,7 +130,6 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    clearMonthEventsCacheForTests()
     mockUseCalendars.mockReturnValue({
       calendars: [{
         id: 'cal-1',
@@ -166,13 +165,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('초기 이벤트 로드 실패 시 오류 상태와 재시도 버튼을 표시한다', async () => {
-    const today = new Date()
-    mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
-      if (year === today.getFullYear() && month === today.getMonth()) {
-        throw new Error('load failed')
-      }
-      return []
-    })
+    mockGetEventsByMonth.mockRejectedValue(new Error('load failed'))
 
     render(
       <CalendarTab
@@ -188,15 +181,9 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('재시도 버튼 클릭 시 캘린더 데이터를 다시 불러온다', async () => {
-    const today = new Date()
-    let shouldFailCurrentMonth = true
-    mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
-      if (year === today.getFullYear() && month === today.getMonth() && shouldFailCurrentMonth) {
-        shouldFailCurrentMonth = false
-        throw new Error('load failed')
-      }
-      return []
-    })
+    mockGetEventsByMonth
+      .mockRejectedValueOnce(new Error('load failed'))
+      .mockResolvedValue([])
 
     render(
       <CalendarTab
@@ -211,6 +198,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(retryButton)
 
     await waitFor(() => expect(mockReloadCalendars).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetEventsByMonth).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByTestId('calendar-grid')).toBeInTheDocument())
   })
 

@@ -38,28 +38,10 @@ interface Props extends AuthState {
   preferences: UserPreferences | null
 }
 
-const monthEventsCache = new Map<string, CalendarEvent[]>()
-const monthEventsRequests = new Map<string, Promise<CalendarEvent[]>>()
-
-export function clearMonthEventsCacheForTests() {
-  monthEventsCache.clear()
-  monthEventsRequests.clear()
-}
+const MAX_MONTH_EVENT_CACHE = 12
 
 function getMonthEventsKey(familyId: string, year: number, month: number) {
   return `${familyId}:${year}:${month}`
-}
-
-function clearFamilyMonthEventsCache(familyId: string) {
-  const prefix = `${familyId}:`
-
-  for (const key of monthEventsCache.keys()) {
-    if (key.startsWith(prefix)) monthEventsCache.delete(key)
-  }
-
-  for (const key of monthEventsRequests.keys()) {
-    if (key.startsWith(prefix)) monthEventsRequests.delete(key)
-  }
 }
 
 function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
@@ -72,37 +54,6 @@ function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
   return month === 11
     ? { year: year + 1, month: 0 }
     : { year, month: month + 1 }
-}
-
-async function fetchMonthEvents(
-  familyId: string,
-  year: number,
-  month: number,
-  options: { force?: boolean } = {}
-) {
-  const key = getMonthEventsKey(familyId, year, month)
-
-  if (!options.force) {
-    const cached = monthEventsCache.get(key)
-    if (cached) return cached
-
-    const inFlight = monthEventsRequests.get(key)
-    if (inFlight) return inFlight
-  }
-
-  const request = getEventsByMonth(familyId, year, month)
-    .then((nextEvents) => {
-      monthEventsCache.set(key, nextEvents)
-      monthEventsRequests.delete(key)
-      return nextEvents
-    })
-    .catch((error) => {
-      monthEventsRequests.delete(key)
-      throw error
-    })
-
-  monthEventsRequests.set(key, request)
-  return request
 }
 
 export function CalendarTab({ preferences, user, familyId, isInitializing }: Props) {
@@ -153,103 +104,179 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
   const [eventsLoading, setEventsLoading] = useState(true)
   const [eventsError, setEventsError] = useState<unknown>(null)
   const [hasLoadedEvents, setHasLoadedEvents] = useState(false)
+  const monthEventsCacheRef = useRef(new Map<string, CalendarEvent[]>())
+  const monthEventsRequestsRef = useRef(new Map<string, Promise<CalendarEvent[]>>())
+  const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
+  const visibleMonthKeyRef = useRef<string | null>(familyId ? getMonthEventsKey(familyId, year, month) : null)
 
-  const prefetchAdjacentMonths = useCallback((targetYear: number, targetMonth: number) => {
-    if (!familyId) return
+  const storeMonthEvents = useCallback((key: string, nextEvents: CalendarEvent[]) => {
+    const cache = monthEventsCacheRef.current
+    if (cache.has(key)) cache.delete(key)
+    cache.set(key, nextEvents)
 
+    while (cache.size > MAX_MONTH_EVENT_CACHE) {
+      const oldestKey = cache.keys().next().value
+      if (!oldestKey) break
+      cache.delete(oldestKey)
+    }
+  }, [])
+
+  const clearFamilyMonthEventsCache = useCallback((targetFamilyId: string) => {
+    const prefix = `${targetFamilyId}:`
+
+    for (const key of monthEventsCacheRef.current.keys()) {
+      if (key.startsWith(prefix)) monthEventsCacheRef.current.delete(key)
+    }
+
+    for (const key of monthEventsRequestsRef.current.keys()) {
+      if (key.startsWith(prefix)) monthEventsRequestsRef.current.delete(key)
+    }
+  }, [])
+
+  const fetchMonthEvents = useCallback(async (
+    targetFamilyId: string,
+    targetYear: number,
+    targetMonth: number,
+    options: { force?: boolean } = {}
+  ) => {
+    const key = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
+
+    if (!options.force) {
+      const cached = monthEventsCacheRef.current.get(key)
+      if (cached) return cached
+
+      const inFlight = monthEventsRequestsRef.current.get(key)
+      if (inFlight) return inFlight
+    }
+
+    const request = getEventsByMonth(targetFamilyId, targetYear, targetMonth)
+      .then((nextEvents) => {
+        storeMonthEvents(key, nextEvents)
+        monthEventsRequestsRef.current.delete(key)
+        return nextEvents
+      })
+      .catch((error) => {
+        monthEventsRequestsRef.current.delete(key)
+        throw error
+      })
+
+    monthEventsRequestsRef.current.set(key, request)
+    return request
+  }, [storeMonthEvents])
+
+  const prefetchAdjacentMonths = useCallback((targetFamilyId: string, targetYear: number, targetMonth: number) => {
     const prev = getAdjacentMonth(targetYear, targetMonth, -1)
     const next = getAdjacentMonth(targetYear, targetMonth, 1)
 
-    void fetchMonthEvents(familyId, prev.year, prev.month).catch(() => {})
-    void fetchMonthEvents(familyId, next.year, next.month).catch(() => {})
-  }, [familyId])
+    void fetchMonthEvents(targetFamilyId, prev.year, prev.month).catch(() => {})
+    void fetchMonthEvents(targetFamilyId, next.year, next.month).catch(() => {})
+  }, [fetchMonthEvents])
+
+  const loadMonthEvents = useCallback(async ({
+    targetFamilyId,
+    targetYear,
+    targetMonth,
+    force = false,
+    silent = false,
+    throwOnError = false,
+  }: {
+    targetFamilyId: string
+    targetYear: number
+    targetMonth: number
+    force?: boolean
+    silent?: boolean
+    throwOnError?: boolean
+  }) => {
+    const key = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
+    const cached = !force ? monthEventsCacheRef.current.get(key) : undefined
+    const isVisibleMonth = () => visibleMonthKeyRef.current === key
+    const applyMonthState = (nextEvents: CalendarEvent[], nextError: unknown = null) => {
+      if (!isVisibleMonth()) return
+      setEvents(nextEvents)
+      setEventsError(nextError)
+      setEventsLoading(false)
+      if (nextError === null) setHasLoadedEvents(true)
+    }
+
+    if (cached) {
+      applyMonthState(cached)
+      prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
+      return cached
+    }
+
+    if (!silent && isVisibleMonth()) {
+      setEvents([])
+      setEventsLoading(true)
+    }
+    if (isVisibleMonth()) setEventsError(null)
+
+    try {
+      const nextEvents = await fetchMonthEvents(targetFamilyId, targetYear, targetMonth, { force })
+      applyMonthState(nextEvents)
+      prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
+      return nextEvents
+    } catch (error) {
+      console.error('[CalendarTab] loadEvents failed:', error)
+      if (isVisibleMonth()) {
+        setEvents([])
+        setEventsError(error)
+        setEventsLoading(false)
+      }
+      if (throwOnError) throw error
+      return []
+    }
+  }, [fetchMonthEvents, prefetchAdjacentMonths])
 
   useEffect(() => {
-    setEvents([])
-    setEventsError(null)
-    setEventsLoading(true)
-    setHasLoadedEvents(false)
-  }, [familyId])
+    visibleMonthKeyRef.current = familyId ? getMonthEventsKey(familyId, year, month) : null
 
-  useEffect(() => {
     if (!familyId) {
       setEvents([])
       setEventsError(null)
       setEventsLoading(false)
+      setHasLoadedEvents(false)
+      previousFamilyIdRef.current = null
       return
     }
 
-    const key = getMonthEventsKey(familyId, year, month)
-    const cached = monthEventsCache.get(key)
-    let cancelled = false
+    const familyChanged = previousFamilyIdRef.current !== familyId
+    previousFamilyIdRef.current = familyId
 
-    if (cached) {
-      setEvents(cached)
+    if (familyChanged) {
+      setEvents([])
       setEventsError(null)
-      setEventsLoading(false)
-      setHasLoadedEvents(true)
-      prefetchAdjacentMonths(year, month)
-      return
+      setEventsLoading(true)
+      setHasLoadedEvents(false)
     }
 
-    setEvents([])
-    setEventsError(null)
-    setEventsLoading(true)
-
-    void fetchMonthEvents(familyId, year, month)
-      .then((nextEvents) => {
-        if (cancelled) return
-        setEvents(nextEvents)
-        setEventsError(null)
-        setEventsLoading(false)
-        setHasLoadedEvents(true)
-        prefetchAdjacentMonths(year, month)
-      })
-      .catch((error) => {
-        if (cancelled) return
-        console.error('[CalendarTab] loadEvents failed:', error)
-        setEvents([])
-        setEventsError(error)
-        setEventsLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [familyId, month, prefetchAdjacentMonths, year])
+    void loadMonthEvents({
+      targetFamilyId: familyId,
+      targetYear: year,
+      targetMonth: month,
+    })
+  }, [familyId, year, month, loadMonthEvents])
 
   const reloadEvents = useCallback(async () => {
     if (!familyId) return
-
-    setEventsLoading(true)
-    try {
-      const nextEvents = await fetchMonthEvents(familyId, year, month, { force: true })
-      setEvents(nextEvents)
-      setEventsError(null)
-      setHasLoadedEvents(true)
-      prefetchAdjacentMonths(year, month)
-    } catch (error) {
-      console.error('[CalendarTab] loadEvents failed:', error)
-      setEvents([])
-      setEventsError(error)
-      throw error
-    } finally {
-      setEventsLoading(false)
-    }
-  }, [familyId, month, prefetchAdjacentMonths, year])
+    await loadMonthEvents({
+      targetFamilyId: familyId,
+      targetYear: year,
+      targetMonth: month,
+      force: true,
+      throwOnError: true,
+    })
+  }, [familyId, year, month, loadMonthEvents])
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
-
-    try {
-      const nextEvents = await fetchMonthEvents(familyId, year, month, { force: true })
-      setEvents(nextEvents)
-      setEventsError(null)
-      setHasLoadedEvents(true)
-    } catch (e) {
-      console.error('[CalendarTab] refreshEvents failed:', e)
-    }
-  }, [familyId, year, month, setEvents])
+    await loadMonthEvents({
+      targetFamilyId: familyId,
+      targetYear: year,
+      targetMonth: month,
+      force: true,
+      silent: true,
+    })
+  }, [familyId, year, month, loadMonthEvents])
 
   const reloadCalendarContext = useCallback(async () => {
     await Promise.allSettled([reloadCalendars(), reloadFamilyMembers()])
@@ -337,9 +364,11 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
 
   const handleCalendarDelete = async () => {
     if (!calendarForm?.calendar) return
+    if (!familyId) return
     setMutationError(null)
 
     try {
+      clearFamilyMonthEventsCache(familyId)
       await deleteCalendar(calendarForm.calendar.id)
       setActiveIds((prev) => {
         const next = new Set(prev)
