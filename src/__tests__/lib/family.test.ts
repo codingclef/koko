@@ -1,4 +1,4 @@
-import { getFamilyInviteCode, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { getFamilyInfo, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
@@ -48,23 +48,23 @@ describe('getMyFamilyMember', () => {
   })
 })
 
-describe('getFamilyInviteCode', () => {
-  it('가족 초대 코드를 반환한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: { invite_code: 'ABC123' }, error: null }))
-    const result = await getFamilyInviteCode('family-1')
-    expect(result).toBe('ABC123')
+describe('getFamilyInfo', () => {
+  it('가족 이름과 초대 코드를 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: { name: '우리 가족', invite_code: 'ABC123' }, error: null }))
+    const result = await getFamilyInfo('family-1')
+    expect(result).toEqual({ name: '우리 가족', invite_code: 'ABC123' })
     expect(mockFrom).toHaveBeenCalledWith('families')
   })
 
-  it('invite_code가 없으면 null을 반환한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: { invite_code: null }, error: null }))
-    const result = await getFamilyInviteCode('family-1')
-    expect(result).toBeNull()
+  it('invite_code가 없으면 null을 포함해 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: { name: '우리 가족', invite_code: null }, error: null }))
+    const result = await getFamilyInfo('family-1')
+    expect(result?.invite_code).toBeNull()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
-    await expect(getFamilyInviteCode('family-1')).rejects.toEqual({ message: 'fetch error' })
+    await expect(getFamilyInfo('family-1')).rejects.toEqual({ message: 'fetch error' })
   })
 })
 
