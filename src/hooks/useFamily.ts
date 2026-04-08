@@ -4,19 +4,27 @@ import type { User } from '@supabase/supabase-js'
 import { postJsonWithAuth } from '@/lib/api-client'
 import { useAsyncData } from '@/hooks/useAsyncData'
 
+interface FamilyData {
+  familyId: string | null
+  appRole: 'admin' | 'member'
+}
+
 export function useFamily(user: User | null) {
-  const { value: familyId, loading } = useAsyncData<string | null>({
+  const { value, loading } = useAsyncData<FamilyData>({
     enabled: Boolean(user),
-    initialValue: null,
+    initialValue: { familyId: null, appRole: 'member' },
     reloadKey: user?.id,
     load: async () => {
-      const { familyId } = await postJsonWithAuth<{ familyId: string }>('/api/family')
-      return familyId
+      return await postJsonWithAuth<FamilyData>('/api/family/me')
     },
     onError: (e) => {
       console.error('[useFamily] unexpected error:', e)
     },
   })
 
-  return { familyId, loading }
+  return {
+    familyId: value?.familyId ?? null,
+    appRole: value?.appRole ?? 'member',
+    loading,
+  }
 }

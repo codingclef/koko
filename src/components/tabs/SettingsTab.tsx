@@ -4,10 +4,10 @@ import { useEffect, useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LogOut, Share2, Check, Users, Pencil, X,
-  Bell, BellOff, ChevronLeft, ChevronRight,
+  Bell, BellOff, ChevronLeft, ChevronRight, UserPlus,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getFamilyInfo, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { getFamilyInfo, getMyFamilyMember, updateMyDisplayName, updateFamilyName } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import { ApiClientError, postJsonWithAuth } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
@@ -26,6 +26,7 @@ interface Props extends AuthState {
   onNavigateToTab: (tab: Tab) => void
   preferences: UserPreferences | null
   updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
+  appRole: 'admin' | 'member'
 }
 
 function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
@@ -43,7 +44,7 @@ function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
   )
 }
 
-export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, user, familyId, isInitializing }: Props) {
+export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, user, familyId, appRole, isInitializing }: Props) {
   const router = useRouter()
   const logoutTitleId = useId()
 
@@ -52,6 +53,11 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [familyName, setFamilyName] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  // 가족 이름 편집
+  const [editingFamilyName, setEditingFamilyName] = useState(false)
+  const [familyNameInput, setFamilyNameInput] = useState('')
+  const [savingFamilyName, setSavingFamilyName] = useState(false)
 
   // 합류 폼
   const [joinCode, setJoinCode] = useState('')
@@ -64,6 +70,12 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
+
+  // 앱 초대 (admin only)
+  const [appInviteCode, setAppInviteCode] = useState<string | null>(null)
+  const [appInviteExpiry, setAppInviteExpiry] = useState<string | null>(null)
+  const [appInviteCopied, setAppInviteCopied] = useState(false)
+  const [creatingAppInvite, setCreatingAppInvite] = useState(false)
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
@@ -104,6 +116,57 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
       setNotifPermission(Notification.permission)
     } finally {
       setEnablingNotif(false)
+    }
+  }
+
+  const handleStartEditFamilyName = () => {
+    setFamilyNameInput(familyName ?? '')
+    setEditingFamilyName(true)
+  }
+
+  const handleSaveFamilyName = async () => {
+    if (!familyId || !familyNameInput.trim()) return
+    setSavingFamilyName(true)
+    try {
+      await updateFamilyName(familyId, familyNameInput.trim())
+      setFamilyName(familyNameInput.trim())
+      setEditingFamilyName(false)
+    } catch (e) {
+      console.error('[SettingsTab] updateFamilyName failed:', e)
+    } finally {
+      setSavingFamilyName(false)
+    }
+  }
+
+  const handleCreateAppInvite = async () => {
+    setCreatingAppInvite(true)
+    try {
+      const { invite } = await postJsonWithAuth<{ invite: { code: string; expires_at: string } }>(
+        '/api/app-invite'
+      )
+      setAppInviteCode(invite.code)
+      setAppInviteExpiry(invite.expires_at)
+    } catch (e) {
+      console.error('[SettingsTab] createAppInvite failed:', e)
+    } finally {
+      setCreatingAppInvite(false)
+    }
+  }
+
+  const handleShareAppInvite = async () => {
+    if (!appInviteCode) return
+    const url = `${window.location.origin}/join-app?code=${appInviteCode}`
+    const shareData = {
+      title: 'Koko 앱 초대',
+      text: 'Koko 앱에 초대합니다. 링크를 눌러 시작하세요!',
+      url,
+    }
+    if (navigator.share) {
+      await navigator.share(shareData)
+    } else {
+      await navigator.clipboard.writeText(url)
+      setAppInviteCopied(true)
+      setTimeout(() => setAppInviteCopied(false), 2000)
     }
   }
 
@@ -276,15 +339,49 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
       <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
         <SubHeader title="가족" onBack={() => setView('main')} />
 
-        {familyName && (
-          <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
-            <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-2">현재 가족</p>
-            <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{familyName}</p>
-          </div>
-        )}
-
+        {/* 가족 이름 */}
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
-          <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">초대 코드</p>
+          <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">가족 이름</p>
+          {editingFamilyName ? (
+            <div className="flex gap-2">
+              <input
+                value={familyNameInput}
+                onChange={(e) => setFamilyNameInput(e.target.value)}
+                placeholder="가족 이름 입력"
+                maxLength={30}
+                autoFocus
+                className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-accent-300"
+              />
+              <button
+                onClick={handleSaveFamilyName}
+                disabled={savingFamilyName || !familyNameInput.trim()}
+                className="px-4 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+              >
+                저장
+              </button>
+              <button
+                onClick={() => setEditingFamilyName(false)}
+                className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{familyName ?? '—'}</p>
+              <button
+                onClick={handleStartEditFamilyName}
+                className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              >
+                <Pencil size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 가족 초대 코드 */}
+        <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+          <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">내 가족에 초대</p>
           <div className="flex items-center gap-3">
             <span className="flex-1 text-2xl font-bold tracking-widest text-stone-800 dark:text-stone-100 font-mono">
               {inviteCode ?? '------'}
@@ -297,9 +394,61 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
               {copied ? '복사됨' : '초대하기'}
             </button>
           </div>
-          <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">버튼을 눌러 카카오톡, 문자 등으로 공유하세요</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">
+            이 코드로 초대받은 사람은 현재 가족에 합류합니다
+          </p>
         </div>
 
+        {/* 앱 초대 (admin only) */}
+        {appRole === 'admin' && (
+          <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+            <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1">
+              <UserPlus size={12} className="inline mr-1" />
+              앱 초대
+            </p>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
+              새 가족을 만들어 앱을 시작하도록 초대합니다. 초대 링크는 1회용이며 7일간 유효합니다.
+            </p>
+            {appInviteCode ? (
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="flex-1 text-sm font-bold tracking-widest text-stone-800 dark:text-stone-100 font-mono break-all">
+                    {appInviteCode}
+                  </span>
+                  <button
+                    onClick={handleShareAppInvite}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 text-white text-sm font-semibold transition-colors shadow-sm shrink-0"
+                  >
+                    {appInviteCopied ? <Check size={14} /> : <Share2 size={14} />}
+                    {appInviteCopied ? '복사됨' : '공유'}
+                  </button>
+                </div>
+                {appInviteExpiry && (
+                  <p className="text-xs text-stone-400 dark:text-stone-500">
+                    만료: {new Date(appInviteExpiry).toLocaleDateString('ko-KR')}
+                  </p>
+                )}
+                <button
+                  onClick={() => { setAppInviteCode(null); setAppInviteExpiry(null) }}
+                  className="mt-2 text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 underline"
+                >
+                  새 초대 코드 만들기
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleCreateAppInvite}
+                disabled={creatingAppInvite}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent-400 hover:bg-accent-500 disabled:opacity-50 text-white font-semibold text-sm transition-colors"
+              >
+                <UserPlus size={15} />
+                {creatingAppInvite ? '생성 중...' : '초대 코드 만들기'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 가족 합류 */}
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
           <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">
             <Users size={12} className="inline mr-1" />

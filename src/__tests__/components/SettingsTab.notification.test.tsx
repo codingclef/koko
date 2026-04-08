@@ -28,6 +28,7 @@ const defaultProps = {
   updatePreferences: jest.fn(),
   user: mockUser,
   familyId: 'family-1',
+  appRole: 'member' as const,
   isInitializing: false,
 }
 
