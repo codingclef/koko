@@ -404,7 +404,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
           role="dialog"
           aria-modal="true"
           aria-labelledby={logoutTitleId}
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-16 sm:pb-4"
         >
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowLogoutConfirm(false)} />
           <div className="relative bg-stone-50 dark:bg-stone-900 rounded-2xl w-full sm:max-w-xs p-6 shadow-xl">
