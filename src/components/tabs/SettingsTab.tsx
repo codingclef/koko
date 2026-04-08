@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut, Share2, Check, Users, Pencil, X, Bell, BellOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -26,6 +26,7 @@ interface Props extends AuthState {
 
 export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, user, familyId, isInitializing }: Props) {
   const router = useRouter()
+  const logoutTitleId = useId()
 
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -41,6 +42,15 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  useEffect(() => {
+    if (!showLogoutConfirm) return
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowLogoutConfirm(false) }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [showLogoutConfirm])
 
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(
     () => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported')
@@ -131,6 +141,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   }
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(false)
     await supabase.auth.signOut()
     router.replace('/login')
   }
@@ -381,12 +392,41 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
       </div>
 
       <button
-        onClick={handleLogout}
+        onClick={() => setShowLogoutConfirm(true)}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-red-100 dark:border-red-900/40 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold text-sm transition-colors"
       >
         <LogOut size={16} />
         로그아웃
       </button>
+
+      {showLogoutConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={logoutTitleId}
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+        >
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowLogoutConfirm(false)} />
+          <div className="relative bg-stone-50 dark:bg-stone-900 rounded-2xl w-full sm:max-w-xs p-6 shadow-xl">
+            <p id={logoutTitleId} className="font-semibold text-stone-800 dark:text-stone-100 mb-1">로그아웃</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">정말 로그아웃 하시겠어요?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-semibold text-sm transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+              >
+                로그아웃
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

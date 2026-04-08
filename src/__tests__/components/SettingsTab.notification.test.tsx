@@ -1,7 +1,8 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
 import { getFamilyInviteCode } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
+import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
 jest.mock('@/lib/supabase', () => ({
@@ -91,5 +92,56 @@ describe('SettingsTab 알림 섹션', () => {
     await act(async () => { render(<SettingsTab {...defaultProps} />) })
 
     expect(screen.queryByText('알림')).not.toBeInTheDocument()
+  })
+})
+
+describe('SettingsTab 로그아웃 확인', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    Object.defineProperty(window, 'Notification', {
+      value: { permission: 'granted' },
+      configurable: true,
+    })
+  })
+
+  it('로그아웃 버튼 클릭 시 확인 다이얼로그가 표시된다', async () => {
+    await act(async () => { render(<SettingsTab {...defaultProps} />) })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }))
+    })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('정말 로그아웃 하시겠어요?')).toBeInTheDocument()
+  })
+
+  it('취소 버튼 클릭 시 다이얼로그가 닫히고 signOut이 호출되지 않는다', async () => {
+    await act(async () => { render(<SettingsTab {...defaultProps} />) })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }))
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(supabase.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it('다이얼로그의 로그아웃 버튼 클릭 시 signOut이 호출된다', async () => {
+    await act(async () => { render(<SettingsTab {...defaultProps} />) })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }))
+    })
+
+    const dialog = screen.getByRole('dialog')
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: '로그아웃' }))
+    })
+
+    expect(supabase.auth.signOut).toHaveBeenCalled()
   })
 })
