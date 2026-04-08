@@ -1,7 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import * as preferencesLib from '@/lib/preferences'
-import { THEME_STORAGE_KEY } from '@/lib/preferences'
 import type { User } from '@supabase/supabase-js'
 
 jest.mock('@/lib/preferences', () => ({
