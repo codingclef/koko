@@ -231,10 +231,12 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     visibleMonthKeyRef.current = familyId ? getMonthEventsKey(familyId, year, month) : null
 
     if (!familyId) {
-      setEvents([])
-      setEventsError(null)
-      setEventsLoading(false)
-      setHasLoadedEvents(false)
+      queueMicrotask(() => {
+        setEvents([])
+        setEventsError(null)
+        setEventsLoading(false)
+        setHasLoadedEvents(false)
+      })
       previousFamilyIdRef.current = null
       return
     }
@@ -243,10 +245,12 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     previousFamilyIdRef.current = familyId
 
     if (familyChanged) {
-      setEvents([])
-      setEventsError(null)
-      setEventsLoading(true)
-      setHasLoadedEvents(false)
+      queueMicrotask(() => {
+        setEvents([])
+        setEventsError(null)
+        setEventsLoading(true)
+        setHasLoadedEvents(false)
+      })
     }
 
     void loadMonthEvents({
