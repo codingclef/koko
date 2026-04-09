@@ -643,36 +643,12 @@ export function CalendarTab({
           </div>
         )}
 
-        {familyMembersLoading && (
-          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-500 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400">
-            가족 구성원 정보를 불러오는 중이에요.
-          </div>
-        )}
-
-        {Boolean(familyMembersError) && (
-          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
-            가족 구성원 정보를 아직 불러오지 못했어요. 캘린더는 계속 사용할 수 있어요.
-          </div>
-        )}
-
-        {eventsLoading && !hasLoadedEvents && (
-          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-500 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400">
-            이번 달 일정을 불러오는 중이에요.
-          </div>
-        )}
-
         {!eventsLoading && Boolean(eventsError) && (
           <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
             이번 달 일정을 불러오지 못했어요.
             <button onClick={() => void handleRetry()} className="ml-2 font-semibold underline underline-offset-2">
               다시 시도
             </button>
-          </div>
-        )}
-
-        {!eventsLoading && !eventsError && hasLoadedEvents && events.length === 0 && (
-          <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-500 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400">
-            이번 달 등록된 일정이 없어요.
           </div>
         )}
       </div>

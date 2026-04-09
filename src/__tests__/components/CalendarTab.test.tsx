@@ -180,6 +180,16 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     expect(screen.getByText('다시 시도')).toBeInTheDocument()
   })
 
+  it('초기 이벤트 로딩 중이나 빈 상태에서는 메인 상태 문구를 표시하지 않는다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+
+    expect(screen.getByTestId('calendar-grid')).toBeInTheDocument()
+    expect(screen.queryByText('이번 달 일정을 불러오는 중이에요.')).not.toBeInTheDocument()
+    expect(screen.queryByText('이번 달 등록된 일정이 없어요.')).not.toBeInTheDocument()
+    await act(async () => {})
+    expect(screen.queryByText('이번 달 등록된 일정이 없어요.')).not.toBeInTheDocument()
+  })
+
   it('재시도 버튼 클릭 시 캘린더 데이터를 다시 불러온다', async () => {
     mockGetEventsByMonth
       .mockRejectedValueOnce(new Error('load failed'))

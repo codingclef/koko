@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { AppSplash } from '@/components/AppSplash'
 
 function LoginInner() {
   const { user, loading } = useAuth()
@@ -29,11 +30,7 @@ function LoginInner() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    )
+    return <AppSplash />
   }
 
   return (
@@ -72,11 +69,7 @@ function LoginInner() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<AppSplash />}>
       <LoginInner />
     </Suspense>
   )
