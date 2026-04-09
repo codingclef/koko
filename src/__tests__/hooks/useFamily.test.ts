@@ -20,6 +20,7 @@ describe('useFamily', () => {
     expect(result.current.familyId).toBeNull()
     expect(result.current.appRole).toBe('member')
     expect(result.current.loading).toBe(true)
+    expect(typeof result.current.reload).toBe('function')
   })
 
   it('API 성공 시 familyId와 appRole이 설정되고 loading이 false가 된다', async () => {
@@ -29,6 +30,7 @@ describe('useFamily', () => {
     expect(result.current.familyId).toBe('fam-1')
     expect(result.current.appRole).toBe('member')
     expect(mockPostJsonWithAuth).toHaveBeenCalledWith('/api/family/me')
+    expect(typeof result.current.reload).toBe('function')
   })
 
   it('admin인 경우 appRole이 admin으로 설정된다', async () => {

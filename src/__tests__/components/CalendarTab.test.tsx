@@ -5,32 +5,6 @@ import { getCalendarMembers, getEventsByMonth, getFamilyMembers, setCalendarMemb
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
 const mockReloadCalendars = jest.fn()
-const mockUseCalendars = jest.fn<
-  {
-    calendars: {
-      id: string
-      family_id: string
-      created_by: string
-      name: string
-      color: string
-      created_at: string
-      updated_at: string
-    }[]
-    loading: false
-    error: null
-    reload: typeof mockReloadCalendars
-  },
-  [string | null]
->(() => ({
-  calendars: [],
-  loading: false,
-  error: null,
-  reload: mockReloadCalendars,
-}))
-
-jest.mock('@/hooks/useCalendars', () => ({
-  useCalendars: (familyId: string | null) => mockUseCalendars(familyId),
-}))
 jest.mock('@/hooks/useUserPreferences', () => ({
   useUserPreferences: () => ({ preferences: null, loading: false, updatePreferences: jest.fn() }),
 }))
@@ -150,6 +124,25 @@ const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof 
 const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof setCalendarMembers>
 const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
 let consoleErrorSpy: jest.SpyInstance
+const mockCalendars = [{
+  id: 'cal-1',
+  family_id: 'fam-1',
+  created_by: 'user-1',
+  name: '가족',
+  color: '#f97316',
+  created_at: '',
+  updated_at: '',
+}]
+
+const defaultProps = {
+  preferences: null,
+  user: { id: 'user-1' } as User,
+  familyId: 'fam-1',
+  isInitializing: false,
+  calendars: mockCalendars,
+  calendarsError: null,
+  reloadCalendars: mockReloadCalendars,
+}
 
 describe('CalendarTab — touch-action 스크롤 차단', () => {
   beforeAll(() => {
@@ -162,20 +155,6 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockUseCalendars.mockReturnValue({
-      calendars: [{
-        id: 'cal-1',
-        family_id: 'fam-1',
-        created_by: 'user-1',
-        name: '가족',
-        color: '#f97316',
-        created_at: '',
-        updated_at: '',
-      }],
-      loading: false,
-      error: null,
-      reload: mockReloadCalendars,
-    })
     mockGetEventsByMonth.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
@@ -183,12 +162,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
     const { container } = render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
+      <CalendarTab {...defaultProps} />
     )
     await act(async () => {})
 
@@ -196,19 +170,13 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     expect(wrapper.style.touchAction).toBe('none')
   })
 
-  it('초기 이벤트 로드 실패 시 오류 상태와 재시도 버튼을 표시한다', async () => {
+  it('초기 이벤트 로드 실패 시 전체 스피너 대신 오류 배너와 캘린더 그리드를 유지한다', async () => {
     mockGetEventsByMonth.mockRejectedValue(new Error('load failed'))
 
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
 
-    expect(await screen.findByText('캘린더를 불러오지 못했어요')).toBeInTheDocument()
+    expect(await screen.findByText('이번 달 일정을 불러오지 못했어요.')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-grid')).toBeInTheDocument()
     expect(screen.getByText('다시 시도')).toBeInTheDocument()
   })
 
@@ -217,14 +185,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
       .mockRejectedValueOnce(new Error('load failed'))
       .mockResolvedValue([])
 
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
 
     const retryButton = await screen.findByText('다시 시도')
     fireEvent.click(retryButton)
@@ -237,14 +198,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   it('캘린더 멤버 조회 실패 시 mutation error를 표시한다', async () => {
     mockGetCalendarMembers.mockRejectedValueOnce(new Error('members failed'))
 
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
 
     fireEvent.click(await screen.findByTestId('calendar-filter-edit'))
 
@@ -252,14 +206,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('연월 헤더 버튼 클릭 시 YearMonthPickerSheet가 열린다', async () => {
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
     await act(async () => {})
 
     const today = new Date()
@@ -271,14 +218,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   it('피커 취소 시 연월이 변경되지 않고 피커가 닫힌다', async () => {
     const today = new Date()
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
     await act(async () => {})
 
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
@@ -292,14 +232,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   it('피커 확인 시 선택한 연월로 이동하고 피커가 닫힌다', async () => {
     const today = new Date()
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
     await act(async () => {})
 
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
@@ -314,12 +247,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   it('피커가 열린 상태에서 isModalOpen이 true가 되어 touch-action이 auto로 바뀐다', async () => {
     const today = new Date()
     const { container } = render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
+      <CalendarTab {...defaultProps} />
     )
     await act(async () => {})
 
@@ -347,14 +275,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
       return []
     })
 
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
 
     expect(await screen.findByTestId('calendar-grid')).toBeInTheDocument()
 
@@ -382,20 +303,6 @@ describe('CalendarTab — handleCalendarUpdate', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockUseCalendars.mockReturnValue({
-      calendars: [{
-        id: 'cal-1',
-        family_id: 'fam-1',
-        created_by: 'user-1',
-        name: '가족',
-        color: '#f97316',
-        created_at: '',
-        updated_at: '',
-      }],
-      loading: false,
-      error: null,
-      reload: mockReloadCalendars,
-    })
     mockGetEventsByMonth.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
@@ -404,14 +311,7 @@ describe('CalendarTab — handleCalendarUpdate', () => {
   })
 
   const openCalendarList = async () => {
-    render(
-      <CalendarTab
-        preferences={null}
-        user={{ id: 'user-1' } as User}
-        familyId="fam-1"
-        isInitializing={false}
-      />
-    )
+    render(<CalendarTab {...defaultProps} />)
     await act(async () => {})
     fireEvent.click(screen.getByRole('button', { name: '캘린더 리스트' }))
     await screen.findByTestId('calendar-list-sheet')

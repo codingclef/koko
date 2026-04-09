@@ -7,9 +7,6 @@ import { render, act, fireEvent, screen } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 
-jest.mock('@/hooks/useCalendars', () => ({
-  useCalendars: () => ({ calendars: [], loading: false, error: null, reload: jest.fn() }),
-}))
 jest.mock('@/hooks/useUserPreferences', () => ({
   useUserPreferences: () => ({ preferences: null, loading: false, updatePreferences: jest.fn() }),
 }))
@@ -64,6 +61,9 @@ const defaultProps = {
   user: { id: 'user-1' } as User,
   familyId: 'fam-1',
   isInitializing: false,
+  calendars: [],
+  calendarsError: null,
+  reloadCalendars: jest.fn(),
 }
 
 describe('CalendarTab + YearMonthPickerSheet 통합', () => {

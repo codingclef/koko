@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { TabsShell } from '@/components/TabsShell'
 import { registerPushSubscription } from '@/lib/push'
 
@@ -6,7 +7,12 @@ const mockReplace = jest.fn()
 let mockTabParam: string | null = null
 let mockAuthLoading = false
 let mockFamilyLoading = false
+let mockCalendarsLoading = false
 let mockAuthUser: { id: string } | null = { id: 'user-1' }
+let mockFamilyError: Error | null = null
+let mockCalendarsError: Error | null = null
+const mockReloadFamily = jest.fn().mockResolvedValue(undefined)
+const mockReloadCalendars = jest.fn().mockResolvedValue(undefined)
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
@@ -18,7 +24,22 @@ jest.mock('@/hooks/useAuth', () => ({
 }))
 
 jest.mock('@/hooks/useFamily', () => ({
-  useFamily: () => ({ familyId: 'fam-1', appRole: 'member', loading: mockFamilyLoading }),
+  useFamily: () => ({
+    familyId: 'fam-1',
+    appRole: 'member',
+    loading: mockFamilyLoading,
+    error: mockFamilyError,
+    reload: mockReloadFamily,
+  }),
+}))
+
+jest.mock('@/hooks/useCalendars', () => ({
+  useCalendars: () => ({
+    calendars: [],
+    loading: mockCalendarsLoading,
+    error: mockCalendarsError,
+    reload: mockReloadCalendars,
+  }),
 }))
 
 jest.mock('@/hooks/useUserPreferences', () => ({
@@ -56,9 +77,14 @@ jest.mock('@/components/BottomNav', () => ({
 describe('TabsShell', () => {
   beforeEach(() => {
     mockReplace.mockClear()
+    mockReloadFamily.mockClear()
+    mockReloadCalendars.mockClear()
     mockTabParam = null
     mockAuthLoading = false
     mockFamilyLoading = false
+    mockCalendarsLoading = false
+    mockFamilyError = null
+    mockCalendarsError = null
     mockAuthUser = { id: 'user-1' }
   })
 
@@ -73,6 +99,13 @@ describe('TabsShell', () => {
   it('인증 완료 후 가족 데이터 로딩 중에도 AppSplash를 표시한다', () => {
     mockAuthLoading = false
     mockFamilyLoading = true
+    render(<TabsShell />)
+    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
+    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
+  })
+
+  it('캘린더 데이터 로딩 중에도 AppSplash를 표시한다', () => {
+    mockCalendarsLoading = true
     render(<TabsShell />)
     expect(screen.getByTestId('app-splash')).toBeInTheDocument()
     expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
@@ -107,5 +140,25 @@ describe('TabsShell', () => {
   it('초기 진입 시 자동으로 푸시 구독을 요청하지 않는다', () => {
     render(<TabsShell />)
     expect(registerPushSubscription).not.toHaveBeenCalled()
+  })
+
+  it('초기 로딩 실패 시 splash 위 에러 다이얼로그를 표시한다', () => {
+    mockCalendarsError = new Error('calendar failed')
+    render(<TabsShell />)
+
+    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByText('앱을 시작하지 못했어요')).toBeInTheDocument()
+  })
+
+  it('다시 시도 버튼 클릭 시 가족과 캘린더 로드를 모두 재시도한다', async () => {
+    mockCalendarsError = new Error('calendar failed')
+    const user = userEvent.setup()
+
+    render(<TabsShell />)
+    await user.click(screen.getByRole('button', { name: '다시 시도' }))
+
+    expect(mockReloadFamily).toHaveBeenCalled()
+    expect(mockReloadCalendars).toHaveBeenCalled()
   })
 })
