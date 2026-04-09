@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -39,7 +40,9 @@ function LoginInner() {
     <div className="flex flex-col items-center justify-center min-h-screen px-6 bg-white dark:bg-stone-950">
       <div className="w-full max-w-sm flex flex-col items-center gap-8">
         <div className="text-center">
-          <div className="text-6xl mb-4">🏠</div>
+          <div className="mb-4">
+            <Image src="/logo.webp" alt="Koko" width={80} height={80} className="mx-auto" />
+          </div>
           <h1 className="text-3xl font-bold text-stone-800 dark:text-stone-100">Koko</h1>
           <p className="text-stone-400 dark:text-stone-500 mt-2 text-sm">가족과 함께하는 패밀리 허브</p>
         </div>
