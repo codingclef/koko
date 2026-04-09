@@ -18,6 +18,17 @@ export const CALENDAR_COLORS = [
   '#eab308', // yellow
 ]
 
+export const CALENDAR_COLOR_NAMES: Record<string, string> = {
+  '#f97316': '주황색',
+  '#3b82f6': '파란색',
+  '#22c55e': '초록색',
+  '#a855f7': '보라색',
+  '#ec4899': '분홍색',
+  '#14b8a6': '청록색',
+  '#ef4444': '빨간색',
+  '#eab308': '노란색',
+}
+
 export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [
   { label: '5분 전', minutes: 5 },
   { label: '10분 전', minutes: 10 },
