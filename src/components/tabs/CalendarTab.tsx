@@ -23,6 +23,7 @@ import {
   setReminders,
   type CalendarEvent,
   type FamilyMember,
+  type SaveResult,
 } from '@/lib/calendar'
 import { CalendarFilter } from '@/components/calendar/CalendarFilter'
 import { CalendarGrid } from '@/components/calendar/CalendarGrid'
@@ -405,6 +406,63 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     }
   }
 
+  /** CalendarDetailScreen 에서 기존 캘린더 수정 시 사용 */
+  const handleCalendarUpdate = async (
+    calendarId: string,
+    name: string,
+    color: string,
+    memberUserIds: string[] | null,
+  ): Promise<SaveResult> => {
+    if (!user) return { status: 'success' }
+    setMutationError(null)
+
+    // 기본 정보 저장 실패 → 전체 실패 (throw)
+    try {
+      await updateCalendar(calendarId, { name, color })
+    } catch (e) {
+      console.error('[CalendarTab] handleCalendarUpdate failed:', e)
+      setMutationError('캘린더를 저장하지 못했어요')
+      await reloadCalendarContext()
+      throw e
+    }
+
+    // memberUserIds 가 null 이면 멤버 로드 실패 상태 — setCalendarMembers skip
+    if (memberUserIds !== null) {
+      try {
+        await setCalendarMembers(calendarId, user.id, memberUserIds)
+      } catch (e) {
+        console.error('[CalendarTab] setCalendarMembers failed:', e)
+        await reloadCalendarContext()
+        return { status: 'partial' }
+      }
+    }
+
+    await reloadCalendarContext()
+    return { status: 'success' }
+  }
+
+  /** CalendarDetailScreen 에서 캘린더 삭제 시 사용 */
+  const handleCalendarDeleteById = async (calendarId: string) => {
+    if (!familyId) return
+    setMutationError(null)
+
+    try {
+      clearFamilyMonthEventsCache(familyId)
+      await deleteCalendar(calendarId)
+      setActiveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(calendarId)
+        return next
+      })
+      await Promise.allSettled([reloadCalendarContext(), refreshEvents()])
+    } catch (e) {
+      console.error('[CalendarTab] handleCalendarDeleteById failed:', e)
+      setMutationError('캘린더를 삭제하지 못했어요')
+      await Promise.allSettled([reloadCalendarContext(), refreshEvents()])
+      throw e
+    }
+  }
+
   const handleEventSave = async (params: {
     calendarId: string | null
     title: string
@@ -663,13 +721,15 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
         />
       )}
 
-      {showCalendarList && (
+      {showCalendarList && user && (
         <CalendarListSheet
           calendars={calendars}
           familyMembers={familyMembers}
+          currentUserId={user.id}
           onClose={() => setShowCalendarList(false)}
           onAdd={() => { setShowCalendarList(false); openCalendarForm() }}
-          onEdit={(cal) => { setShowCalendarList(false); openCalendarForm(cal) }}
+          onSave={handleCalendarUpdate}
+          onDelete={handleCalendarDeleteById}
         />
       )}
 

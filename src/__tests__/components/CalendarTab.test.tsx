@@ -1,7 +1,7 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { getCalendarMembers, getEventsByMonth, getFamilyMembers } from '@/lib/calendar'
+import { getCalendarMembers, getEventsByMonth, getFamilyMembers, setCalendarMembers, updateCalendar } from '@/lib/calendar'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
 const mockReloadCalendars = jest.fn()
@@ -111,7 +111,19 @@ jest.mock('@/components/calendar/CalendarFormModal', () => ({
   CalendarFormModal: () => <div />,
 }))
 jest.mock('@/components/calendar/CalendarListSheet', () => ({
-  CalendarListSheet: () => <div />,
+  CalendarListSheet: ({
+    onSave,
+    onDelete,
+  }: {
+    onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<{ status: string }>
+    onDelete: (calendarId: string) => Promise<void>
+  }) => (
+    <div data-testid="calendar-list-sheet">
+      <button data-testid="list-save-null-members" onClick={() => onSave('cal-1', '가족', '#f97316', null)} />
+      <button data-testid="list-save-with-members" onClick={() => onSave('cal-1', '가족', '#f97316', ['user-2'])} />
+      <button data-testid="list-delete" onClick={() => onDelete('cal-1')} />
+    </div>
+  ),
 }))
 jest.mock('@/components/calendar/YearMonthPickerSheet', () => ({
   YearMonthPickerSheet: ({
@@ -135,6 +147,8 @@ jest.mock('@/components/calendar/YearMonthPickerSheet', () => ({
 const mockGetEventsByMonth = getEventsByMonth as jest.MockedFunction<typeof getEventsByMonth>
 const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getFamilyMembers>
 const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof getCalendarMembers>
+const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof setCalendarMembers>
+const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
 let consoleErrorSpy: jest.SpyInstance
 
 describe('CalendarTab — touch-action 스크롤 차단', () => {
@@ -352,5 +366,89 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {
       resolvePrefetch?.([])
     })
+  })
+})
+
+describe('CalendarTab — handleCalendarUpdate', () => {
+  let consoleErrorSpy: jest.SpyInstance
+
+  beforeAll(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore()
+  })
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockUseCalendars.mockReturnValue({
+      calendars: [{
+        id: 'cal-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족',
+        color: '#f97316',
+        created_at: '',
+        updated_at: '',
+      }],
+      loading: false,
+      error: null,
+      reload: mockReloadCalendars,
+    })
+    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetFamilyMembers.mockResolvedValue([])
+    mockGetCalendarMembers.mockResolvedValue([])
+    mockUpdateCalendar.mockResolvedValue(undefined)
+    mockSetCalendarMembers.mockResolvedValue(undefined)
+  })
+
+  const openCalendarList = async () => {
+    render(
+      <CalendarTab
+        preferences={null}
+        user={{ id: 'user-1' } as User}
+        familyId="fam-1"
+        isInitializing={false}
+      />
+    )
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: '캘린더 리스트' }))
+    await screen.findByTestId('calendar-list-sheet')
+  }
+
+  it('memberIds null 이면 setCalendarMembers를 호출하지 않는다', async () => {
+    await openCalendarList()
+
+    fireEvent.click(screen.getByTestId('list-save-null-members'))
+
+    await waitFor(() => {
+      expect(mockUpdateCalendar).toHaveBeenCalledWith('cal-1', { name: '가족', color: '#f97316' })
+      expect(mockSetCalendarMembers).not.toHaveBeenCalled()
+    })
+  })
+
+  it('memberIds 배열이면 setCalendarMembers를 호출한다', async () => {
+    await openCalendarList()
+
+    fireEvent.click(screen.getByTestId('list-save-with-members'))
+
+    await waitFor(() => {
+      expect(mockSetCalendarMembers).toHaveBeenCalledWith('cal-1', 'user-1', ['user-2'])
+    })
+  })
+
+  it('setCalendarMembers 실패 시 CalendarTab 에러 배너를 표시하지 않는다 (부분 성공)', async () => {
+    mockSetCalendarMembers.mockRejectedValue(new Error('member save failed'))
+
+    await openCalendarList()
+    fireEvent.click(screen.getByTestId('list-save-with-members'))
+
+    await waitFor(() => {
+      expect(mockUpdateCalendar).toHaveBeenCalled()
+      expect(mockSetCalendarMembers).toHaveBeenCalled()
+    })
+    // 부분 성공은 throw가 아닌 partial 반환이므로 CalendarTab 에러 배너 없음
+    expect(screen.queryByText('캘린더를 저장하지 못했어요')).not.toBeInTheDocument()
   })
 })
