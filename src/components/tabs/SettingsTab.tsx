@@ -29,6 +29,9 @@ interface Props extends AuthState {
   appRole: 'admin' | 'member'
 }
 
+const MAIN_VIEW_CONTAINER_CLASS = 'max-w-lg md:max-w-xl xl:max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-24 min-h-screen'
+const SUB_VIEW_CONTAINER_CLASS = 'max-w-lg xl:max-w-xl mx-auto px-4 sm:px-6 py-8 pb-24 min-h-screen'
+
 function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div className="flex items-center gap-1 mb-6">
@@ -244,7 +247,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 계정 ────────────────────────────────────────────────────
   if (view === 'account') {
     return (
-      <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className={SUB_VIEW_CONTAINER_CLASS}>
         <SubHeader title="계정" onBack={() => setView('main')} />
 
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
@@ -336,7 +339,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 가족 ────────────────────────────────────────────────────
   if (view === 'family') {
     return (
-      <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className={SUB_VIEW_CONTAINER_CLASS}>
         <SubHeader title="가족" onBack={() => setView('main')} />
 
         {/* 가족 이름 */}
@@ -489,7 +492,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 캘린더 ──────────────────────────────────────────────────
   if (view === 'calendar') {
     return (
-      <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className={SUB_VIEW_CONTAINER_CLASS}>
         <SubHeader title="캘린더" onBack={() => setView('main')} />
 
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
@@ -553,7 +556,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 앱 ──────────────────────────────────────────────────────
   if (view === 'app') {
     return (
-      <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className={SUB_VIEW_CONTAINER_CLASS}>
         <SubHeader title="앱" onBack={() => setView('main')} />
 
         {notifPermission !== 'unsupported' && (
@@ -629,7 +632,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   ]
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 pb-24 min-h-screen">
+    <div data-testid="settings-main-container" className={MAIN_VIEW_CONTAINER_CLASS}>
       <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-6">설정</h1>
 
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 overflow-hidden">

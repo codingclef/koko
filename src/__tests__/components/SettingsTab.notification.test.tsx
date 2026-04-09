@@ -68,6 +68,11 @@ describe('SettingsTab 메인 화면', () => {
     await act(async () => {})
     expect(screen.getByText('우리 가족')).toBeInTheDocument()
   })
+
+  it('메인 뷰는 더 넓은 반응형 컨테이너를 사용한다', async () => {
+    await act(async () => { render(<SettingsTab {...defaultProps} />) })
+    expect(screen.getByTestId('settings-main-container')).toHaveClass('max-w-lg', 'md:max-w-xl', 'xl:max-w-2xl')
+  })
 })
 
 describe('SettingsTab 앱 서브뷰 — 알림', () => {
@@ -83,6 +88,7 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     })
     await navigateToApp()
     expect(screen.getByText('알림 허용하기')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-subview-container')).toHaveClass('max-w-lg', 'xl:max-w-xl')
   })
 
   it('권한이 granted일 때 허용 상태 메시지가 표시된다', async () => {
