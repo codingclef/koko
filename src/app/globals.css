@@ -181,6 +181,21 @@ h1, h2, h3, h4, h5, h6 {
   animation: modal-slide-down 0.28s ease-in forwards;
 }
 
+@keyframes splash-logo-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.splash-logo-fade-in {
+  animation: splash-logo-fade-in 0.36s ease-out;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

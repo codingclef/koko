@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { AppSplash } from '@/components/AppSplash'
 
 function LoginInner() {
   const { user, loading } = useAuth()
@@ -29,11 +30,7 @@ function LoginInner() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    )
+    return <AppSplash />
   }
 
   return (
@@ -50,6 +47,12 @@ function LoginInner() {
         {error === 'unauthorized' && (
           <div className="w-full px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-sm text-center">
             이 서비스는 초대된 가족만 이용할 수 있어요
+          </div>
+        )}
+
+        {error === 'auth_callback_failed' && (
+          <div className="w-full px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-sm text-center">
+            로그인 처리 중 문제가 발생했어요. 다시 시도해주세요.
           </div>
         )}
 
@@ -72,11 +75,7 @@ function LoginInner() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<AppSplash />}>
       <LoginInner />
     </Suspense>
   )

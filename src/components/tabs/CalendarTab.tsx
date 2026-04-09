@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { useCalendars } from '@/hooks/useCalendars'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { useHolidays } from '@/hooks/useHolidays'
 import type { UserPreferences } from '@/lib/preferences'
@@ -38,6 +37,9 @@ import type { Calendar } from '@/lib/calendar'
 
 interface Props extends AuthState {
   preferences: UserPreferences | null
+  calendars: Calendar[]
+  calendarsError: unknown
+  reloadCalendars: () => Promise<unknown>
 }
 
 const MAX_MONTH_EVENT_CACHE = 12
@@ -58,14 +60,14 @@ function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
     : { year, month: month + 1 }
 }
 
-export function CalendarTab({ preferences, user, familyId, isInitializing }: Props) {
-  const {
-    calendars,
-    loading: calLoading,
-    error: calendarsError,
-    reload: reloadCalendars,
-  } = useCalendars(familyId)
-
+export function CalendarTab({
+  preferences,
+  user,
+  familyId,
+  calendars,
+  calendarsError,
+  reloadCalendars,
+}: Props) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -537,19 +539,10 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
     setSelectedEvent(null)
   }
 
-  const loading = isInitializing || calLoading || familyMembersLoading || (!hasLoadedEvents && eventsLoading)
-  const fetchError = calendarsError || familyMembersError || eventsError
+  const fetchError = calendarsError
 
   const handleRetry = async () => {
     await Promise.all([reloadCalendars(), reloadFamilyMembers(), reloadEvents()])
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    )
   }
 
   if (fetchError) {
@@ -647,6 +640,15 @@ export function CalendarTab({ preferences, user, familyId, isInitializing }: Pro
         {mutationError && (
           <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
             {mutationError}
+          </div>
+        )}
+
+        {!eventsLoading && Boolean(eventsError) && (
+          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+            이번 달 일정을 불러오지 못했어요.
+            <button onClick={() => void handleRetry()} className="ml-2 font-semibold underline underline-offset-2">
+              다시 시도
+            </button>
           </div>
         )}
       </div>

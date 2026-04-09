@@ -10,7 +10,7 @@ interface FamilyData {
 }
 
 export function useFamily(user: User | null) {
-  const { value, loading, error } = useAsyncData<FamilyData>({
+  const { value, loading, error, reload } = useAsyncData<FamilyData>({
     enabled: Boolean(user),
     initialValue: { familyId: null, appRole: 'member' },
     reloadKey: user?.id,
@@ -27,5 +27,6 @@ export function useFamily(user: User | null) {
     appRole: value?.appRole ?? 'member',
     loading,
     error,
+    reload,
   }
 }
