@@ -1,9 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import AuthCallbackPage from '@/app/auth/callback/page'
 
+const mockReplace = jest.fn()
+let mockErrorParam: string | null = null
+
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: jest.fn() }),
-  useSearchParams: () => ({ get: () => null }),
+  useRouter: () => ({ replace: mockReplace }),
+  useSearchParams: () => ({
+    get: (key: string) => key === 'error' ? mockErrorParam : null,
+  }),
 }))
 
 jest.mock('@/lib/supabase', () => ({
@@ -30,14 +35,15 @@ jest.mock('@/lib/api-client', () => ({
   postJson: jest.fn(),
 }))
 
-jest.mock('@/components/AppSplash', () => ({
-  AppSplash: () => <div data-testid="app-splash" />,
-}))
-
 describe('AuthCallbackPage', () => {
-  it('callback 처리 중에는 스피너 대신 AppSplash를 표시한다', () => {
+  beforeEach(() => {
+    mockReplace.mockClear()
+    mockErrorParam = null
+  })
+
+  it('callback 전이 단계에서는 시각적 splash를 렌더링하지 않는다', () => {
     render(<AuthCallbackPage />)
 
-    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

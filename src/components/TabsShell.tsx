@@ -25,8 +25,9 @@ export function TabsShell() {
     reload: reloadCalendars,
   } = useCalendars(familyId)
   const { preferences, updatePreferences } = useUserPreferences(user)
-  const isInitializing = authLoading || familyLoading || calendarsLoading
-  const startupError = familyError || calendarsError
+  const shouldLoadCalendars = Boolean(familyId) && !familyError
+  const isInitializing = authLoading || familyLoading || (shouldLoadCalendars && calendarsLoading)
+  const startupError = !isInitializing ? (familyError || calendarsError) : null
 
   // 인증됨 + 앱 접근권 있음 + 아직 가족 없음 → 온보딩 필요
   // familyError가 있으면 DB 장애로 판단, 온보딩으로 잘못 보내지 않는다
@@ -59,7 +60,7 @@ export function TabsShell() {
   if (isInitializing || startupError) {
     return (
       <>
-        <AppSplash />
+        <AppSplash animateLogo />
         {startupError && (
           <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 px-6">
             <div

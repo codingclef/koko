@@ -49,4 +49,13 @@ describe('LoginPage', () => {
     expect(screen.getByTestId('app-splash')).toBeInTheDocument()
     expect(screen.queryByText('Google로 로그인')).not.toBeInTheDocument()
   })
+
+  it('callback 실패 에러는 표시만 하고 자동 재시도하지 않는다', () => {
+    mockErrorParam = 'auth_callback_failed'
+
+    render(<LoginPage />)
+
+    expect(screen.getByText('로그인 처리 중 문제가 발생했어요. 다시 시도해주세요.')).toBeInTheDocument()
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
 })

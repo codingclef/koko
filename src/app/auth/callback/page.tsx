@@ -5,18 +5,34 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { parseInviteCodeFromNext } from '@/lib/auth'
 import { postJson } from '@/lib/api-client'
-import { AppSplash } from '@/components/AppSplash'
 
 function AuthCallbackInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const handledRef = useRef(false)
+  const fallbackTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
+    const routeToLoginError = (code: string) => {
+      if (handledRef.current) return
+      handledRef.current = true
+      router.replace(`/login?error=${code}`)
+    }
+
+    const callbackError = searchParams.get('error')
+    if (callbackError) {
+      routeToLoginError('auth_callback_failed')
+      return
+    }
+
     const handleSession = async (email: string) => {
       // 중복 실행 방지 (getSession + onAuthStateChange 둘 다 트리거될 수 있음)
       if (handledRef.current) return
       handledRef.current = true
+      if (fallbackTimerRef.current !== null) {
+        window.clearTimeout(fallbackTimerRef.current)
+        fallbackTimerRef.current = null
+      }
 
       const next = searchParams.get('next') ?? '/calendar'
       const isAppInvite = next.startsWith('/join-app')
@@ -51,29 +67,39 @@ function AuthCallbackInner() {
 
     // Supabase가 이미 세션을 처리한 경우 (effect 실행 전 자동 교환 완료)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.email) {
+      if (session && session.user?.email) {
         handleSession(session.user.email)
+        return
       }
+
+      fallbackTimerRef.current = window.setTimeout(() => {
+        routeToLoginError('auth_callback_failed')
+      }, 800)
     })
 
     // Supabase가 effect 실행 후 세션을 처리하는 경우
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user?.email) {
+      if (event === 'SIGNED_IN' && session && session.user?.email) {
         handleSession(session.user.email)
+      } else if (event === 'SIGNED_OUT') {
+        routeToLoginError('auth_callback_failed')
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      if (fallbackTimerRef.current !== null) {
+        window.clearTimeout(fallbackTimerRef.current)
+      }
+    }
   }, [router, searchParams])
 
-  return (
-    <AppSplash />
-  )
+  return null
 }
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<AppSplash />}>
+    <Suspense fallback={null}>
       <AuthCallbackInner />
     </Suspense>
   )

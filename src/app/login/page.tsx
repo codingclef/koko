@@ -50,6 +50,12 @@ function LoginInner() {
           </div>
         )}
 
+        {error === 'auth_callback_failed' && (
+          <div className="w-full px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-sm text-center">
+            로그인 처리 중 문제가 발생했어요. 다시 시도해주세요.
+          </div>
+        )}
+
         <button
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 font-semibold text-sm hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors shadow-sm"
