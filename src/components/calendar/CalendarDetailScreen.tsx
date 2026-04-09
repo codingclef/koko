@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Check } from 'lucide-react'
-import { CALENDAR_COLORS, CALENDAR_COLOR_NAMES, type Calendar, type FamilyMember } from '@/lib/calendar'
+import { CALENDAR_COLORS, CALENDAR_COLOR_NAMES, type Calendar, type FamilyMember, type SaveResult } from '@/lib/calendar'
 
 interface Props {
   calendar: Calendar
@@ -19,10 +19,10 @@ interface Props {
   onBack: () => void
   /**
    * memberIds가 null(에러 포함) 이면 멤버 변경 저장 skip.
-   * 공통 배너: 이름/색상 실패 → "저장하지 못했어요"
-   *           이름/색상 성공 + 멤버 실패 → CalendarTab 핸들러가 throw, 여기서 catch.
+   * 이름/색상 실패 → throw → 이 컴포넌트 catch → 화면 유지 + 에러 표시
+   * 이름/색상 성공 + 멤버 실패 → { status: 'partial' } 반환 → onBack() 호출
    */
-  onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<void>
+  onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<SaveResult>
   /** 성공 시 onBack() 호출. 실패 시 detail 화면 유지 + 에러 표시 */
   onDelete: (calendarId: string) => Promise<void>
 }

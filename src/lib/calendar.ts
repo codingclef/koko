@@ -29,6 +29,8 @@ export const CALENDAR_COLOR_NAMES: Record<string, string> = {
   '#eab308': '노란색',
 }
 
+export type SaveResult = { status: 'success' } | { status: 'partial' }
+
 export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [
   { label: '5분 전', minutes: 5 },
   { label: '10분 전', minutes: 10 },

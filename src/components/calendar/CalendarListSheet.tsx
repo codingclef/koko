@@ -8,6 +8,7 @@ import {
   type Calendar,
   type CalendarMember,
   type FamilyMember,
+  type SaveResult,
 } from '@/lib/calendar'
 import { CalendarDetailScreen } from '@/components/calendar/CalendarDetailScreen'
 
@@ -17,7 +18,7 @@ interface Props {
   currentUserId: string
   onClose: () => void
   onAdd: () => void
-  onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<void>
+  onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<SaveResult>
   onDelete: (calendarId: string) => Promise<void>
 }
 
@@ -35,6 +36,7 @@ export function CalendarListSheet({
 }: Props) {
   // ── 리스트 뷰 ──────────────────────────────────────────────
   const [memberMap, setMemberMap] = useState<MemberMap>({})
+  const [listWarning, setListWarning] = useState<string | null>(null)
 
   useEffect(() => {
     if (calendars.length === 0) return
@@ -67,6 +69,7 @@ export function CalendarListSheet({
     setSelectedCalendar(cal)
     setMemberIds(null)
     setMemberLoadError(false)
+    setListWarning(null)
     setView('detail')
 
     const seq = ++memberLoadSeqRef.current
@@ -89,6 +92,19 @@ export function CalendarListSheet({
     setMemberLoadError(false)
   }
 
+  const handleSave = async (
+    calendarId: string,
+    name: string,
+    color: string,
+    memberIds: string[] | null,
+  ): Promise<SaveResult> => {
+    const result = await onSave(calendarId, name, color, memberIds)
+    if (result.status === 'partial') {
+      setListWarning('캘린더 정보는 저장됐지만 멤버는 저장하지 못했어요')
+    }
+    return result
+  }
+
   return (
     <div className="fixed inset-0 z-[70] bg-white dark:bg-stone-950 overflow-hidden">
       {/* 리스트 뷰 */}
@@ -108,6 +124,11 @@ export function CalendarListSheet({
 
           {/* 목록 */}
           <div className="flex-1 overflow-y-auto px-4 pb-safe space-y-2">
+            {listWarning && (
+              <div className="mb-1 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+                {listWarning}
+              </div>
+            )}
             <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
               캘린더 ({calendars.length})
             </p>
@@ -185,7 +206,7 @@ export function CalendarListSheet({
           familyMembers={familyMembers}
           currentUserId={currentUserId}
           onBack={handleBack}
-          onSave={onSave}
+          onSave={handleSave}
           onDelete={onDelete}
         />
       )}
