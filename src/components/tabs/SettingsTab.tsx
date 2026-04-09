@@ -29,8 +29,8 @@ interface Props extends AuthState {
   appRole: 'admin' | 'member'
 }
 
-const MAIN_VIEW_CONTAINER_CLASS = 'max-w-lg md:max-w-xl xl:max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-24 min-h-screen'
-const SUB_VIEW_CONTAINER_CLASS = 'max-w-lg xl:max-w-xl mx-auto px-4 sm:px-6 py-8 pb-24 min-h-screen'
+const MAIN_VIEW_CONTAINER_CLASS = 'max-w-lg md:max-w-3xl xl:max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-24 min-h-screen'
+const SUB_VIEW_CONTAINER_CLASS = 'max-w-lg md:max-w-xl xl:max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-24 min-h-screen'
 
 function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
