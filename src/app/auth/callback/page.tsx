@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { parseInviteCodeFromNext } from '@/lib/auth'
 import { postJson } from '@/lib/api-client'
+import { AppSplash } from '@/components/AppSplash'
 
 function AuthCallbackInner() {
   const router = useRouter()
@@ -66,19 +67,13 @@ function AuthCallbackInner() {
   }, [router, searchParams])
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-    </div>
+    <AppSplash />
   )
 }
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<AppSplash />}>
       <AuthCallbackInner />
     </Suspense>
   )
