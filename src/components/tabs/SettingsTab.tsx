@@ -635,22 +635,22 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     <div data-testid="settings-main-container" className={MAIN_VIEW_CONTAINER_CLASS}>
       <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-6">설정</h1>
 
-      <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 overflow-hidden">
+      <div className="grid gap-3 md:grid-cols-2">
         {menuItems.map(({ view: target, label, subtitle }, i) => (
           <button
             key={target}
             onClick={() => setView(target)}
-            className={`w-full flex items-center justify-between px-4 py-4 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors text-left ${
-              i < menuItems.length - 1 ? 'border-b border-stone-100 dark:border-stone-800' : ''
-            }`}
+            className="w-full rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 px-5 py-5 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors text-left"
           >
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{label}</p>
-              {subtitle && (
-                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 truncate">{subtitle}</p>
-              )}
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{label}</p>
+                {subtitle && (
+                  <p className="text-xs text-stone-400 dark:text-stone-500 mt-1 truncate">{subtitle}</p>
+                )}
+              </div>
+              <ChevronRight size={16} className="mt-0.5 text-stone-400 dark:text-stone-500 shrink-0" />
             </div>
-            <ChevronRight size={16} className="text-stone-400 dark:text-stone-500 shrink-0" />
           </button>
         ))}
       </div>
