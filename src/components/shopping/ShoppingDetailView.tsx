@@ -71,13 +71,27 @@ export function ShoppingDetailView({
     refreshOnSubscribed: false,
   })
 
-  const loadDetail = useCallback(async () => {
-    setStatus('loading')
-    setMutationError(null)
+  const fetchDetailData = useCallback(async () => {
+    const shoppingList = await getShoppingList(listId)
+    if (!shoppingList) {
+      return { type: 'not-found' as const }
+    }
 
-    try {
-      const shoppingList = await getShoppingList(listId)
-      if (!shoppingList) {
+    const fetchedItems = await getShoppingItems(listId)
+    return {
+      type: 'ready' as const,
+      shoppingList,
+      fetchedItems,
+    }
+  }, [listId])
+
+  const applyLoadResult = useCallback(
+    (
+      result:
+        | { type: 'not-found' }
+        | { type: 'ready'; shoppingList: ShoppingList; fetchedItems: ShoppingItemType[] }
+    ) => {
+      if (result.type === 'not-found') {
         setList(null)
         setItems([])
         setStatus('not-found')
@@ -85,22 +99,49 @@ export function ShoppingDetailView({
         return
       }
 
-      const fetchedItems = await getShoppingItems(listId)
-      setList(shoppingList)
-      setItems(fetchedItems)
-      syncPreview(fetchedItems)
+      setList(result.shoppingList)
+      setItems(result.fetchedItems)
+      syncPreview(result.fetchedItems)
       setStatus('ready')
-    } catch (e) {
-      console.error('[ShoppingDetailView] initial load failed:', e)
-      setList(null)
-      setItems([])
-      setStatus('fetch-error')
-    }
-  }, [listId, syncPreview])
+    },
+    [syncPreview]
+  )
 
   useEffect(() => {
-    loadDetail()
-  }, [loadDetail])
+    let cancelled = false
+
+    void fetchDetailData()
+      .then((result) => {
+        if (cancelled) return
+        applyLoadResult(result)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error('[ShoppingDetailView] initial load failed:', e)
+        setList(null)
+        setItems([])
+        setStatus('fetch-error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [applyLoadResult, fetchDetailData])
+
+  const handleRetry = () => {
+    setStatus('loading')
+    setMutationError(null)
+    void fetchDetailData()
+      .then((result) => {
+        applyLoadResult(result)
+      })
+      .catch((e) => {
+        console.error('[ShoppingDetailView] initial load failed:', e)
+        setList(null)
+        setItems([])
+        setStatus('fetch-error')
+      })
+  }
 
   const setItemsWithPreview = useCallback(
     (updater: ShoppingItemType[] | ((prev: ShoppingItemType[]) => ShoppingItemType[])) => {
@@ -271,7 +312,7 @@ export function ShoppingDetailView({
           title="장바구니를 불러오지 못했어요"
           description="잠시 후 다시 시도해주세요."
           actionLabel="다시 시도"
-          onAction={loadDetail}
+          onAction={handleRetry}
           secondaryLabel="목록으로 돌아가기"
           onSecondaryAction={onClose}
         />
