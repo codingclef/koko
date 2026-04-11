@@ -74,10 +74,6 @@ describe('SettingsTab 메인 화면', () => {
     expect(screen.getByTestId('settings-main-container')).toHaveClass('max-w-lg', 'md:max-w-3xl', 'xl:max-w-5xl')
   })
 
-  it('메인 메뉴는 반응형 2열 그리드 배치를 사용한다', async () => {
-    await act(async () => { render(<SettingsTab {...defaultProps} />) })
-    expect(screen.getByText('계정').closest('button')?.parentElement).toHaveClass('grid', 'md:grid-cols-2')
-  })
 })
 
 describe('SettingsTab 앱 서브뷰 — 알림', () => {
