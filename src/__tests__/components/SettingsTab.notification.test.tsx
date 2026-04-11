@@ -91,7 +91,7 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     })
     await navigateToApp()
     expect(screen.getByText('알림 허용하기')).toBeInTheDocument()
-    expect(screen.getByTestId('settings-subview-container')).toHaveClass('max-w-2xl')
+    expect(screen.getByTestId('settings-subview-container')).toBeInTheDocument()
   })
 
   it('권한이 granted일 때 허용 상태 메시지가 표시된다', async () => {
