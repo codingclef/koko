@@ -2,11 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import type { ShoppingList, ItemPreview } from '@/lib/shopping'
 
-const mockPush = jest.fn()
-
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-}))
+const mockOnOpen = jest.fn()
 
 jest.mock('@dnd-kit/sortable', () => ({
   useSortable: () => ({
@@ -42,11 +38,11 @@ const mockPreviewItems: ItemPreview[] = [
 
 describe('ShoppingListCard', () => {
   beforeEach(() => {
-    mockPush.mockClear()
+    mockOnOpen.mockClear()
   })
 
   it('삭제 버튼 클릭 시 다이얼로그가 나타난다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
 
     fireEvent.click(screen.getByLabelText('삭제'))
 
@@ -57,7 +53,7 @@ describe('ShoppingListCard', () => {
 
   it('다이얼로그에서 삭제 클릭 시 onDelete가 호출된다', () => {
     const onDelete = jest.fn()
-    render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} onOpen={mockOnOpen} />)
 
     fireEvent.click(screen.getByLabelText('삭제'))
     fireEvent.click(screen.getByLabelText('삭제 확인'))
@@ -67,7 +63,7 @@ describe('ShoppingListCard', () => {
 
   it('다이얼로그에서 취소 클릭 시 onDelete가 호출되지 않고 다이얼로그가 닫힌다', () => {
     const onDelete = jest.fn()
-    render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={onDelete} onRename={jest.fn()} onOpen={mockOnOpen} />)
 
     fireEvent.click(screen.getByLabelText('삭제'))
     fireEvent.click(screen.getByLabelText('취소'))
@@ -77,19 +73,19 @@ describe('ShoppingListCard', () => {
   })
 
   it('목록 이름이 렌더링된다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     expect(screen.getByText('이마트')).toBeInTheDocument()
   })
 
   it('이름 클릭 시 인라인 편집 입력창이 나타난다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByText('이마트'))
     expect(screen.getByLabelText('목록 이름 수정')).toBeInTheDocument()
   })
 
   it('이름 수정 후 Enter 키로 onRename이 호출된다', () => {
     const onRename = jest.fn()
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={onRename} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={onRename} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByText('이마트'))
     const input = screen.getByLabelText('목록 이름 수정')
     fireEvent.change(input, { target: { value: '코스트코' } })
@@ -99,7 +95,7 @@ describe('ShoppingListCard', () => {
 
   it('Escape 키 입력 시 편집이 취소된다', () => {
     const onRename = jest.fn()
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={onRename} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={onRename} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByText('이마트'))
     const input = screen.getByLabelText('목록 이름 수정')
     fireEvent.change(input, { target: { value: '코스트코' } })
@@ -109,7 +105,7 @@ describe('ShoppingListCard', () => {
   })
 
   it('previewItems가 없으면 빈 상태 텍스트가 렌더링된다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     expect(screen.getByText('아이템 없음')).toBeInTheDocument()
     expect(screen.queryByText('우유')).not.toBeInTheDocument()
   })
@@ -121,6 +117,7 @@ describe('ShoppingListCard', () => {
         previewItems={mockPreviewItems}
         onDelete={jest.fn()}
         onRename={jest.fn()}
+        onOpen={mockOnOpen}
       />
     )
     expect(screen.getByText('우유')).toBeInTheDocument()
@@ -137,6 +134,7 @@ describe('ShoppingListCard', () => {
         previewItems={mockPreviewItems.slice(0, 2)}
         onDelete={jest.fn()}
         onRename={jest.fn()}
+        onOpen={mockOnOpen}
       />
     )
     expect(screen.getByText('우유')).toBeInTheDocument()
@@ -145,39 +143,39 @@ describe('ShoppingListCard', () => {
   })
 
   it('카드 본문이 키보드로 접근 가능하다 (tabIndex=0)', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     const cardBody = screen.getByLabelText('이마트 장바구니 열기')
     expect(cardBody).toHaveAttribute('tabindex', '0')
   })
 
-  it('카드 본문에서 Enter 키 입력 시 라우터 push가 호출된다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+  it('카드 본문에서 Enter 키 입력 시 onOpen이 호출된다', () => {
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     const cardBody = screen.getByLabelText('이마트 장바구니 열기')
     fireEvent.keyDown(cardBody, { key: 'Enter' })
-    expect(mockPush).toHaveBeenCalledWith('/shopping/list-1')
+    expect(mockOnOpen).toHaveBeenCalledWith('list-1')
   })
 
   it('삭제 버튼 클릭 시 카드 네비게이션이 발생하지 않는다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByLabelText('삭제'))
-    expect(mockPush).not.toHaveBeenCalled()
+    expect(mockOnOpen).not.toHaveBeenCalled()
   })
 
   it('이름 영역 클릭 시 카드 네비게이션이 발생하지 않는다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByText('이마트'))
-    expect(mockPush).not.toHaveBeenCalled()
+    expect(mockOnOpen).not.toHaveBeenCalled()
   })
 
   it('이름에서 Enter 키 입력 시 인라인 편집 입력창이 나타난다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     const nameBtn = screen.getByRole('button', { name: '이마트' })
     fireEvent.keyDown(nameBtn, { key: 'Enter' })
     expect(screen.getByLabelText('목록 이름 수정')).toBeInTheDocument()
   })
 
   it('삭제 모달이 role="dialog"와 aria-modal 속성을 가진다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByLabelText('삭제'))
     const dialog = screen.getByRole('dialog')
     expect(dialog).toBeInTheDocument()
@@ -185,7 +183,7 @@ describe('ShoppingListCard', () => {
   })
 
   it('모달에서 Escape 키 입력 시 모달이 닫힌다', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByLabelText('삭제'))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -193,7 +191,7 @@ describe('ShoppingListCard', () => {
   })
 
   it('편집 모드 input은 text-base 클래스를 가진다 (iOS Safari zoom 방지)', () => {
-    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} />)
+    render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByText('이마트'))
     const input = screen.getByLabelText('목록 이름 수정')
     expect(input).toHaveClass('text-base')

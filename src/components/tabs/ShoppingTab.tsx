@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react'
 import {
   DndContext,
@@ -20,9 +21,10 @@ import {
   reorderShoppingLists,
 } from '@/lib/shopping'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
+import { ShoppingDetailView } from '@/components/shopping/ShoppingDetailView'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import type { ShoppingListWithPreview, ListType } from '@/lib/shopping'
+import type { ShoppingListWithPreview, ListType, ShoppingItem } from '@/lib/shopping'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
 const cachedListsByFamily = new Map<string, ShoppingListWithPreview[]>()
@@ -39,12 +41,19 @@ export function clearShoppingTabCache() {
 type Props = AuthState
 
 export function ShoppingTab({ user, familyId, isInitializing }: Props) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [lists, setLists] = useState<ShoppingListWithPreview[]>(
     () => getCachedLists(familyId) ?? []
   )
   const [fetchError, setFetchError] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+
+  const activeListId = useMemo(() => {
+    const raw = searchParams.get('list')?.trim()
+    return raw ? raw : null
+  }, [searchParams])
 
   // 현재 family 기준 캐시가 없으면 첫 진입으로 간주한다.
   const loading = isInitializing && getCachedLists(familyId) === null
@@ -166,6 +175,46 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     }
   }
 
+  const buildShoppingHref = useCallback((listId?: string | null) => {
+    const params = new URLSearchParams()
+    params.set('tab', 'shopping')
+    if (listId) {
+      params.set('list', listId)
+    }
+    return `/calendar?${params.toString()}`
+  }, [])
+
+  const openShoppingDetail = useCallback(
+    (listId: string) => {
+      router.push(buildShoppingHref(listId), { scroll: false })
+    },
+    [buildShoppingHref, router]
+  )
+
+  const closeShoppingDetail = useCallback(() => {
+    router.replace(buildShoppingHref(), { scroll: false })
+  }, [buildShoppingHref, router])
+
+  const handlePreviewItemsChange = useCallback((listId: string, items: ShoppingItem[]) => {
+    updateLists((prev) =>
+      prev.map((list) =>
+        list.id === listId
+          ? {
+              ...list,
+              previewItems: items
+                .map(({ id, name, is_checked, sort_order }) => ({
+                  id,
+                  name,
+                  is_checked,
+                  sort_order,
+                }))
+                .sort((a, b) => a.sort_order - b.sort_order),
+            }
+          : list
+      )
+    )
+  }, [updateLists])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
@@ -176,6 +225,60 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   return (
     <div className="px-4 py-8 pb-24 min-h-screen">
+      <ShoppingListView
+        lists={lists}
+        fetchError={fetchError}
+        mutationError={mutationError}
+        sensors={sensors}
+        onCreateClick={() => setShowModal(true)}
+        onDelete={handleDelete}
+        onRename={handleRename}
+        onDragEnd={handleDragEnd}
+        onOpen={openShoppingDetail}
+      />
+
+      {showModal && (
+        <CreateListModal onClose={() => setShowModal(false)} onCreate={handleCreate} />
+      )}
+
+      {user && activeListId && (
+        <ShoppingDetailView
+          key={activeListId}
+          listId={activeListId}
+          user={user}
+          onClose={closeShoppingDetail}
+          onPreviewItemsChange={handlePreviewItemsChange}
+        />
+      )}
+    </div>
+  )
+}
+
+interface ShoppingListViewProps {
+  lists: ShoppingListWithPreview[]
+  fetchError: boolean
+  mutationError: string | null
+  sensors: ReturnType<typeof useSensors>
+  onCreateClick: () => void
+  onDelete: (listId: string) => void
+  onRename: (listId: string, name: string) => void
+  onDragEnd: (event: DragEndEvent) => void
+  onOpen: (listId: string) => void
+}
+
+function ShoppingListView({
+  lists,
+  fetchError,
+  mutationError,
+  sensors,
+  onCreateClick,
+  onDelete,
+  onRename,
+  onDragEnd,
+  onOpen,
+}: ShoppingListViewProps) {
+  return (
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
@@ -184,7 +287,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={onCreateClick}
           className="w-11 h-11 flex items-center justify-center rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-sm transition-colors"
           aria-label="새 장바구니 추가"
         >
@@ -211,26 +314,23 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 + 버튼을 눌러보세요</p>
         </div>
       ) : (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <SortableContext items={lists.map((l) => l.id)} strategy={rectSortingStrategy}>
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          <SortableContext items={lists.map((list) => list.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {lists.map((list) => (
                 <ShoppingListCard
                   key={list.id}
                   list={list}
                   previewItems={list.previewItems}
-                  onDelete={handleDelete}
-                  onRename={handleRename}
+                  onDelete={onDelete}
+                  onRename={onRename}
+                  onOpen={onOpen}
                 />
               ))}
             </div>
           </SortableContext>
         </DndContext>
       )}
-
-      {showModal && (
-        <CreateListModal onClose={() => setShowModal(false)} onCreate={handleCreate} />
-      )}
-    </div>
+    </>
   )
 }

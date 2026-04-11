@@ -9,6 +9,9 @@ const mockDeleteShoppingList = jest.fn()
 const mockRenameShoppingList = jest.fn()
 const mockReorderShoppingLists = jest.fn()
 const mockBroadcast = jest.fn()
+const mockPush = jest.fn()
+const mockReplace = jest.fn()
+let mockListParam: string | null = null
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
 
 jest.mock('@/lib/shopping', () => ({
@@ -21,6 +24,13 @@ jest.mock('@/lib/shopping', () => ({
 
 jest.mock('@/hooks/useRealtimeSync', () => ({
   useRealtimeSync: () => mockBroadcast,
+}))
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: () => ({
+    get: (key: string) => (key === 'list' ? mockListParam : null),
+  }),
 }))
 
 jest.mock('@dnd-kit/core', () => ({
@@ -38,13 +48,35 @@ jest.mock('@dnd-kit/sortable', () => ({
 }))
 
 jest.mock('@/components/shopping/ShoppingListCard', () => ({
-  ShoppingListCard: ({ list }: { list: { name: string } }) => <div>{list.name}</div>,
+  ShoppingListCard: ({
+    list,
+    onOpen,
+  }: {
+    list: { id: string; name: string }
+    onOpen: (listId: string) => void
+  }) => <button onClick={() => onOpen(list.id)}>{list.name}</button>,
+}))
+
+jest.mock('@/components/shopping/ShoppingDetailView', () => ({
+  ShoppingDetailView: ({
+    listId,
+    onClose,
+  }: {
+    listId: string
+    onClose: () => void
+  }) => (
+    <div>
+      <p>detail:{listId}</p>
+      <button onClick={onClose}>close-detail</button>
+    </div>
+  ),
 }))
 
 describe('ShoppingTab', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     clearShoppingTabCache()
+    mockListParam = null
     mockGetShoppingListsWithPreviews.mockResolvedValue([])
   })
 
@@ -106,5 +138,43 @@ describe('ShoppingTab', () => {
     })
 
     expect(screen.queryByText('첫째 가족 목록')).not.toBeInTheDocument()
+  })
+
+  it('목록 카드 열기 시 canonical shopping detail URL로 push한다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+
+    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+      {
+        id: 'list-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '이마트',
+        type: 'strikethrough',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+    ])
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    await user.click(await screen.findByRole('button', { name: '이마트' }))
+
+    expect(mockPush).toHaveBeenCalledWith('/calendar?tab=shopping&list=list-1', { scroll: false })
+  })
+
+  it('list 쿼리가 있으면 상세를 열고 닫기 시 shopping 리스트 URL로 replace한다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockListParam = 'list-1'
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    expect(await screen.findByText('detail:list-1')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'close-detail' }))
+
+    expect(mockReplace).toHaveBeenCalledWith('/calendar?tab=shopping', { scroll: false })
   })
 })
