@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -12,10 +11,10 @@ interface Props {
   previewItems?: ItemPreview[]
   onDelete: (listId: string) => void
   onRename: (listId: string, name: string) => void
+  onOpen: (listId: string) => void
 }
 
-export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }: Props) {
-  const router = useRouter()
+export function ShoppingListCard({ list, previewItems = [], onDelete, onRename, onOpen }: Props) {
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(list.name)
@@ -104,7 +103,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
   const handleCardKeyDown = (e: React.KeyboardEvent) => {
     if ((e.key === 'Enter' || e.key === ' ') && !confirming && !editing) {
       e.preventDefault()
-      router.push(`/shopping/${list.id}`)
+      onOpen(list.id)
     }
   }
 
@@ -120,7 +119,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename }
         {...listeners}
         tabIndex={confirming || editing ? -1 : 0}
         aria-label={`${list.name} 장바구니 열기`}
-        onClick={() => !confirming && !editing && router.push(`/shopping/${list.id}`)}
+        onClick={() => !confirming && !editing && onOpen(list.id)}
         onKeyDown={handleCardKeyDown}
         className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-accent-200 dark:hover:border-accent-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-1"
       >
