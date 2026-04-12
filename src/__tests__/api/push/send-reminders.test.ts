@@ -8,7 +8,7 @@ const mockSendNotification = jest.fn()
 
 jest.mock('@/lib/webpush', () => ({
   __esModule: true,
-  default: { sendNotification: (arg: unknown) => mockSendNotification(arg) },
+  default: { sendNotification: (...args: unknown[]) => mockSendNotification(...args) },
 }))
 
 let mockRpcResult: { data: unknown; error: unknown } = { data: [], error: null }
@@ -78,7 +78,7 @@ describe('POST /api/cron/send-reminders', () => {
         data: [{ id: 'sub1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'u1' }],
       }),
     }))
-    // update last_used_at
+    // update last_used_at (dispatchPushNotifications 내부)
     mockFrom.mockImplementationOnce(() => ({
       update: jest.fn().mockReturnThis(),
       in: jest.fn().mockResolvedValue({ error: null }),
@@ -109,12 +109,10 @@ describe('POST /api/cron/send-reminders', () => {
         data: [{ id: 'sub1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'u1' }],
       }),
     }))
-    // delete stale subs
-    const mockDelete = jest.fn().mockReturnThis()
-    const mockDeleteIn = jest.fn().mockResolvedValue({ error: null })
+    // delete stale subs (dispatchPushNotifications 내부)
     mockFrom.mockImplementationOnce(() => ({
-      delete: mockDelete,
-      in: mockDeleteIn,
+      delete: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ error: null }),
     }))
 
     const err = Object.assign(new Error('Gone'), { statusCode: 410 })
