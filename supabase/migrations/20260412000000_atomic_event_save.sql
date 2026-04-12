@@ -21,6 +21,7 @@ create or replace function create_event_with_reminders(
 returns setof events
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_event events;
@@ -46,6 +47,12 @@ begin
 end;
 $$;
 
+-- 이 함수는 service role(API route)에서만 호출해야 한다.
+-- anon/authenticated 클라이언트가 route 검증을 우회하지 못하도록 실행 권한을 제거한다.
+revoke execute on function create_event_with_reminders(
+  uuid, uuid, uuid, text, text, timestamptz, timestamptz, boolean, integer[]
+) from public, anon, authenticated;
+
 -- ============================================================
 -- update_event_with_reminders
 -- p_reminder_minutes = NULL  → reminders unchanged
@@ -65,6 +72,7 @@ create or replace function update_event_with_reminders(
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 begin
   update events
@@ -87,3 +95,9 @@ begin
   end if;
 end;
 $$;
+
+-- 이 함수는 service role(API route)에서만 호출해야 한다.
+-- anon/authenticated 클라이언트가 route 검증을 우회하지 못하도록 실행 권한을 제거한다.
+revoke execute on function update_event_with_reminders(
+  uuid, text, text, timestamptz, timestamptz, boolean, uuid, integer[]
+) from public, anon, authenticated;
