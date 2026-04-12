@@ -1,6 +1,4 @@
-<img src="public/logo.webp" alt="Koko 로고" width="72" />
-
-# Koko — 패밀리 허브
+<h1><img src="public/logo.webp" alt="Koko 로고" width="40" /> Koko — 패밀리 허브</h1>
 
 **[한국어]** | [日本語](README.ja.md) | [English](README.md)
 
