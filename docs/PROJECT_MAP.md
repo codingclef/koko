@@ -2,77 +2,118 @@
 
 # Koko Project Map
 
-This document is a fast orientation guide for understanding the current codebase.
-It summarizes implemented features, file ownership, data relationships, and the main runtime flows.
+이 문서는 현재 코드베이스를 빠르게 파악하기 위한 안내서다.
+구현된 기능 범위, 주요 파일 책임, 데이터 관계, 런타임 흐름을 현재 `main` 기준으로 요약한다.
 
 ## 1. Product Scope
 
-Koko is a family collaboration PWA centered on one shared app shell.
+Koko는 가족 단위로 일정을 공유하고 장보기와 설정을 함께 관리하는 PWA다.
+앱의 실제 진입점은 `/calendar` 하나이며, 내부에서 탭 셸이 살아 있는 상태로 캘린더, 장보기, 설정을 전환한다.
 
 ### Implemented
 
-- Family login with Google OAuth and email allowlist
-- Automatic family creation and family join by invite code
-- Calendar with family-scoped and calendar-scoped visibility
-- Shopping lists with realtime sync and drag-and-drop sorting
-- User preferences: holiday countries, app theme, lunar display
-- PWA installation and Web Push reminder delivery
+- Google OAuth 로그인 + 이메일 허용 목록 기반 접근 제어
+- 앱 초대 코드와 가족 초대 코드를 분리한 온보딩/합류 흐름
+- 가족 생성, 가족 이름 수정, 가족 초대 코드 공유, 다른 가족으로 합류
+- 가족 단위/캘린더 단위 가시성을 모두 지원하는 캘린더
+- 일정 생성, 수정, 삭제 API route와 reminder 원자 저장 RPC
+- 일정 변경 시 가족/캘린더 멤버 대상 push notification 전송
+- 장보기 목록/아이템 관리, 실시간 동기화, 드래그 정렬
+- 사용자 설정: holiday countries, app theme, lunar display
+- PWA 설치, service worker, reminder cron 기반 Web Push
+- OAuth 심사 대응용 privacy / terms 페이지
 
-### Present in Schema but Not Implemented in UI
+### Present In Schema But Not Implemented In UI
 
 - `memos`
 - `event_votes`
 
-These appear in the database schema and generated types, but there is no active frontend or `lib/*` implementation for them.
+이 두 테이블은 스키마와 generated types에는 존재하지만 현재 `src/lib/*`, `src/app/*`, `src/components/*`에서 활성 기능으로 연결되어 있지 않다.
 
 ## 2. App Structure
 
 ### Top-Level Runtime Shape
 
 - `src/app/layout.tsx`
-  - Global metadata, font loading, SSR-safe theme bootstrapping
+  - 글로벌 메타데이터, 폰트, SSR-safe theme bootstrap
 - `src/app/page.tsx`
-  - Redirects to `/calendar`
+  - `/calendar`로 리다이렉트
 - `src/app/calendar/page.tsx`
-  - Single mounted app entry point
+  - 가족 앱의 단일 live entry point
 - `src/components/TabsShell.tsx`
-  - Keep-alive shell for calendar, shopping, settings
+  - auth/family/preferences/calendars 초기화 후 탭을 keep-alive 상태로 렌더링
+
+### Auxiliary Routes
+
+- `src/app/login/page.tsx`
+  - Google OAuth 시작
+- `src/app/auth/callback/page.tsx`
+  - Supabase 자동 세션 교환 후 allowlist/app invite/family invite 판정
+- `src/app/onboarding/page.tsx`
+  - allowed user이지만 아직 가족이 없는 사용자의 가족 생성
+- `src/app/join/page.tsx`
+  - 가족 초대 코드로 기존 가족에 합류
+- `src/app/join-app/page.tsx`
+  - 앱 초대 링크 진입점. 로그인 후 callback 판정으로 이어짐
+- `src/app/shopping/[id]/page.tsx`
+  - 구형 상세 링크를 `?tab=shopping&list=...` 형태로 브리지
+- `src/app/privacy/page.tsx`
+- `src/app/terms/page.tsx`
 
 ### Redirect Routes
 
-- `src/app/shopping/page.tsx`
 - `src/app/settings/page.tsx`
+- `src/app/shopping/page.tsx`
 
-These redirect to `/calendar` because the real app state is hosted inside `TabsShell`.
+이 두 route는 독립 화면을 렌더링하지 않고 `/calendar` 기반 탭 셸로 리다이렉트한다.
 
 ## 3. Feature Map
 
-### Auth and Access
+### Auth And Access
 
 - Login page: `src/app/login/page.tsx`
 - OAuth callback: `src/app/auth/callback/page.tsx`
 - Allowlist check API: `src/app/api/auth/check-allowed/route.ts`
-- Invite code parsing: `src/lib/auth.ts`
+- Invite parsing helper: `src/lib/auth.ts`
+- Auth hook: `src/hooks/useAuth.ts`
 
 Flow:
-- User signs in with Google
-- Supabase auto-creates the session
-- Callback checks `allowed_emails`
-- A valid invite code can auto-allow a first-time user
-- Unauthorized users are signed out and redirected to login
+- 사용자는 Google OAuth로 로그인한다.
+- Supabase가 callback URL에서 세션을 자동 교환한다.
+- callback 페이지는 `getSession()` + `onAuthStateChange()`로 세션 확보를 기다린다.
+- `/api/auth/check-allowed`가 `allowed_emails`, 앱 초대 코드, 가족 초대 코드를 판정한다.
+- 앱 초대 코드가 소비되면 `needsOnboarding: true`가 반환되고 `/onboarding`으로 이동한다.
+- 허용되지 않은 사용자는 즉시 sign out 후 `/login?error=unauthorized`로 보낸다.
 
-### Family
+### Family And Onboarding
 
-- Family bootstrap API: `src/app/api/family/route.ts`
+- Family lookup API: `src/app/api/family/me/route.ts`
+- Legacy get-or-create API: `src/app/api/family/route.ts`
+- Explicit family create API: `src/app/api/family/create/route.ts`
 - Family join API: `src/app/api/family/join/route.ts`
-- Join page: `src/app/join/page.tsx`
+- Family rename API: `src/app/api/family/name/route.ts`
 - Family helpers: `src/lib/family.ts`
 - Family hook: `src/hooks/useFamily.ts`
 
-Flow:
-- After auth, the app resolves the user's family via `get_or_create_family`
-- Users can move into another family by invite code
-- The active family is the tenant boundary for most data
+Current behavior:
+- `useFamily()`는 `/api/family/me`를 호출해 현재 가족과 `appRole`을 읽는다.
+- 가족이 없는 allowed user는 `TabsShell`에서 `/onboarding`으로 보낸다.
+- `/onboarding`은 `create_family_with_name` RPC로 명시적 가족 생성을 수행한다.
+- 가족 합류는 `join_family_by_invite_code` RPC로 원자 처리된다.
+- 설정 탭에서 가족 이름을 수정할 수 있다.
+- `allowed_emails.app_role`이 `admin`이면 앱 초대 생성 권한을 가진다.
+
+### App Invite Administration
+
+- App invite API: `src/app/api/app-invite/route.ts`
+- App invite UI: `src/components/tabs/SettingsTab.tsx`
+- Schema support: `app_invites`, `allowed_emails.app_role`
+
+Current behavior:
+- 앱 관리자만 새 앱 초대를 생성할 수 있다.
+- 앱 초대 링크는 `/join-app?code=...` 형식이다.
+- 앱 초대는 1회용이며 만료 시간이 있다.
+- 초대 소비는 `consume_app_invite(code, email)` RPC로 원자 처리된다.
 
 ### Calendar
 
@@ -81,143 +122,168 @@ Flow:
 - Calendar hook: `src/hooks/useCalendars.ts`
 - Holiday hook: `src/hooks/useHolidays.ts`
 - Swipe hook: `src/hooks/useSwipe.ts`
-- UI:
+- Event APIs:
+  - `src/app/api/events/route.ts`
+  - `src/app/api/events/[id]/route.ts`
+- Key UI:
   - `src/components/calendar/CalendarGrid.tsx`
   - `src/components/calendar/CalendarFilter.tsx`
   - `src/components/calendar/CalendarListSheet.tsx`
+  - `src/components/calendar/CalendarDetailScreen.tsx`
   - `src/components/calendar/DayEventsSheet.tsx`
   - `src/components/calendar/EventDetailSheet.tsx`
   - `src/components/calendar/EventFormModal.tsx`
   - `src/components/calendar/CalendarFormModal.tsx`
   - `src/components/calendar/TimeWheelPicker.tsx`
+  - `src/components/calendar/YearMonthPickerSheet.tsx`
 
 Current behavior:
-- Month-based event loading
-- Calendar filter chips
-- Family-wide events and calendar-specific events
-- Calendar membership management
-- Reminder settings per event
-- Holiday overlays and optional lunar date display
+- 월 단위로 이벤트를 로드하고 인접 월을 prefetch한다.
+- 월 이벤트 캐시는 최대 12개월까지 유지된다.
+- 가족 전체 일정과 캘린더 전용 일정을 함께 지원한다.
+- 캘린더 생성/수정/삭제와 멤버 관리가 가능하다.
+- 이벤트 생성/수정은 API route 뒤의 `create_event_with_reminders`, `update_event_with_reminders` RPC로 원자 저장한다.
+- 이벤트 삭제는 API route에서 권한 검증 후 수행한다.
+- 이벤트 생성/수정/삭제 시 관련 멤버에게 push notification을 보낼 수 있다.
+- holiday overlay, lunar display, year-month picker, swipe month navigation을 제공한다.
 
 ### Shopping
 
 - Tab container: `src/components/tabs/ShoppingTab.tsx`
-- Detail page: `src/app/shopping/[id]/page.tsx`
+- Detail view: `src/components/shopping/ShoppingDetailView.tsx`
+- Bridge route: `src/app/shopping/[id]/page.tsx`
 - Data layer: `src/lib/shopping.ts`
-- UI:
+- Key UI:
   - `src/components/shopping/ShoppingListCard.tsx`
   - `src/components/shopping/CreateListModal.tsx`
   - `src/components/shopping/ShoppingItem.tsx`
   - `src/components/shopping/AddItemInput.tsx`
 
 Current behavior:
-- Shopping list creation, rename, delete
-- Two list types: `strikethrough` and `delete`
-- Item add/check/delete/rename
-- Drag-and-drop list and item ordering
-- Optimistic UI for create operations
+- 장보기 목록 생성, 이름 변경, 삭제
+- 두 가지 목록 타입: `strikethrough`, `delete`
+- 아이템 추가/체크/삭제/이름 변경
+- 목록/아이템 drag-and-drop 정렬
+- 생성 계열 optimistic UI + 서버 row 치환
+- 가족별 module-level cache로 탭 전환과 상세 진입 시 초기 스피너를 최소화
+- 상세 상태는 별도 페이지가 아니라 `/calendar?tab=shopping&list=<id>` search param으로 유지한다
 
-### Settings and Preferences
+### Settings And Preferences
 
 - Tab container: `src/components/tabs/SettingsTab.tsx`
 - Preferences helpers: `src/lib/preferences.ts`
 - Preferences hook: `src/hooks/useUserPreferences.ts`
+- Push registration: `src/lib/push.ts`
 
 Current behavior:
-- View account email
-- Edit display name
-- Share family invite code
-- Join a family by code
-- Enable push notifications
-- Configure holiday countries
-- Toggle lunar display
-- Change app theme
+- 계정 이메일 표시
+- 내 display name 수정
+- 가족 이름 수정
+- 가족 초대 코드 공유
+- 가족 초대 코드로 다른 가족 합류
+- 앱 관리자용 앱 초대 생성/공유
+- push notification 권한 요청 및 구독 등록
+- holiday countries 변경
+- lunar display toggle
+- app theme 변경
 
-### Realtime and Push
+### Realtime And Push
 
 - Realtime hook: `src/hooks/useRealtimeSync.ts`
-- Push registration: `src/lib/push.ts`
+- Push notification helpers: `src/lib/push-utils.ts`
 - Web Push sender: `src/lib/webpush.ts`
 - Push subscription API: `src/app/api/push/subscribe/route.ts`
 - Push test API: `src/app/api/push/test/route.ts`
 - Reminder cron API: `src/app/api/cron/send-reminders/route.ts`
 - Service worker: `public/sw.js`
-- PWA manifest: `public/manifest.json`
+- Manifest: `public/manifest.json`
+
+Current behavior:
+- Supabase Realtime Broadcast를 사용해 가족 범위 변경사항을 동기화한다.
+- 이벤트 mutation API는 일정 변경 push를 비동기로 발송한다.
+- reminder cron은 `event_reminders`를 기준으로 예정 알림을 발송한다.
+- 만료된 push subscription은 발송 실패 시 정리된다.
 
 ## 4. File Responsibility Map
 
 ### `src/app/*`
 
-- Route entry points, redirects, and server APIs
-- Minimal orchestration only
+- 라우트 진입점, redirect, API route
+- 서버 권한 검증과 orchestration
 
 ### `src/components/*`
 
-- UI composition and local interaction state
-- Tab-level containers own feature-level fetch and realtime subscription wiring
+- UI composition과 feature-level interaction state
+- 탭 컨테이너가 feature fetch, mutation trigger, realtime wiring을 보유
 
 ### `src/lib/*`
 
-- Supabase clients
-- Typed CRUD and feature utilities
-- No view logic
+- Supabase client
+- typed CRUD, API client helper, feature utility
+- 서버/클라이언트 공용 비즈니스 접근 함수
 
 ### `src/hooks/*`
 
-- Shared stateful client hooks
-- Reusable auth, family, preferences, holidays, swipe, realtime logic
+- 여러 화면에서 재사용하는 client state 로직
+- auth, family, preferences, holidays, swipe, realtime, async data 관리
 
 ### `src/types/*`
 
-- Generated database contract and shared UI types
+- generated DB contract
+- tab / push 등 앱 공용 타입
 
 ### `supabase/migrations/*`
 
-- Source of truth for database schema, RLS, helper functions, and operational fixes
+- DB schema, RLS, helper RPC, 운영 fix의 source of truth
 
 ### `src/__tests__/*`
 
-- Regression coverage across API routes, hooks, lib functions, and major UI pieces
+- API route, lib, hook, major component 회귀 테스트
 
 ## 5. Data Model Summary
 
 ### Core Entities
 
 - `families`
-  - Top-level tenant for shared family data
+  - 가족 tenant와 가족 초대 코드
 - `family_members`
-  - Membership records for users inside a family
+  - 사용자와 가족의 membership
 - `allowed_emails`
-  - Login allowlist for authorized users
+  - 앱 접근 허용 이메일 + `app_role`
+- `app_invites`
+  - 앱 접근용 1회성 초대 코드
 - `user_preferences`
-  - Per-user UI and calendar display preferences
+  - 사용자별 UI/캘린더 설정
 
 ### Calendar Domain
 
 - `calendars`
-  - Named calendars belonging to a family
+  - 가족 소속 캘린더
 - `calendar_members`
-  - Per-calendar access control
+  - 캘린더별 접근 제어
 - `events`
-  - Calendar events, optionally assigned to a specific calendar
+  - 가족 또는 캘린더 범위 일정
 - `event_reminders`
-  - Reminder offsets attached to events
+  - 일정별 reminder offset
 - `event_votes`
-  - Exists in schema only at the moment
+  - 현재 UI 미구현
 
 ### Shopping Domain
 
 - `shopping_lists`
-  - Family-owned lists
+  - 가족 소속 장보기 목록
 - `shopping_items`
-  - Items inside a shopping list
+  - 목록 내 아이템
+
+### Push Domain
+
+- `push_subscriptions`
+  - 브라우저/디바이스별 Web Push endpoint
 
 ### Other Domain Tables
 
 - `memos`
-  - Exists in schema only at the moment
-- `push_subscriptions`
-  - Web Push endpoints per user/device/browser
+  - 현재 UI 미구현
 
 ## 6. ERD-Level Relationship Summary
 
@@ -225,7 +291,11 @@ Current behavior:
 auth.users
   ├─< family_members >─ families
   ├─< user_preferences
-  └─< push_subscriptions
+  ├─< push_subscriptions
+  └─< app_invites(created_by)
+
+allowed_emails
+  └─ app_role
 
 families
   ├─< calendars
@@ -246,54 +316,49 @@ shopping_lists
 ```
 
 Important notes:
-- A user is effectively modeled as belonging to one active family through `family_members.user_id` uniqueness.
-- `events.calendar_id` can be `null`, which means a family-wide event not restricted to a specific calendar.
-- `calendar_members` is the access-control table for calendar visibility.
+- 앱 접근 허용과 가족 소속은 별개다. `allowed_emails`에 있어도 `family_members`에는 없을 수 있다.
+- `family_members.user_id`는 사실상 사용자당 활성 가족 1개 모델을 만든다.
+- `events.calendar_id = null`은 가족 전체 일정이다.
+- `calendar_members`가 캘린더별 읽기/쓰기 권한의 기준이다.
 
 ## 7. Main Runtime Flows
 
-### App Initialization
+### App Startup
 
-1. `useAuth()` resolves the current session
-2. `useFamily()` calls `/api/family`
-3. `TabsShell` mounts all three tabs
-4. Each tab loads its own data
+1. `useAuth()`가 현재 세션을 확인한다.
+2. `useFamily()`가 `/api/family/me`를 호출해 `familyId`와 `appRole`을 가져온다.
+3. `useCalendars()`가 가족 캘린더를 읽는다.
+4. `TabsShell`이 세 탭을 keep-alive 상태로 렌더링한다.
+5. 가족이 없으면 `/onboarding`으로 리다이렉트한다.
 
-### Realtime
+### Login And Access Decision
 
-1. Tab/page subscribes through `useRealtimeSync`
-2. Local mutation updates Supabase
-3. The mutation owner manually broadcasts `refresh`
-4. Other clients receive the event and reload
+1. `/login`에서 Google OAuth를 시작한다.
+2. Supabase가 `/auth/callback`에서 세션을 자동 교환한다.
+3. callback 페이지가 `/api/auth/check-allowed`를 호출한다.
+4. 결과에 따라:
+   - allowed + onboarding 필요 없음 → 원래 `next`로 이동
+   - allowed + onboarding 필요 → `/onboarding`
+   - not allowed → sign out 후 `/login?error=unauthorized`
 
-### Push Reminders
+### Family Creation / Join
 
-1. Client requests notification permission
-2. Browser push subscription is stored in `push_subscriptions`
-3. Scheduled cron hits `/api/cron/send-reminders`
-4. Server fetches due reminders and marks them as sent atomically
-5. Web Push is sent to active subscriptions
+1. allowed user가 가족이 없으면 `/onboarding`으로 이동한다.
+2. 가족 생성은 `/api/family/create` -> `create_family_with_name` RPC로 수행한다.
+3. 기존 가족 합류는 `/api/family/join` -> `join_family_by_invite_code` RPC로 수행한다.
+4. 합류 후 앱의 tenant boundary는 새 `familyId`로 바뀐다.
 
-## 8. Rules to Keep in Mind Before Editing
+### Event Mutation
 
-- Read `docs/PATTERNS.md` before feature work.
-- Read `docs/CHALLENGES.md` when touching auth, realtime, RLS, shopping optimistic UI, or mobile modal behavior.
-- Do not replace the `TabsShell` keep-alive structure with route-per-tab navigation without understanding the tradeoff.
-- Do not switch realtime back to `postgres_changes`.
-- Do not call `exchangeCodeForSession`.
-- Do not use service-role keys on the client.
-- Do not add RLS policies with naive nested `family_members` subqueries when helper functions already exist.
+1. `CalendarTab`이 `/api/events` 또는 `/api/events/[id]`를 호출한다.
+2. API route가 요청 사용자의 가족/캘린더 write 권한을 검증한다.
+3. create/update는 reminder까지 함께 RPC로 원자 저장한다.
+4. 성공 후 현재 월 이벤트를 강제 refresh하고 realtime broadcast를 보낸다.
+5. 이벤트 변경 push notification은 API route에서 비동기로 발송한다.
 
-## 9. Useful Entry Files for Fast Orientation
+### Shopping Sync
 
-- `src/components/TabsShell.tsx`
-- `src/components/tabs/CalendarTab.tsx`
-- `src/components/tabs/ShoppingTab.tsx`
-- `src/components/tabs/SettingsTab.tsx`
-- `src/lib/calendar.ts`
-- `src/lib/shopping.ts`
-- `src/lib/preferences.ts`
-- `src/hooks/useRealtimeSync.ts`
-- `src/types/database.ts`
-- `docs/PATTERNS.md`
-- `docs/CHALLENGES.md`
+1. `ShoppingTab`이 가족별 목록을 읽고 module-level cache에 저장한다.
+2. create/rename/delete/reorder 후 로컬 상태를 즉시 갱신한다.
+3. mutation 성공 시 `family_lists_${familyId}` broadcast를 보낸다.
+4. 다른 탭/기기는 realtime 수신 후 목록을 새로고침한다.

@@ -1,4 +1,6 @@
-# 🏠 Koko — ファミリーハブ
+<img src="public/logo.webp" alt="Koko ロゴ" width="72" />
+
+# Koko — ファミリーハブ
 
 [한국어](README.ko.md) | **[日本語]** | [English](README.md)
 

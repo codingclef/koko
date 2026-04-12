@@ -1,4 +1,6 @@
-# 🏠 Koko — Family Hub
+<img src="public/logo.webp" alt="Koko logo" width="72" />
+
+# Koko — Family Hub
 
 [한국어](README.ko.md) | [日本語](README.ja.md) | **[English]**
 
