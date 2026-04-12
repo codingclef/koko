@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedUserId } from '@/lib/api-auth'
+import { getAuthenticatedUserId, isFamilyMember, assertCalendarWriteAccess } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEventNotification } from '@/lib/push-utils'
 
@@ -13,14 +13,14 @@ interface UpdateEventRequest {
   reminderMinutes?: number[]
 }
 
-async function isFamilyMember(familyId: string, userId: string): Promise<boolean> {
-  const { data } = await supabaseAdmin
-    .from('family_members')
-    .select('user_id')
-    .eq('family_id', familyId)
-    .eq('user_id', userId)
-    .maybeSingle()
-  return !!data
+async function canWriteEvent(
+  existing: { calendar_id: string | null; family_id: string },
+  actorUserId: string
+): Promise<boolean> {
+  if (existing.calendar_id) {
+    return assertCalendarWriteAccess(existing.family_id, existing.calendar_id, actorUserId)
+  }
+  return isFamilyMember(existing.family_id, actorUserId)
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -42,8 +42,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
   }
 
-  if (!(await isFamilyMember(existing.family_id, actorUserId))) {
+  if (!(await canWriteEvent(existing, actorUserId))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // 대상 캘린더가 바뀌는 경우 target 캘린더 접근 권한도 검증
+  if (body.calendarId !== undefined && body.calendarId !== null && body.calendarId !== existing.calendar_id) {
+    const hasTargetAccess = await assertCalendarWriteAccess(existing.family_id, body.calendarId, actorUserId)
+    if (!hasTargetAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   const updates: Record<string, unknown> = {}
@@ -68,11 +76,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (body.reminderMinutes !== undefined) {
-    await supabaseAdmin.from('event_reminders').delete().eq('event_id', eventId)
+    const { error: deleteError } = await supabaseAdmin
+      .from('event_reminders')
+      .delete()
+      .eq('event_id', eventId)
+    if (deleteError) {
+      return NextResponse.json({ error: 'Failed to update reminders' }, { status: 500 })
+    }
+
     if (body.reminderMinutes.length > 0) {
-      await supabaseAdmin
+      const { error: insertError } = await supabaseAdmin
         .from('event_reminders')
         .insert(body.reminderMinutes.map((m) => ({ event_id: eventId, remind_minutes_before: m })))
+      if (insertError) {
+        return NextResponse.json({ error: 'Failed to update reminders' }, { status: 500 })
+      }
     }
   }
 
@@ -108,7 +126,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
   }
 
-  if (!(await isFamilyMember(existing.family_id, actorUserId))) {
+  if (!(await canWriteEvent(existing, actorUserId))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

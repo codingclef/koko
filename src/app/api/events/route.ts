@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedUserId } from '@/lib/api-auth'
+import { getAuthenticatedUserId, assertCalendarWriteAccess } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEventNotification } from '@/lib/push-utils'
 
@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Family not found' }, { status: 403 })
   }
 
+  if (calendarId) {
+    const hasAccess = await assertCalendarWriteAccess(member.family_id, calendarId, actorUserId)
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
   const { data: event, error: eventError } = await supabaseAdmin
     .from('events')
     .insert({
@@ -56,9 +63,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (reminderMinutes.length > 0) {
-    await supabaseAdmin
+    const { error: reminderError } = await supabaseAdmin
       .from('event_reminders')
       .insert(reminderMinutes.map((m) => ({ event_id: event.id, remind_minutes_before: m })))
+    if (reminderError) {
+      return NextResponse.json({ error: 'Failed to save reminders' }, { status: 500 })
+    }
   }
 
   void sendEventNotification({

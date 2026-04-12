@@ -23,14 +23,17 @@ jest.mock('@/lib/supabase-admin', () => ({
 const ACTOR_USER_ID = 'actor-user'
 const EVENT_ID = 'evt-1'
 const FAMILY_ID = 'fam-1'
+const CALENDAR_ID = 'cal-1'
 
 const mockExisting = {
   id: EVENT_ID,
   title: '생일 파티',
   start_at: '2026-04-15T09:00:00.000Z',
-  calendar_id: 'cal-1',
+  calendar_id: CALENDAR_ID,
   family_id: FAMILY_ID,
 }
+
+const mockExistingFamilyWide = { ...mockExisting, calendar_id: null }
 
 function makeRequest(token = 'valid-token') {
   return new NextRequest(`http://localhost/api/events/${EVENT_ID}`, {
@@ -54,6 +57,48 @@ beforeEach(() => {
   })
 })
 
+function mockEventFetch(existing: Record<string, unknown> | null = mockExisting) {
+  mockFrom.mockImplementationOnce(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(existing ? { data: existing } : { data: null }),
+  }))
+}
+
+function mockCalendarAccess(calendarFound = true, isMember = true) {
+  mockFrom.mockImplementationOnce(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(
+      calendarFound ? { data: { id: CALENDAR_ID } } : { data: null }
+    ),
+  }))
+  mockFrom.mockImplementationOnce(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(
+      isMember ? { data: { user_id: ACTOR_USER_ID } } : { data: null }
+    ),
+  }))
+}
+
+function mockFamilyAccess(isMember = true) {
+  mockFrom.mockImplementationOnce(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(
+      isMember ? { data: { user_id: ACTOR_USER_ID } } : { data: null }
+    ),
+  }))
+}
+
+function mockEventDelete(error: unknown = null) {
+  mockFrom.mockImplementationOnce(() => ({
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockResolvedValue({ error }),
+  }))
+}
+
 describe('DELETE /api/events/[id]', () => {
   it('인증 토큰 없으면 401을 반환한다', async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: new Error('unauthorized') })
@@ -62,51 +107,29 @@ describe('DELETE /api/events/[id]', () => {
   })
 
   it('이벤트가 없으면 404를 반환한다', async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null }),
-    }))
+    mockEventFetch(null)
     const res = await DELETE(makeRequest(), makeParams())
     expect(res.status).toBe(404)
   })
 
-  it('가족 미소속이면 403을 반환한다', async () => {
-    // events 조회
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: mockExisting }),
-    }))
-    // family_members 검증 실패
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null }),
-    }))
+  it('캘린더 미소속이면 403을 반환한다 (캘린더 이벤트)', async () => {
+    mockEventFetch()
+    mockCalendarAccess(true, false)
+    const res = await DELETE(makeRequest(), makeParams())
+    expect(res.status).toBe(403)
+  })
+
+  it('가족 미소속이면 403을 반환한다 (가족 전체 이벤트)', async () => {
+    mockEventFetch(mockExistingFamilyWide)
+    mockFamilyAccess(false)
     const res = await DELETE(makeRequest(), makeParams())
     expect(res.status).toBe(403)
   })
 
   it('이벤트를 삭제하고 204를 반환하며 알림을 보낸다', async () => {
-    // events 조회
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: mockExisting }),
-    }))
-    // family_members 검증
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: { user_id: ACTOR_USER_ID } }),
-    }))
-    // events delete
-    mockFrom.mockImplementationOnce(() => ({
-      delete: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ error: null }),
-    }))
-
+    mockEventFetch()
+    mockCalendarAccess()
+    mockEventDelete()
     mockSendEventNotification.mockResolvedValue(undefined)
 
     const res = await DELETE(makeRequest(), makeParams())
@@ -116,24 +139,10 @@ describe('DELETE /api/events/[id]', () => {
     )
   })
 
-  it('삭제 실패 시 500을 반환한다', async () => {
-    // events 조회
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: mockExisting }),
-    }))
-    // family_members 검증
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: { user_id: ACTOR_USER_ID } }),
-    }))
-    // events delete 실패
-    mockFrom.mockImplementationOnce(() => ({
-      delete: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ error: { message: 'DB error' } }),
-    }))
+  it('삭제 실패 시 500을 반환하고 알림을 보내지 않는다', async () => {
+    mockEventFetch()
+    mockCalendarAccess()
+    mockEventDelete({ message: 'DB error' })
 
     const res = await DELETE(makeRequest(), makeParams())
     expect(res.status).toBe(500)
