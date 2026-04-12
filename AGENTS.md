@@ -59,7 +59,7 @@ These rules apply to every task without exception.
 2. When asking the user to run a command or tool, include a Korean explanation.
 3. Whenever code is written or modified, add or update tests with it.
 4. After writing or modifying code, run `npx tsc --noEmit` before considering the work complete.
-5. GitHub Actions CI must pass before merge.
+5. After creating a PR, monitor GitHub Actions CI until it completes. If any check fails, fix the issue and repeat until CI passes.
 6. Manual visual verification items must be listed as checkboxes in the PR.
 
 ## Engineering Rules
