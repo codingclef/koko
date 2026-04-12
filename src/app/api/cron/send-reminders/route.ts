@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import webpush from '@/lib/webpush'
+import { dispatchPushNotifications } from '@/lib/push-utils'
 
 function formatReminderBody(eventStart: string): string {
   const d = new Date(eventStart)
@@ -48,10 +48,10 @@ export async function POST(req: NextRequest) {
     usersByFamily.set(m.family_id, arr)
   }
 
-  const successIds: string[] = []
-  const staleIds: string[] = []
-
   // 4. 각 리마인더를 가족 구성원 전체에게 발송
+  let totalSent = 0
+  let totalRemoved = 0
+
   await Promise.all(
     reminders.map(async (reminder) => {
       const memberUserIds = new Set(usersByFamily.get(reminder.family_id) ?? [])
@@ -62,37 +62,11 @@ export async function POST(req: NextRequest) {
         url: '/',
       })
 
-      await Promise.all(
-        familySubs.map(async (sub) => {
-          try {
-            await webpush.sendNotification(
-              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              payload
-            )
-            successIds.push(sub.id)
-          } catch (err: unknown) {
-            const status = (err as { statusCode?: number }).statusCode
-            if (status === 404 || status === 410) {
-              staleIds.push(sub.id)
-            }
-          }
-        })
-      )
+      const { sent, removed } = await dispatchPushNotifications(familySubs, payload)
+      totalSent += sent
+      totalRemoved += removed
     })
   )
 
-  // 5. last_used_at 갱신 + 만료 구독 삭제
-  await Promise.all([
-    successIds.length
-      ? supabaseAdmin
-          .from('push_subscriptions')
-          .update({ last_used_at: new Date().toISOString() })
-          .in('id', successIds)
-      : Promise.resolve(),
-    staleIds.length
-      ? supabaseAdmin.from('push_subscriptions').delete().in('id', staleIds)
-      : Promise.resolve(),
-  ])
-
-  return NextResponse.json({ sent: successIds.length, removed: staleIds.length })
+  return NextResponse.json({ sent: totalSent, removed: totalRemoved })
 }

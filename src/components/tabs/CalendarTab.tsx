@@ -33,7 +33,9 @@ import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
 import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { postJsonWithAuth } from '@/lib/api-client'
 import type { Calendar } from '@/lib/calendar'
+import type { EventAction } from '@/types/push'
 
 interface Props extends AuthState {
   preferences: UserPreferences | null
@@ -465,6 +467,14 @@ export function CalendarTab({
     }
   }
 
+  const notifyEventChange = useCallback(async (action: EventAction, eventId: string) => {
+    try {
+      await postJsonWithAuth('/api/push/notify-event', { action, eventId })
+    } catch (e) {
+      console.warn('[CalendarTab] notifyEventChange failed:', e)
+    }
+  }, [])
+
   const handleEventSave = async (params: {
     calendarId: string | null
     title: string
@@ -481,7 +491,15 @@ export function CalendarTab({
       clearFamilyMonthEventsCache(familyId)
 
       if (editingEvent?.event) {
-        await updateEvent(editingEvent.event.id, {
+        const old = editingEvent.event
+        const changed =
+          old.title !== params.title ||
+          old.start_at !== params.startAt ||
+          old.end_at !== params.endAt ||
+          old.description !== params.description ||
+          old.calendar_id !== params.calendarId ||
+          old.is_all_day !== params.isAllDay
+        await updateEvent(old.id, {
           calendarId: params.calendarId,
           title: params.title,
           description: params.description,
@@ -489,7 +507,8 @@ export function CalendarTab({
           endAt: params.endAt,
           isAllDay: params.isAllDay,
         })
-        await setReminders(editingEvent.event.id, params.reminderMinutes)
+        await setReminders(old.id, params.reminderMinutes)
+        if (changed) void notifyEventChange('updated', old.id)
       } else {
         const evt = await createEvent({
           familyId,
@@ -502,6 +521,7 @@ export function CalendarTab({
           isAllDay: params.isAllDay,
         })
         await setReminders(evt.id, params.reminderMinutes)
+        void notifyEventChange('created', evt.id)
       }
 
       await refreshEvents()
@@ -519,9 +539,13 @@ export function CalendarTab({
     if (!familyId) return
     setMutationError(null)
 
+    const eventId = selectedEvent.id
+
     try {
+      // 삭제 전에 알림 발송 (이벤트가 DB에 존재할 때 서버가 조회할 수 있도록)
+      await notifyEventChange('deleted', eventId)
       clearFamilyMonthEventsCache(familyId)
-      await deleteEvent(selectedEvent.id)
+      await deleteEvent(eventId)
       setSelectedEvent(null)
       await refreshEvents()
       broadcast()
