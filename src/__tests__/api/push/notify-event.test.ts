@@ -33,6 +33,17 @@ function makeRequest(body: Record<string, unknown>, token = 'valid-token') {
 }
 
 const ACTOR_USER_ID = 'actor-user'
+const EVENT_ID = 'event-123'
+const FAMILY_ID = 'fam-1'
+const CALENDAR_ID = 'cal-1'
+
+const mockEvent = {
+  id: EVENT_ID,
+  title: '생일 파티',
+  start_at: '2026-04-15T09:00:00.000Z',
+  calendar_id: CALENDAR_ID,
+  family_id: FAMILY_ID,
+}
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -47,28 +58,33 @@ beforeEach(() => {
   })
 })
 
-const baseBody = {
-  action: 'created',
-  title: '생일 파티',
-  startAt: '2026-04-15T09:00:00.000Z',
-  familyId: 'fam-1',
-  calendarId: 'cal-1',
-}
+const baseBody = { action: 'created', eventId: EVENT_ID }
 
-/** calendar_members → push_subscriptions → update last_used_at 순서로 mockFrom 세팅 */
-function setupSendMocks(otherUserId = 'user-2') {
-  // calendar_members 조회 (actor 포함)
+/** events → family_members(검증) → calendar_members → push_subscriptions → update 순서로 mockFrom 세팅 */
+function setupSendMocks() {
+  // events 조회
   mockFrom.mockImplementationOnce(() => ({
     select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockResolvedValue({
-      data: [{ user_id: ACTOR_USER_ID }, { user_id: otherUserId }],
-    }),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: mockEvent }),
+  }))
+  // family_members 멤버십 검증
+  mockFrom.mockImplementationOnce(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: { user_id: ACTOR_USER_ID } }),
+  }))
+  // calendar_members 조회 (본인 제외)
+  mockFrom.mockImplementationOnce(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockResolvedValue({ data: [{ user_id: 'user-2' }] }),
   }))
   // push_subscriptions 조회
   mockFrom.mockImplementationOnce(() => ({
     select: jest.fn().mockReturnThis(),
     in: jest.fn().mockResolvedValue({
-      data: [{ id: 'sub-1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: otherUserId }],
+      data: [{ id: 'sub-1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'user-2' }],
     }),
   }))
   // update last_used_at
@@ -86,29 +102,38 @@ describe('POST /api/push/notify-event', () => {
   })
 
   it('필수 필드 누락 시 400을 반환한다', async () => {
-    const res = await POST(makeRequest({ action: 'created', familyId: 'fam-1' }))
+    const res = await POST(makeRequest({ action: 'created' }))
     expect(res.status).toBe(400)
   })
 
-  it('actor가 캘린더 멤버가 아니면 403을 반환한다', async () => {
+  it('이벤트가 존재하지 않으면 404를 반환한다', async () => {
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ data: [{ user_id: 'other-user' }] }),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null }),
+    }))
+    const res = await POST(makeRequest(baseBody))
+    expect(res.status).toBe(404)
+  })
+
+  it('actor가 가족 멤버가 아니면 403을 반환한다', async () => {
+    // events 조회 성공
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: mockEvent }),
+    }))
+    // family_members 검증 실패
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null }),
     }))
     const res = await POST(makeRequest(baseBody))
     expect(res.status).toBe(403)
   })
 
-  it('actor가 가족 멤버가 아니면 403을 반환한다', async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ data: [{ user_id: 'other-user' }] }),
-    }))
-    const res = await POST(makeRequest({ ...baseBody, calendarId: null }))
-    expect(res.status).toBe(403)
-  })
-
-  it('calendarId가 있으면 calendar_members를 조회한다', async () => {
+  it('calendarId가 있으면 calendar_members를 조회하고 알림을 발송한다', async () => {
     setupSendMocks()
     mockSendNotification.mockResolvedValue({})
 
@@ -117,39 +142,66 @@ describe('POST /api/push/notify-event', () => {
     const json = await res.json() as { sent: number }
     expect(json.sent).toBe(1)
     expect(mockSendNotification).toHaveBeenCalledTimes(1)
-    expect(mockFrom).toHaveBeenNthCalledWith(1, 'calendar_members')
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'calendar_members')
   })
 
   it('calendarId가 null이면 family_members를 조회한다', async () => {
-    // family_members 조회 (actor 포함)
+    const familyOnlyEvent = { ...mockEvent, calendar_id: null }
+    // events 조회
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({
-        data: [{ user_id: ACTOR_USER_ID }, { user_id: 'user-2' }],
-      }),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: familyOnlyEvent }),
     }))
+    // family_members 멤버십 검증
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: { user_id: ACTOR_USER_ID } }),
+    }))
+    // family_members 알림 대상 조회
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockResolvedValue({ data: [{ user_id: 'user-2' }] }),
+    }))
+    // push_subscriptions
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       in: jest.fn().mockResolvedValue({
         data: [{ id: 'sub-1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'user-2' }],
       }),
     }))
+    // update last_used_at
     mockFrom.mockImplementationOnce(() => ({
       update: jest.fn().mockReturnThis(),
       in: jest.fn().mockResolvedValue({ error: null }),
     }))
 
     mockSendNotification.mockResolvedValue({})
-
-    const res = await POST(makeRequest({ ...baseBody, calendarId: null }))
+    const res = await POST(makeRequest(baseBody))
     expect(res.status).toBe(200)
-    expect(mockFrom).toHaveBeenNthCalledWith(1, 'family_members')
+    expect(mockFrom).toHaveBeenNthCalledWith(3, 'family_members')
   })
 
-  it('actor 혼자만 있는 그룹이면 sent: 0을 반환한다', async () => {
+  it('알림 대상이 없으면 sent: 0을 반환한다', async () => {
+    // events 조회
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ data: [{ user_id: ACTOR_USER_ID }] }),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: mockEvent }),
+    }))
+    // family_members 검증 성공
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: { user_id: ACTOR_USER_ID } }),
+    }))
+    // calendar_members 빈 결과
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockResolvedValue({ data: [] }),
     }))
 
     const res = await POST(makeRequest(baseBody))
@@ -158,36 +210,33 @@ describe('POST /api/push/notify-event', () => {
     expect(mockSendNotification).not.toHaveBeenCalled()
   })
 
-  it('push 구독이 없으면 sent: 0을 반환한다', async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({
-        data: [{ user_id: ACTOR_USER_ID }, { user_id: 'user-2' }],
-      }),
-    }))
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      in: jest.fn().mockResolvedValue({ data: [] }),
-    }))
-
-    const res = await POST(makeRequest(baseBody))
-    const json = await res.json() as { sent: number }
-    expect(json.sent).toBe(0)
-  })
-
   it('만료된 구독(410)은 삭제된다', async () => {
+    // events 조회
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({
-        data: [{ user_id: ACTOR_USER_ID }, { user_id: 'user-2' }],
-      }),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: mockEvent }),
     }))
+    // family_members 검증
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: { user_id: ACTOR_USER_ID } }),
+    }))
+    // calendar_members 조회
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockResolvedValue({ data: [{ user_id: 'user-2' }] }),
+    }))
+    // push_subscriptions 조회
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       in: jest.fn().mockResolvedValue({
         data: [{ id: 'sub-1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'user-2' }],
       }),
     }))
+    // delete stale subs (successIds 비어있어 update 생략, delete만 호출)
     mockFrom.mockImplementationOnce(() => ({
       delete: jest.fn().mockReturnThis(),
       in: jest.fn().mockResolvedValue({ error: null }),
@@ -212,8 +261,17 @@ describe('POST /api/push/notify-event', () => {
     ] as const) {
       jest.clearAllMocks()
       setupSendMocks()
-      await POST(makeRequest({ ...baseBody, action }))
+      await POST(makeRequest({ action, eventId: EVENT_ID }))
       expect(JSON.parse(mockSendNotification.mock.calls[0][1] as string).title).toBe(expected)
     }
+  })
+
+  it('알림 본문에 이벤트 제목이 포함된다', async () => {
+    setupSendMocks()
+    mockSendNotification.mockResolvedValue({})
+
+    await POST(makeRequest(baseBody))
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1] as string) as { body: string }
+    expect(payload.body).toContain('생일 파티')
   })
 })

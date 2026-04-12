@@ -2,15 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { dispatchPushNotifications } from '@/lib/push-utils'
+import type { EventAction } from '@/types/push'
 
-export type EventAction = 'created' | 'updated' | 'deleted'
-
-export interface NotifyEventRequest {
+interface NotifyEventRequest {
   action: EventAction
-  title: string
-  startAt: string
-  familyId: string
-  calendarId: string | null
+  eventId: string
 }
 
 export async function POST(req: NextRequest) {
@@ -19,35 +15,54 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { action, title, startAt, familyId, calendarId } =
-    (await req.json()) as NotifyEventRequest
+  const { action, eventId } = (await req.json()) as NotifyEventRequest
 
-  if (!action || !title || !familyId) {
+  if (!action || !eventId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  // 알림 대상 조회 + 멤버십 검증 (actor 포함해서 전체 조회 후 필터)
-  let allUserIds: string[]
+  // 이벤트를 DB에서 직접 조회해 payload를 구성 (클라이언트 데이터 비신뢰)
+  const { data: event } = await supabaseAdmin
+    .from('events')
+    .select('id, title, start_at, calendar_id, family_id')
+    .eq('id', eventId)
+    .maybeSingle()
 
-  if (calendarId) {
-    const { data } = await supabaseAdmin
-      .from('calendar_members')
-      .select('user_id')
-      .eq('calendar_id', calendarId)
-    allUserIds = (data ?? []).map((m) => m.user_id)
-  } else {
-    const { data } = await supabaseAdmin
-      .from('family_members')
-      .select('user_id')
-      .eq('family_id', familyId)
-    allUserIds = (data ?? []).map((m) => m.user_id)
+  if (!event) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 })
   }
 
-  if (!allUserIds.includes(actorUserId)) {
+  // actor가 해당 가족 멤버인지 검증
+  const { data: membership } = await supabaseAdmin
+    .from('family_members')
+    .select('user_id')
+    .eq('family_id', event.family_id)
+    .eq('user_id', actorUserId)
+    .maybeSingle()
+
+  if (!membership) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const targetUserIds = allUserIds.filter((id) => id !== actorUserId)
+  // 알림 대상: calendarId가 있으면 calendar_members, 없으면 family_members (본인 제외)
+  let targetUserIds: string[]
+
+  if (event.calendar_id) {
+    const { data: members } = await supabaseAdmin
+      .from('calendar_members')
+      .select('user_id')
+      .eq('calendar_id', event.calendar_id)
+      .neq('user_id', actorUserId)
+    targetUserIds = (members ?? []).map((m) => m.user_id)
+  } else {
+    const { data: members } = await supabaseAdmin
+      .from('family_members')
+      .select('user_id')
+      .eq('family_id', event.family_id)
+      .neq('user_id', actorUserId)
+    targetUserIds = (members ?? []).map((m) => m.user_id)
+  }
+
   if (targetUserIds.length === 0) return NextResponse.json({ sent: 0 })
 
   const { data: subs } = await supabaseAdmin
@@ -59,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   const payload = JSON.stringify({
     title: buildTitle(action),
-    body: buildBody(action, title, startAt),
+    body: buildBody(action, event.title, event.start_at),
     url: '/',
   })
 
