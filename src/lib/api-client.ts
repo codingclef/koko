@@ -111,3 +111,19 @@ export async function patchJsonWithAuth<TResponse>(
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 }
+
+export async function deleteWithAuth<TResponse = void>(
+  input: string,
+  init?: Omit<RequestInit, 'method'>
+): Promise<TResponse> {
+  const authHeaders = await getAuthHeaders()
+
+  return requestJson<TResponse>(input, {
+    ...init,
+    method: 'DELETE',
+    headers: {
+      ...(init?.headers ?? {}),
+      ...authHeaders,
+    },
+  })
+}

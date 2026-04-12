@@ -188,62 +188,6 @@ export async function getEventsByMonth(
   return data ?? []
 }
 
-export async function createEvent(params: {
-  familyId: string
-  userId: string
-  calendarId: string | null
-  title: string
-  description: string | null
-  startAt: string
-  endAt: string | null
-  isAllDay: boolean
-}): Promise<CalendarEvent> {
-  const { data, error } = await supabase
-    .from('events')
-    .insert({
-      family_id: params.familyId,
-      created_by: params.userId,
-      calendar_id: params.calendarId,
-      title: params.title,
-      description: params.description,
-      start_at: params.startAt,
-      end_at: params.endAt,
-      is_all_day: params.isAllDay,
-    })
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateEvent(
-  eventId: string,
-  updates: {
-    calendarId?: string | null
-    title?: string
-    description?: string | null
-    startAt?: string
-    endAt?: string | null
-    isAllDay?: boolean
-  }
-): Promise<void> {
-  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (updates.calendarId !== undefined) payload.calendar_id = updates.calendarId
-  if (updates.title !== undefined) payload.title = updates.title
-  if (updates.description !== undefined) payload.description = updates.description
-  if (updates.startAt !== undefined) payload.start_at = updates.startAt
-  if (updates.endAt !== undefined) payload.end_at = updates.endAt
-  if (updates.isAllDay !== undefined) payload.is_all_day = updates.isAllDay
-
-  const { error } = await supabase.from('events').update(payload).eq('id', eventId)
-  if (error) throw error
-}
-
-export async function deleteEvent(eventId: string): Promise<void> {
-  const { error } = await supabase.from('events').delete().eq('id', eventId)
-  if (error) throw error
-}
-
 // ── Reminders ──────────────────────────────────────────────
 
 export async function getReminders(eventId: string): Promise<EventReminder[]> {
@@ -254,17 +198,4 @@ export async function getReminders(eventId: string): Promise<EventReminder[]> {
     .order('remind_minutes_before', { ascending: true })
   if (error) throw error
   return data ?? []
-}
-
-export async function setReminders(eventId: string, minutesList: number[]): Promise<void> {
-  const { error: delError } = await supabase
-    .from('event_reminders')
-    .delete()
-    .eq('event_id', eventId)
-  if (delError) throw delError
-  if (minutesList.length === 0) return
-  const { error } = await supabase
-    .from('event_reminders')
-    .insert(minutesList.map((m) => ({ event_id: eventId, remind_minutes_before: m })))
-  if (error) throw error
 }
