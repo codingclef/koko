@@ -14,9 +14,9 @@ Read this first, then follow the linked project documents before making changes.
 ## Read Order
 
 1. `AGENTS.md` — repo-wide working rules
-2. `PROJECT_MAP.md` — feature map, ownership map, data model summary
-3. `PATTERNS.md` — implementation conventions and forbidden patterns
-4. `CHALLENGES.md` — background on past bugs and why current rules exist
+2. `docs/PROJECT_MAP.md` — feature map, ownership map, data model summary
+3. `docs/PATTERNS.md` — implementation conventions and forbidden patterns
+4. `docs/CHALLENGES.md` — background on past bugs and why current rules exist
 
 ## Project Summary
 
@@ -55,7 +55,7 @@ These rules apply to every task without exception.
 
 ## Working Rules
 
-1. Before changing features or architecture, read `PATTERNS.md`.
+1. Before changing features or architecture, read `docs/PATTERNS.md`.
 2. When asking the user to run a command or tool, include a Korean explanation.
 3. Whenever code is written or modified, add or update tests with it.
 4. After writing or modifying code, run `npx tsc --noEmit` before considering the work complete.

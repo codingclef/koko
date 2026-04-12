@@ -91,9 +91,9 @@ supabase/
 프로젝트를 수정할 때는 아래 문서 순서로 읽는 것을 권장합니다.
 
 1. `AGENTS.md`
-2. `PROJECT_MAP.md`
-3. `PATTERNS.md`
-4. `CHALLENGES.md`
+2. `docs/PROJECT_MAP.md`
+3. `docs/PATTERNS.md`
+4. `docs/CHALLENGES.md`
 
 ## 주요 파일
 
@@ -183,5 +183,5 @@ npx tsc --noEmit
 
 ## 문서 메모
 
-`PATTERNS.md`는 유지해야 할 구현 규칙을 정리합니다.
-`CHALLENGES.md`는 그 규칙이 생긴 버그와 회귀 배경을 기록합니다.
+`docs/PATTERNS.md`는 유지해야 할 구현 규칙을 정리합니다.
+`docs/CHALLENGES.md`는 그 규칙이 생긴 버그와 회귀 배경을 기록합니다.

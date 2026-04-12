@@ -91,9 +91,9 @@ supabase/
 プロジェクトを変更するときは、次の順に読むのを推奨します。
 
 1. `AGENTS.md`
-2. `PROJECT_MAP.md`
-3. `PATTERNS.md`
-4. `CHALLENGES.md`
+2. `docs/PROJECT_MAP.md`
+3. `docs/PATTERNS.md`
+4. `docs/CHALLENGES.md`
 
 ## 主要ファイル
 
@@ -183,5 +183,5 @@ npx tsc --noEmit
 
 ## ドキュメントメモ
 
-`PATTERNS.md` は維持すべき実装ルールをまとめます。
-`CHALLENGES.md` はそのルールが生まれた不具合と回帰背景を記録します。
+`docs/PATTERNS.md` は維持すべき実装ルールをまとめます。
+`docs/CHALLENGES.md` はそのルールが生まれた不具合と回帰背景を記録します。
