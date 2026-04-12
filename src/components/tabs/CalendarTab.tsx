@@ -15,11 +15,7 @@ import {
   getCalendarMembers,
   setCalendarMembers,
   getFamilyMembers,
-  createEvent,
-  updateEvent,
-  deleteEvent,
   getReminders,
-  setReminders,
   type CalendarEvent,
   type FamilyMember,
   type SaveResult,
@@ -33,9 +29,8 @@ import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
 import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import { postJsonWithAuth } from '@/lib/api-client'
+import { postJsonWithAuth, patchJsonWithAuth, deleteWithAuth } from '@/lib/api-client'
 import type { Calendar } from '@/lib/calendar'
-import type { EventAction } from '@/types/push'
 
 interface Props extends AuthState {
   preferences: UserPreferences | null
@@ -467,14 +462,6 @@ export function CalendarTab({
     }
   }
 
-  const notifyEventChange = useCallback(async (action: EventAction, eventId: string) => {
-    try {
-      await postJsonWithAuth('/api/push/notify-event', { action, eventId })
-    } catch (e) {
-      console.warn('[CalendarTab] notifyEventChange failed:', e)
-    }
-  }, [])
-
   const handleEventSave = async (params: {
     calendarId: string | null
     title: string
@@ -484,44 +471,32 @@ export function CalendarTab({
     isAllDay: boolean
     reminderMinutes: number[]
   }) => {
-    if (!familyId || !user) return
+    if (!familyId) return
     setMutationError(null)
 
     try {
       clearFamilyMonthEventsCache(familyId)
 
       if (editingEvent?.event) {
-        const old = editingEvent.event
-        const changed =
-          old.title !== params.title ||
-          old.start_at !== params.startAt ||
-          old.end_at !== params.endAt ||
-          old.description !== params.description ||
-          old.calendar_id !== params.calendarId ||
-          old.is_all_day !== params.isAllDay
-        await updateEvent(old.id, {
+        await patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
           calendarId: params.calendarId,
           title: params.title,
           description: params.description,
           startAt: params.startAt,
           endAt: params.endAt,
           isAllDay: params.isAllDay,
+          reminderMinutes: params.reminderMinutes,
         })
-        await setReminders(old.id, params.reminderMinutes)
-        if (changed) void notifyEventChange('updated', old.id)
       } else {
-        const evt = await createEvent({
-          familyId,
-          userId: user.id,
+        await postJsonWithAuth('/api/events', {
           calendarId: params.calendarId,
           title: params.title,
           description: params.description,
           startAt: params.startAt,
           endAt: params.endAt,
           isAllDay: params.isAllDay,
+          reminderMinutes: params.reminderMinutes,
         })
-        await setReminders(evt.id, params.reminderMinutes)
-        void notifyEventChange('created', evt.id)
       }
 
       await refreshEvents()
@@ -535,17 +510,12 @@ export function CalendarTab({
   }
 
   const handleEventDelete = async () => {
-    if (!selectedEvent) return
-    if (!familyId) return
+    if (!selectedEvent || !familyId) return
     setMutationError(null)
 
-    const eventId = selectedEvent.id
-
     try {
-      // 삭제 전에 알림 발송 (이벤트가 DB에 존재할 때 서버가 조회할 수 있도록)
-      await notifyEventChange('deleted', eventId)
       clearFamilyMonthEventsCache(familyId)
-      await deleteEvent(eventId)
+      await deleteWithAuth(`/api/events/${selectedEvent.id}`)
       setSelectedEvent(null)
       await refreshEvents()
       broadcast()

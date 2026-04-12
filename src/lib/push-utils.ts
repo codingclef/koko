@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import webpush from '@/lib/webpush'
+import type { EventAction } from '@/types/push'
 
 type PushSub = { id: string; endpoint: string; p256dh: string; auth: string }
 
@@ -39,4 +40,67 @@ export async function dispatchPushNotifications(
   ])
 
   return { sent: successIds.length, removed: staleIds.length }
+}
+
+/**
+ * 이벤트 action에 따라 가족/캘린더 멤버에게 푸시 알림을 발송한다.
+ * actor 본인은 제외된다.
+ */
+export async function sendEventNotification(params: {
+  familyId: string
+  calendarId: string | null
+  actorUserId: string
+  action: EventAction
+  eventTitle: string
+  eventStartAt: string
+}): Promise<void> {
+  const { familyId, calendarId, actorUserId, action, eventTitle, eventStartAt } = params
+
+  let targetUserIds: string[]
+
+  if (calendarId) {
+    const { data: members } = await supabaseAdmin
+      .from('calendar_members')
+      .select('user_id')
+      .eq('calendar_id', calendarId)
+      .neq('user_id', actorUserId)
+    targetUserIds = (members ?? []).map((m) => m.user_id)
+  } else {
+    const { data: members } = await supabaseAdmin
+      .from('family_members')
+      .select('user_id')
+      .eq('family_id', familyId)
+      .neq('user_id', actorUserId)
+    targetUserIds = (members ?? []).map((m) => m.user_id)
+  }
+
+  if (targetUserIds.length === 0) return
+
+  const { data: subs } = await supabaseAdmin
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .in('user_id', targetUserIds)
+
+  if (!subs?.length) return
+
+  const payload = JSON.stringify({
+    title: buildEventNotificationTitle(action),
+    body: buildEventNotificationBody(action, eventTitle, eventStartAt),
+    url: '/',
+  })
+
+  await dispatchPushNotifications(subs, payload)
+}
+
+function buildEventNotificationTitle(action: EventAction): string {
+  if (action === 'created') return '새 일정이 추가됐어요'
+  if (action === 'updated') return '일정이 변경됐어요'
+  return '일정이 삭제됐어요'
+}
+
+function buildEventNotificationBody(action: EventAction, title: string, startAt: string): string {
+  if (action === 'deleted') return title
+  const d = new Date(startAt)
+  const dateStr = d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+  return `${title} · ${dateStr}`
 }

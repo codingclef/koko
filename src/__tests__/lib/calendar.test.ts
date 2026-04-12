@@ -8,11 +8,7 @@ import {
   setCalendarMembers,
   getFamilyMembers,
   getEventsByMonth,
-  createEvent,
-  updateEvent,
-  deleteEvent,
   getReminders,
-  setReminders,
 } from '@/lib/calendar'
 
 function makeChain(result: { data: unknown; error: unknown }) {
@@ -243,63 +239,6 @@ describe('getEventsByMonth', () => {
   })
 })
 
-// ── createEvent ───────────────────────────────────────────
-
-describe('createEvent', () => {
-  it('생성된 이벤트를 반환한다', async () => {
-    const mockEvt = { id: 'evt-1', title: '생일' }
-    mockFrom.mockReturnValue(makeChain({ data: mockEvt, error: null }))
-    const result = await createEvent({
-      familyId: 'fam-1',
-      userId: 'user-1',
-      calendarId: 'cal-1',
-      title: '생일',
-      description: null,
-      startAt: '2026-03-15T00:00:00Z',
-      endAt: null,
-      isAllDay: true,
-    })
-    expect(result).toEqual(mockEvt)
-  })
-
-  it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'insert error' } }))
-    await expect(createEvent({
-      familyId: 'fam-1', userId: 'user-1', calendarId: null,
-      title: '생일', description: null,
-      startAt: '2026-03-15T00:00:00Z', endAt: null, isAllDay: true,
-    })).rejects.toEqual({ message: 'insert error' })
-  })
-})
-
-// ── updateEvent ───────────────────────────────────────────
-
-describe('updateEvent', () => {
-  it('에러 없이 완료된다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(updateEvent('evt-1', { title: '새제목' })).resolves.toBeUndefined()
-  })
-
-  it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'update error' } }))
-    await expect(updateEvent('evt-1', { title: '새제목' })).rejects.toEqual({ message: 'update error' })
-  })
-})
-
-// ── deleteEvent ───────────────────────────────────────────
-
-describe('deleteEvent', () => {
-  it('에러 없이 완료된다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(deleteEvent('evt-1')).resolves.toBeUndefined()
-  })
-
-  it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
-    await expect(deleteEvent('evt-1')).rejects.toEqual({ message: 'delete error' })
-  })
-})
-
 // ── getReminders ──────────────────────────────────────────
 
 describe('getReminders', () => {
@@ -317,23 +256,3 @@ describe('getReminders', () => {
   })
 })
 
-// ── setReminders ──────────────────────────────────────────
-
-describe('setReminders', () => {
-  it('기존 알림을 삭제하고 새로 등록한다', async () => {
-    mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
-    await setReminders('evt-1', [30, 60])
-    expect(mockFrom).toHaveBeenCalledWith('event_reminders')
-  })
-
-  it('빈 배열이면 삭제만 한다', async () => {
-    mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
-    await setReminders('evt-1', [])
-    expect(mockFrom).toHaveBeenCalledTimes(1)
-  })
-
-  it('삭제 시 error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
-    await expect(setReminders('evt-1', [30])).rejects.toEqual({ message: 'delete error' })
-  })
-})
