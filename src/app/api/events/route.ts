@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId, assertCalendarWriteAccess } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { fireEventNotification } from '@/lib/push-utils'
+import { sendEventNotification } from '@/lib/push-utils'
 
 interface CreateEventRequest {
   calendarId: string | null
@@ -62,13 +62,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 })
   }
 
-  fireEventNotification({
-    familyId: member.family_id,
-    calendarId,
-    actorUserId,
-    action: 'created',
-    eventTitle: title,
-    eventStartAt: startAt,
+  after(async () => {
+    await sendEventNotification({
+      familyId: member.family_id,
+      calendarId,
+      actorUserId,
+      action: 'created',
+      eventTitle: title,
+      eventStartAt: startAt,
+    })
   })
 
   return NextResponse.json(events[0], { status: 201 })

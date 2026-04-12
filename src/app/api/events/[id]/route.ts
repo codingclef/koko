@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId, isFamilyMember, assertCalendarWriteAccess } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { fireEventNotification } from '@/lib/push-utils'
+import { sendEventNotification } from '@/lib/push-utils'
 
 interface UpdateEventRequest {
   calendarId?: string | null
@@ -85,13 +85,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (changed) {
-    fireEventNotification({
-      familyId: existing.family_id,
-      calendarId: newCalendarId,
-      actorUserId,
-      action: 'updated',
-      eventTitle: newTitle,
-      eventStartAt: newStartAt,
+    after(async () => {
+      await sendEventNotification({
+        familyId: existing.family_id,
+        calendarId: newCalendarId,
+        actorUserId,
+        action: 'updated',
+        eventTitle: newTitle,
+        eventStartAt: newStartAt,
+      })
     })
   }
 
@@ -129,13 +131,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Failed to delete event' }, { status: 500 })
   }
 
-  fireEventNotification({
-    familyId: existing.family_id,
-    calendarId: existing.calendar_id,
-    actorUserId,
-    action: 'deleted',
-    eventTitle: existing.title,
-    eventStartAt: existing.start_at,
+  after(async () => {
+    await sendEventNotification({
+      familyId: existing.family_id,
+      calendarId: existing.calendar_id,
+      actorUserId,
+      action: 'deleted',
+      eventTitle: existing.title,
+      eventStartAt: existing.start_at,
+    })
   })
 
   return new NextResponse(null, { status: 204 })

@@ -1,13 +1,21 @@
 /**
  * @jest-environment node
  */
+jest.mock('next/server', () => {
+  const actual = jest.requireActual('next/server')
+  return {
+    ...actual,
+    after: (callback: () => unknown) => callback(),
+  }
+})
+
 import { DELETE } from '@/app/api/events/[id]/route'
 import { NextRequest } from 'next/server'
 
 const mockSendEventNotification = jest.fn()
 
 jest.mock('@/lib/push-utils', () => ({
-  fireEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
+  sendEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
 }))
 
 const mockGetUser = jest.fn()

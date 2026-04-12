@@ -21,8 +21,21 @@ export async function dispatchPushNotifications(
         )
         successIds.push(sub.id)
       } catch (err: unknown) {
-        const status = (err as { statusCode?: number }).statusCode
+        const error = err as {
+          statusCode?: number
+          body?: string
+          message?: string
+        }
+        const status = error.statusCode
         if (status === 404 || status === 410) staleIds.push(sub.id)
+
+        console.error('[push-utils] sendNotification failed:', {
+          subscriptionId: sub.id,
+          endpointHost: getEndpointHost(sub.endpoint),
+          statusCode: status ?? null,
+          message: error.message ?? 'unknown error',
+          body: error.body ?? null,
+        })
       }
     })
   )
@@ -98,6 +111,14 @@ export function fireEventNotification(params: EventNotificationParams): void {
   void sendEventNotification(params).catch((err) =>
     console.error('[push-utils] sendEventNotification failed:', err)
   )
+}
+
+function getEndpointHost(endpoint: string): string {
+  try {
+    return new URL(endpoint).host
+  } catch {
+    return 'invalid-endpoint'
+  }
 }
 
 function buildEventNotificationTitle(action: EventAction): string {
