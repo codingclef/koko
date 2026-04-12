@@ -1,13 +1,21 @@
 /**
  * @jest-environment node
  */
+jest.mock('next/server', () => {
+  const actual = jest.requireActual('next/server')
+  return {
+    ...actual,
+    after: (callback: () => unknown) => callback(),
+  }
+})
+
 import { PATCH } from '@/app/api/events/[id]/route'
 import { NextRequest } from 'next/server'
 
 const mockSendEventNotification = jest.fn()
 
 jest.mock('@/lib/push-utils', () => ({
-  fireEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
+  sendEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
 }))
 
 const mockGetUser = jest.fn()
@@ -145,6 +153,7 @@ describe('PATCH /api/events/[id]', () => {
   it('변경사항 있으면 204를 반환하고 알림을 보낸다', async () => {
     mockEventFetch()
     mockCalendarAccess()
+    mockSendEventNotification.mockResolvedValue(undefined)
     const res = await PATCH(makeRequest({ title: '새 제목' }), makeParams())
     expect(res.status).toBe(204)
     expect(mockSendEventNotification).toHaveBeenCalledWith(

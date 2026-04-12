@@ -1,13 +1,21 @@
 /**
  * @jest-environment node
  */
+jest.mock('next/server', () => {
+  const actual = jest.requireActual('next/server')
+  return {
+    ...actual,
+    after: (callback: () => unknown) => callback(),
+  }
+})
+
 import { POST } from '@/app/api/events/route'
 import { NextRequest } from 'next/server'
 
 const mockSendEventNotification = jest.fn()
 
 jest.mock('@/lib/push-utils', () => ({
-  fireEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
+  sendEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
 }))
 
 const mockGetUser = jest.fn()
@@ -127,6 +135,7 @@ describe('POST /api/events', () => {
     mockFamilyMember()
     mockCalendarAccess()
     mockRpcSuccess()
+    mockSendEventNotification.mockResolvedValue(undefined)
 
     const res = await POST(makeRequest(baseBody))
     expect(res.status).toBe(201)
@@ -149,6 +158,7 @@ describe('POST /api/events', () => {
   it('calendarId가 null이면 캘린더 검증을 건너뛴다', async () => {
     mockFamilyMember()
     mockRpcSuccess()
+    mockSendEventNotification.mockResolvedValue(undefined)
 
     const res = await POST(makeRequest({ ...baseBody, calendarId: null }))
     expect(res.status).toBe(201)
