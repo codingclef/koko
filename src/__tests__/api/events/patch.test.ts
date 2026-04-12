@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server'
 const mockSendEventNotification = jest.fn()
 
 jest.mock('@/lib/push-utils', () => ({
-  sendEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
+  fireEventNotification: (...args: unknown[]) => mockSendEventNotification(...args),
 }))
 
 const mockGetUser = jest.fn()

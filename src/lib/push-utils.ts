@@ -42,18 +42,20 @@ export async function dispatchPushNotifications(
   return { sent: successIds.length, removed: staleIds.length }
 }
 
-/**
- * 이벤트 action에 따라 가족/캘린더 멤버에게 푸시 알림을 발송한다.
- * actor 본인은 제외된다.
- */
-export async function sendEventNotification(params: {
+export interface EventNotificationParams {
   familyId: string
   calendarId: string | null
   actorUserId: string
   action: EventAction
   eventTitle: string
   eventStartAt: string
-}): Promise<void> {
+}
+
+/**
+ * 이벤트 action에 따라 가족/캘린더 멤버에게 푸시 알림을 발송한다.
+ * actor 본인은 제외된다.
+ */
+export async function sendEventNotification(params: EventNotificationParams): Promise<void> {
   const { familyId, calendarId, actorUserId, action, eventTitle, eventStartAt } = params
 
   let targetUserIds: string[]
@@ -90,6 +92,12 @@ export async function sendEventNotification(params: {
   })
 
   await dispatchPushNotifications(subs, payload)
+}
+
+export function fireEventNotification(params: EventNotificationParams): void {
+  void sendEventNotification(params).catch((err) =>
+    console.error('[push-utils] sendEventNotification failed:', err)
+  )
 }
 
 function buildEventNotificationTitle(action: EventAction): string {

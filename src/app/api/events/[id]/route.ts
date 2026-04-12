@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId, isFamilyMember, assertCalendarWriteAccess } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { sendEventNotification } from '@/lib/push-utils'
+import { fireEventNotification } from '@/lib/push-utils'
 
 interface UpdateEventRequest {
   calendarId?: string | null
@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (changed) {
-    void sendEventNotification({
+    fireEventNotification({
       familyId: existing.family_id,
       calendarId: (updates.calendar_id !== undefined ? updates.calendar_id : existing.calendar_id) as string | null,
       actorUserId,
@@ -139,7 +139,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Failed to delete event' }, { status: 500 })
   }
 
-  void sendEventNotification({
+  fireEventNotification({
     familyId: existing.family_id,
     calendarId: existing.calendar_id,
     actorUserId,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId, assertCalendarWriteAccess } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { sendEventNotification } from '@/lib/push-utils'
+import { fireEventNotification } from '@/lib/push-utils'
 
 interface CreateEventRequest {
   calendarId: string | null
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  void sendEventNotification({
+  fireEventNotification({
     familyId: member.family_id,
     calendarId,
     actorUserId,
