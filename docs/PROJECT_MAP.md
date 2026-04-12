@@ -276,8 +276,8 @@ Important notes:
 
 ## 8. Rules to Keep in Mind Before Editing
 
-- Read `PATTERNS.md` before feature work.
-- Read `CHALLENGES.md` when touching auth, realtime, RLS, shopping optimistic UI, or mobile modal behavior.
+- Read `docs/PATTERNS.md` before feature work.
+- Read `docs/CHALLENGES.md` when touching auth, realtime, RLS, shopping optimistic UI, or mobile modal behavior.
 - Do not replace the `TabsShell` keep-alive structure with route-per-tab navigation without understanding the tradeoff.
 - Do not switch realtime back to `postgres_changes`.
 - Do not call `exchangeCodeForSession`.
@@ -295,5 +295,5 @@ Important notes:
 - `src/lib/preferences.ts`
 - `src/hooks/useRealtimeSync.ts`
 - `src/types/database.ts`
-- `PATTERNS.md`
-- `CHALLENGES.md`
+- `docs/PATTERNS.md`
+- `docs/CHALLENGES.md`

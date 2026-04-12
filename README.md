@@ -91,9 +91,9 @@ supabase/
 Start with these repo docs when changing the project:
 
 1. `AGENTS.md`
-2. `PROJECT_MAP.md`
-3. `PATTERNS.md`
-4. `CHALLENGES.md`
+2. `docs/PROJECT_MAP.md`
+3. `docs/PATTERNS.md`
+4. `docs/CHALLENGES.md`
 
 ## Key Directories
 
@@ -183,5 +183,5 @@ Important current RPC and migration-driven behavior:
 
 ## Documentation Notes
 
-`PATTERNS.md` captures the implementation rules that should be preserved.
-`CHALLENGES.md` records the bugs and regressions that produced those rules.
+`docs/PATTERNS.md` captures the implementation rules that should be preserved.
+`docs/CHALLENGES.md` records the bugs and regressions that produced those rules.

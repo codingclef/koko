@@ -3,7 +3,7 @@
 # Koko Implementation Patterns
 
 이 문서는 "현재 코드베이스에서 반복적으로 검증된 구현 방식"만 정리한다.
-기능 소개나 파일 목록은 `PROJECT_MAP.md`를 보고, 과거 버그의 배경은 `CHALLENGES.md`를 본다.
+기능 소개나 파일 목록은 `docs/PROJECT_MAP.md`를 보고, 과거 버그의 배경은 `docs/CHALLENGES.md`를 본다.
 
 ## 1. Layer Rules
 
@@ -130,4 +130,4 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 모달, 탭 셸, 모바일 터치 동작을 바꿀 때
 - OAuth callback이나 이메일 허용 목록 흐름을 바꿀 때
 
-위 경우는 먼저 `CHALLENGES.md`를 읽고 같은 버그를 재도입하지 않는지 확인한다.
+위 경우는 먼저 `docs/CHALLENGES.md`를 읽고 같은 버그를 재도입하지 않는지 확인한다.
