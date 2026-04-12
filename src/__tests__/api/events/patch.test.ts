@@ -12,11 +12,13 @@ jest.mock('@/lib/push-utils', () => ({
 
 const mockGetUser = jest.fn()
 const mockFrom = jest.fn()
+const mockRpc = jest.fn()
 
 jest.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: {
     auth: { getUser: (token: unknown) => mockGetUser(token) },
     from: (table: unknown) => mockFrom(table),
+    rpc: (fn: unknown, args: unknown) => mockRpc(fn, args),
   },
 }))
 
@@ -59,6 +61,7 @@ beforeEach(() => {
     data: { user: { id: ACTOR_USER_ID, email: 'actor@test.com' } },
     error: null,
   })
+  mockRpc.mockResolvedValue({ error: null })
 })
 
 function mockEventFetch(existing: Record<string, unknown> | null = mockExisting) {
@@ -93,13 +96,6 @@ function mockFamilyAccess(isMember = true) {
     maybeSingle: jest.fn().mockResolvedValue(
       isMember ? { data: { user_id: ACTOR_USER_ID } } : { data: null }
     ),
-  }))
-}
-
-function mockEventUpdate() {
-  mockFrom.mockImplementationOnce(() => ({
-    update: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockResolvedValue({ error: null }),
   }))
 }
 
@@ -141,7 +137,6 @@ describe('PATCH /api/events/[id]', () => {
   it('변경사항 없으면 204를 반환하고 알림을 보내지 않는다', async () => {
     mockEventFetch()
     mockCalendarAccess()
-    mockEventUpdate()
     const res = await PATCH(makeRequest({ title: mockExisting.title }), makeParams())
     expect(res.status).toBe(204)
     expect(mockSendEventNotification).not.toHaveBeenCalled()
@@ -150,8 +145,6 @@ describe('PATCH /api/events/[id]', () => {
   it('변경사항 있으면 204를 반환하고 알림을 보낸다', async () => {
     mockEventFetch()
     mockCalendarAccess()
-    mockEventUpdate()
-    mockSendEventNotification.mockResolvedValue(undefined)
     const res = await PATCH(makeRequest({ title: '새 제목' }), makeParams())
     expect(res.status).toBe(204)
     expect(mockSendEventNotification).toHaveBeenCalledWith(
@@ -159,34 +152,31 @@ describe('PATCH /api/events/[id]', () => {
     )
   })
 
-  it('reminderMinutes가 있으면 event_reminders를 교체한다', async () => {
+  it('update_event_with_reminders RPC를 호출한다', async () => {
     mockEventFetch()
     mockCalendarAccess()
-    mockEventUpdate()
-    // event_reminders delete
-    mockFrom.mockImplementationOnce(() => ({
-      delete: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ error: null }),
-    }))
-    // event_reminders insert
-    const reminderInsert = jest.fn().mockResolvedValue({ error: null })
-    mockFrom.mockImplementationOnce(() => ({ insert: reminderInsert }))
-    mockSendEventNotification.mockResolvedValue(undefined)
-
     await PATCH(makeRequest({ reminderMinutes: [30] }), makeParams())
-    expect(mockFrom).toHaveBeenCalledWith('event_reminders')
-    expect(reminderInsert).toHaveBeenCalled()
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_event_with_reminders',
+      expect.objectContaining({ p_reminder_minutes: [30] })
+    )
   })
 
-  it('reminder delete 실패 시 500을 반환한다', async () => {
+  it('reminderMinutes 미제공 시 p_reminder_minutes를 null로 전달한다', async () => {
     mockEventFetch()
     mockCalendarAccess()
-    mockEventUpdate()
-    mockFrom.mockImplementationOnce(() => ({
-      delete: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockResolvedValue({ error: { message: 'delete error' } }),
-    }))
-    const res = await PATCH(makeRequest({ reminderMinutes: [30] }), makeParams())
+    await PATCH(makeRequest({ title: '새 제목' }), makeParams())
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_event_with_reminders',
+      expect.objectContaining({ p_reminder_minutes: null })
+    )
+  })
+
+  it('RPC 실패 시 500을 반환한다', async () => {
+    mockEventFetch()
+    mockCalendarAccess()
+    mockRpc.mockResolvedValue({ error: { message: 'rpc error' } })
+    const res = await PATCH(makeRequest({ title: '새 제목' }), makeParams())
     expect(res.status).toBe(500)
   })
 })

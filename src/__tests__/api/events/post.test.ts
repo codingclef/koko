@@ -12,17 +12,20 @@ jest.mock('@/lib/push-utils', () => ({
 
 const mockGetUser = jest.fn()
 const mockFrom = jest.fn()
+const mockRpc = jest.fn()
 
 jest.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: {
     auth: { getUser: (token: unknown) => mockGetUser(token) },
     from: (table: unknown) => mockFrom(table),
+    rpc: (fn: unknown, args: unknown) => mockRpc(fn, args),
   },
 }))
 
 const ACTOR_USER_ID = 'actor-user'
 const FAMILY_ID = 'fam-1'
 const CALENDAR_ID = 'cal-1'
+const CREATED_EVENT = { id: 'evt-1', title: '생일 파티', family_id: FAMILY_ID }
 
 function makeRequest(body: Record<string, unknown>, token = 'valid-token') {
   return new NextRequest('http://localhost/api/events', {
@@ -80,12 +83,12 @@ function mockCalendarAccess(calendarFound = true, isMember = true) {
   }))
 }
 
-function mockEventInsert(event: Record<string, unknown> | null = { id: 'evt-1', title: '생일 파티' }) {
-  mockFrom.mockImplementationOnce(() => ({
-    insert: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue(event ? { data: event, error: null } : { data: null, error: { message: 'insert error' } }),
-  }))
+function mockRpcSuccess(event = CREATED_EVENT) {
+  mockRpc.mockResolvedValue({ data: [event], error: null })
+}
+
+function mockRpcFailure() {
+  mockRpc.mockResolvedValue({ data: null, error: { message: 'rpc error' } })
 }
 
 describe('POST /api/events', () => {
@@ -123,8 +126,7 @@ describe('POST /api/events', () => {
   it('이벤트를 생성하고 201을 반환한다', async () => {
     mockFamilyMember()
     mockCalendarAccess()
-    mockEventInsert()
-    mockSendEventNotification.mockResolvedValue(undefined)
+    mockRpcSuccess()
 
     const res = await POST(makeRequest(baseBody))
     expect(res.status).toBe(201)
@@ -132,38 +134,33 @@ describe('POST /api/events', () => {
     expect(json.id).toBe('evt-1')
   })
 
+  it('create_event_with_reminders RPC를 호출한다', async () => {
+    mockFamilyMember()
+    mockCalendarAccess()
+    mockRpcSuccess()
+
+    await POST(makeRequest({ ...baseBody, reminderMinutes: [30, 60] }))
+    expect(mockRpc).toHaveBeenCalledWith(
+      'create_event_with_reminders',
+      expect.objectContaining({ p_reminder_minutes: [30, 60] })
+    )
+  })
+
   it('calendarId가 null이면 캘린더 검증을 건너뛴다', async () => {
     mockFamilyMember()
-    mockEventInsert()
-    mockSendEventNotification.mockResolvedValue(undefined)
+    mockRpcSuccess()
 
     const res = await POST(makeRequest({ ...baseBody, calendarId: null }))
     expect(res.status).toBe(201)
     expect(mockFrom).not.toHaveBeenCalledWith('calendars')
   })
 
-  it('reminderMinutes가 있으면 event_reminders에 insert한다', async () => {
+  it('RPC 실패 시 500을 반환한다', async () => {
     mockFamilyMember()
     mockCalendarAccess()
-    mockEventInsert()
-    const reminderInsert = jest.fn().mockResolvedValue({ error: null })
-    mockFrom.mockImplementationOnce(() => ({ insert: reminderInsert }))
-    mockSendEventNotification.mockResolvedValue(undefined)
+    mockRpcFailure()
 
-    await POST(makeRequest({ ...baseBody, reminderMinutes: [30, 60] }))
-    expect(mockFrom).toHaveBeenCalledWith('event_reminders')
-    expect(reminderInsert).toHaveBeenCalled()
-  })
-
-  it('reminder insert 실패 시 500을 반환한다', async () => {
-    mockFamilyMember()
-    mockCalendarAccess()
-    mockEventInsert()
-    mockFrom.mockImplementationOnce(() => ({
-      insert: jest.fn().mockResolvedValue({ error: { message: 'reminder error' } }),
-    }))
-
-    const res = await POST(makeRequest({ ...baseBody, reminderMinutes: [30] }))
+    const res = await POST(makeRequest(baseBody))
     expect(res.status).toBe(500)
   })
 })
