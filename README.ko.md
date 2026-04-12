@@ -1,4 +1,6 @@
-# 🏠 Koko — 패밀리 허브
+<img src="public/logo.webp" alt="Koko 로고" width="72" />
+
+# Koko — 패밀리 허브
 
 **[한국어]** | [日本語](README.ja.md) | [English](README.md)
 

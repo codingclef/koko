@@ -1,207 +1,247 @@
 # 개발 과제 & 해결 기록
 
-Koko 개발 과정에서 마주친 기술적 과제와 해결 방법을 기록합니다.
+Koko 개발 과정에서 실제로 문제를 만들었거나, 다시 깨질 가능성이 높은 기술 이슈와 해결 방식을 기록한다.
+새 작업이 아래 주제와 닿아 있으면 구현 전에 먼저 읽는다.
 
 ---
 
-## 1. 브라우저 탭 간 실시간 동기화
+## 1. 브라우저 탭과 기기 간 실시간 동기화
 
 ### 과제
-장바구니 아이템을 추가/삭제할 때, 같은 브라우저에서 열린 다른 탭에 변경사항이 즉시 반영되지 않았다. 처음에는 Supabase Realtime의 `postgres_changes` 이벤트를 사용했지만, DELETE 이벤트의 `payload.old`에 `list_id` 같은 외래키 필드가 누락되어 있어 어느 목록의 아이템인지 식별이 불가능했다.
+
+같은 브라우저의 다른 탭, 또는 다른 기기에서 장보기와 캘린더 변경이 즉시 반영되지 않았다.
+초기에는 `postgres_changes`를 검토했지만, 삭제 payload 정보가 충분하지 않거나 UI 단위 refresh 경계와 잘 맞지 않았다.
 
 ### 해결
-두 레이어의 동기화 전략을 조합했다.
 
-- **같은 브라우저 내 탭 간**: Web API인 `BroadcastChannel`을 사용. WebSocket 연결 없이 동기적으로 메시지가 전달되어 지연이 없다.
-- **다른 기기 간**: Supabase Realtime의 Broadcast 채널을 사용. `postgres_changes` 대신 수동으로 `send()`를 호출해 refresh 이벤트를 전파한다.
+Supabase Realtime Broadcast 기반으로 단순화했다.
 
-또한 채널이 SUBSCRIBED 상태가 되기 전에 `send()`를 호출하면 REST API로 폴백되며 경고가 발생하는 문제가 있었다. `channelReadyRef`로 구독 완료 여부를 추적해 SUBSCRIBED 이후에만 broadcast를 전송하도록 개선했다.
+- mutation 성공 뒤 필요한 로컬 refresh를 수행한다.
+- 이어서 `refresh` broadcast를 수동 전송한다.
+- 수신 측은 같은 범위의 데이터를 다시 읽는다.
 
-```
-BroadcastChannel (same browser) ─── 즉시 동기화
-Supabase Realtime Broadcast     ─── 다른 기기 동기화
-```
+또한 채널이 `SUBSCRIBED` 되기 전에 `send()`를 호출하면 REST fallback 경고가 발생하고 메시지 누락 가능성이 있었다.
+그래서 `useRealtimeSync`에서 `channelReadyRef`를 두고, `SUBSCRIBED` 이후에만 broadcast를 보낸다.
+
+### 남은 규칙
+
+- 자동 전파를 기대하지 않는다.
+- 데이터 범위와 채널 범위를 맞춘다.
+- `channel.send()`를 직접 흩뿌리지 말고 `useRealtimeSync` 패턴을 재사용한다.
 
 ---
 
-## 2. Optimistic UI의 UUID 불일치로 인한 아이템 부활 현상
+## 2. Optimistic UI 임시 UUID로 인한 데이터 부활
 
 ### 과제
-빠른 UI 반응을 위해 서버 응답 전에 임시 UUID로 아이템을 화면에 먼저 표시(Optimistic UI)했다. 이때 다른 탭에서 Realtime으로 목록을 새로고침하면 서버의 실제 UUID로 아이템이 들어온다. 이후 Optimistic 아이템을 삭제해도 DB에는 가짜 UUID로 삭제 요청이 가서 아무것도 삭제되지 않고, 다음 새로고침 시 아이템이 다시 나타나는 "부활" 현상이 발생했다.
+
+장보기 아이템/목록을 optimistic UUID로 먼저 렌더링한 뒤, 그 임시 ID를 그대로 삭제/수정/정렬에 사용하면 서버 row와 ID가 맞지 않아 아이템이 "삭제된 것처럼 보였다가 다시 살아나는" 문제가 생겼다.
 
 ### 해결
-서버로부터 실제 응답을 받은 즉시 Optimistic 아이템을 실제 아이템으로 교체했다.
+
+서버 응답을 받는 즉시 optimistic row를 실제 DB row로 치환했다.
 
 ```typescript
-// 임시 ID로 먼저 렌더링
 setItems((prev) => [...prev, optimisticItem])
 
-// 서버 응답 후 실제 ID로 교체
 const realItem = await addShoppingItem(...)
-setItems((prev) => prev.map((i) => i.id === optimisticItem.id ? realItem : i))
+setItems((prev) =>
+  prev.map((item) => item.id === optimisticItem.id ? realItem : item)
+)
 ```
 
-이후 삭제/수정 시에는 항상 실제 서버 UUID를 사용하게 되어 문제가 해결됐다.
+### 남은 규칙
+
+- optimistic ID를 후속 mutation key로 쓰지 않는다.
+- create 계열 optimistic UI는 반드시 "실제 row 치환"까지 포함해야 한다.
 
 ---
 
-## 3. Supabase RLS(Row Level Security) 정책 위반
+## 3. Supabase RLS 정책의 재귀와 중첩 권한 실패
 
 ### 과제
-`shopping_items` 테이블의 INSERT/DELETE 시 RLS 정책에서 `42501 permission denied` 오류가 발생했다. 처음 작성한 정책은 `get_my_list_ids()` 함수를 WITH CHECK 절에서 서브쿼리로 사용했는데, RLS 컨텍스트에서 중첩 쿼리가 올바르게 동작하지 않았다.
+
+`family_members`를 직접 서브쿼리하는 RLS 정책과, 자식 테이블 `WITH CHECK`에서 JOIN 기반 검사를 넣은 정책은 예상보다 쉽게 무한 재귀나 `permission denied`를 만들었다.
+특히 `shopping_items`, `calendar_members` 주변에서 이런 문제가 반복됐다.
 
 ### 해결
-`get_my_list_ids()`를 `SECURITY DEFINER`로 정의해 RLS를 우회하는 방식을 사용하되, INSERT/DELETE 정책 자체는 `auth.uid() IS NOT NULL` 조건으로 단순화했다. 어차피 어떤 list에 아이템을 추가할 수 있는지는 애플리케이션 레벨에서 `family_id`로 제어되므로, RLS는 인증 여부만 확인하는 것으로 MVP 범위에서는 충분하다고 판단했다.
+
+- 가족 범위 판정은 `get_my_family_ids()` 같은 helper 함수 기반으로 단순화했다.
+- 복잡한 다중 테이블 권한 검사는 가능하면 API route + service role 쪽으로 이동했다.
+- `calendar_members` bootstrap은 owner 선삽입 패턴을 전제로 맞췄다.
+
+### 남은 규칙
+
+- RLS 안에서 권한 모델을 과도하게 표현하려 하지 않는다.
+- 중첩 정책이 필요한 순간 API route로 경계를 옮기는 편이 더 안전하다.
 
 ---
 
-## 4. 가족 생성 시 레이스 컨디션
+## 4. 가족 생성/합류를 클라이언트 다중 요청으로 처리했을 때의 레이스 컨디션
 
 ### 과제
-로그인 직후 여러 탭이 동시에 열리면, 각 탭이 독립적으로 `/api/family` API를 호출해 가족이 중복 생성되는 문제가 있었다. 두 탭 모두 "내 가족이 없다"고 판단하고 각각 INSERT를 실행하기 때문이다.
+
+로그인 직후 여러 탭이 동시에 열리면 "가족이 없으면 만들기"를 클라이언트 select -> insert 흐름으로 처리할 경우 중복 가족 생성이나 membership 충돌이 발생했다.
+가족 합류도 조회와 업데이트를 분리하면 동시 요청에서 정합성이 깨질 수 있었다.
 
 ### 해결
-애플리케이션 레벨이 아닌 **DB 레벨에서 원자적으로 처리**했다.
 
-1. `family_members` 테이블에 `user_id` 유니크 제약을 추가해 중복 삽입을 차단했다.
-2. PL/pgSQL 함수 `get_or_create_family(p_user_id)`를 작성해, 조회와 생성을 하나의 트랜잭션으로 묶었다. `ON CONFLICT DO NOTHING`으로 동시 요청이 와도 하나만 성공하도록 처리했다.
+가족 생성과 합류를 DB 함수로 옮겨 원자 처리했다.
 
-```sql
-CREATE OR REPLACE FUNCTION get_or_create_family(p_user_id uuid)
-RETURNS uuid AS $$
-DECLARE
-  v_family_id uuid;
-BEGIN
-  -- 기존 가족 조회
-  SELECT family_id INTO v_family_id
-  FROM family_members WHERE user_id = p_user_id;
+- `get_or_create_family(p_user_id)`는 legacy bootstrap 경로를 담당한다.
+- `create_family_with_name(p_user_id, p_name)`는 현재 온보딩의 명시적 가족 생성을 담당한다.
+- `join_family_by_invite_code(...)`는 가족 이동을 원자 처리한다.
 
-  IF v_family_id IS NULL THEN
-    -- 원자적 생성
-    INSERT INTO families (name) VALUES ('우리 가족')
-    RETURNING id INTO v_family_id;
+### 남은 규칙
 
-    INSERT INTO family_members (family_id, user_id, display_name, role)
-    VALUES (v_family_id, p_user_id, 'Member', 'admin')
-    ON CONFLICT (user_id) DO NOTHING;
-  END IF;
-
-  RETURN v_family_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
+- 가족 생성/합류는 클라이언트에서 select 후 insert로 구현하지 않는다.
+- 온보딩 접근 여부와 가족 존재 여부를 분리해서 본다.
 
 ---
 
-## 5. 모달 하단 버튼이 네비게이션 바에 가려지는 문제
+## 5. OAuth 자동 세션 교환으로 허용 목록 검사가 우회된 문제
 
 ### 과제
-PWA로 설치한 스마트폰에서 "새 장바구니" 모달을 열면 "만들기" 버튼이 잘려서 보이지 않았다. `max-h-[90vh]`와 `overflow-y-auto`로 스크롤을 추가하는 방식으로 한 번 수정했으나 문제가 재현됐다.
 
-### 원인
-모달 컨테이너(`fixed inset-0 flex items-end`)와 하단 네비게이션 바(`fixed bottom-0`)가 동일한 `z-50`를 사용하고 있었다. `items-end`는 모달 시트를 화면 최하단에 붙이는데, 네비게이션 바(약 64px)가 그 위를 덮어 버튼이 보이지 않는 구조였다. `max-h`로 높이를 제한해도 모달이 네비게이션 바 뒤에서 시작하기 때문에 근본 해결이 안 됐다.
+초기에는 callback 페이지에서 `exchangeCodeForSession`을 수동 호출한 뒤 `allowed_emails`를 검사했다.
+하지만 Supabase가 URL의 code를 먼저 자동 교환해 세션을 저장해버려, 수동 교환은 실패하고 이메일 검사가 우회되는 케이스가 생겼다.
 
 ### 해결
-모달 외부 컨테이너에 `pb-16 sm:pb-0`을 추가했다. `flex items-end`는 패딩을 존중하므로, 모바일에서 모달 시트가 네비게이션 바 높이만큼 위로 올라가 버튼이 온전히 노출된다. 태블릿/데스크탑(`sm` 이상)에서는 패딩 없이 중앙 정렬이 유지된다.
 
-```tsx
-// 수정 전
-<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+- `exchangeCodeForSession`을 제거했다.
+- `getSession()`과 `onAuthStateChange()`를 함께 사용해 세션 확보 시점을 잡았다.
+- 세션이 생긴 직후 `/api/auth/check-allowed`를 호출해 허용 여부를 최종 판정한다.
 
-// 수정 후
-<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pb-16 sm:pb-0">
-```
+### 남은 규칙
+
+- callback에서 세션 교환을 직접 다시 시도하지 않는다.
+- callback 검증은 "세션 생성 이후 판정" 모델로 유지한다.
 
 ---
 
-## 6. 탭 전환 시 로딩 스피너 발생
+## 6. 앱 초대 코드 소비를 분리 처리했을 때의 중복 사용 문제
 
 ### 과제
-캘린더, 장바구니, 설정 탭을 이동할 때마다 스피너가 표시되며 로딩이 발생했다. 각 탭이 별도의 Next.js 라우트 페이지로 구성되어 있어, 탭 이동 시 컴포넌트가 언마운트 → 재마운트되고 Supabase 데이터를 새로 fetch하기 때문이다. 네이티브 앱처럼 로딩 없이 즉각적인 탭 전환이 필요했다.
+
+앱 초대 코드를 "조회 -> 사용 처리 -> allowlist insert"로 나누면, 거의 동시에 두 요청이 들어왔을 때 같은 코드가 중복 소비될 수 있었다.
+또 앱 초대와 가족 초대의 의미가 섞이면 허용 목록 추가, 온보딩 이동, 가족 합류 경계가 무너지기 쉬웠다.
 
 ### 해결
-모든 탭 콘텐츠를 항상 마운트된 상태로 유지하고 CSS `display: none`으로 숨기는 방식(CSS Keep-Alive 패턴)을 적용했다.
 
-- 각 페이지(`calendar/page.tsx`, `shopping/page.tsx`, `settings/page.tsx`)의 내용을 탭 컴포넌트(`CalendarTab`, `ShoppingTab`, `SettingsTab`)로 추출
-- `TabsShell` 컴포넌트에서 세 탭을 동시에 렌더링하고 `display: contents` / `display: none`으로 가시성 제어
-- `BottomNav`를 라우팅 모드(Link)와 콜백 모드(button + onTabChange) 둘 다 지원하도록 수정
-- `/calendar`가 단일 진입점이 되고, `/shopping`과 `/settings`는 `/calendar`로 리다이렉트
+- 앱 초대는 `consume_app_invite(code, email)` RPC 한 번으로 소비한다.
+- callback 응답에 `needsOnboarding`를 포함해, 앱 접근 허용과 가족 생성 여부를 분리했다.
+- 가족 초대는 allowlist 허용만 수행하고 실제 가족 합류는 `/join`에서 처리한다.
 
-Supabase Realtime 구독이 이미 각 탭에 구현되어 있어, 탭이 항상 마운트된 상태에서도 가족 구성원의 변경이 즉시 반영된다.
+### 남은 규칙
 
-```
-변경 전: 탭 클릭 → 페이지 라우팅 → 컴포넌트 마운트 → 데이터 fetch → 스피너 표시
-변경 후: 탭 클릭 → activeTab 상태 변경 → display: none → display: contents (즉각 전환)
-```
-
-### 트레이드오프
-- URL이 항상 `/calendar`로 고정됨 (내부 가족 앱이므로 실질적 문제 없음)
-- 앱 초기 로딩 시 세 탭 데이터를 동시에 fetch함 (탭 수가 적고 데이터가 가벼워 영향 미미)
+- 앱 초대와 가족 초대는 서로 다른 목적의 링크로 유지한다.
+- 앱 초대 소비는 반드시 원자 RPC로 처리한다.
 
 ---
 
-## 7. Supabase OAuth 자동 세션 교환으로 이메일 허용 목록 우회
+## 7. 모달 CTA가 하단 네비게이션 바에 가려진 문제
 
 ### 과제
-가족 전용 앱이므로 허용된 이메일만 로그인할 수 있도록 제한하는 기능을 구현했다. OAuth 콜백 페이지에서 `exchangeCodeForSession`으로 코드를 교환한 뒤 이메일을 검사하고, 허용 목록에 없으면 즉시 로그아웃하는 방식이었다. 그러나 실제 테스트에서 허용 목록에 없는 이메일도 로그인이 가능했다.
 
-### 원인
-`@supabase/supabase-js` v2는 기본적으로 `detectSessionInUrl: true`가 설정되어 있다. OAuth 콜백 URL(`?code=xxx`)이 로드되는 순간 Supabase 클라이언트가 **React 렌더링보다 먼저** 코드 교환을 자동 완료하고 세션을 저장한다. 이후 `useEffect`에서 수동으로 `exchangeCodeForSession`을 호출하면 코드가 이미 소진된 상태라 에러가 발생하고, 에러 핸들러가 `/login`으로 리다이렉트한다. 그런데 Supabase가 이미 세션을 설정해둔 상태이므로 로그인 페이지가 자동으로 `/shopping`으로 튕겨버려 이메일 체크가 완전히 우회됐다.
-
-`detectSessionInUrl: false`로 자동 교환을 비활성화하면 이번엔 PKCE 코드 검증자(code verifier) 처리에 문제가 생겨 `exchangeCodeForSession` 자체가 실패했다.
+모바일 PWA에서 하단에서 올라오는 모달의 CTA가 고정 BottomNav 뒤로 가려졌다.
+단순 `max-h`나 내부 스크롤 추가만으로는 구조적으로 해결되지 않았다.
 
 ### 해결
-`exchangeCodeForSession`을 버리고 `onAuthStateChange`로 전략을 바꿨다. Supabase가 알아서 코드를 교환한 직후 `SIGNED_IN` 이벤트가 발생하는데, 이 시점에 이메일 허용 목록 체크를 수행한다. `getSession`과 `onAuthStateChange`를 함께 사용해 이벤트가 `useEffect` 등록 전에 발생하는 레이스 컨디션도 방지했다.
 
-```
-기존: 코드 교환(수동) → 이메일 체크 → 리다이렉트
-       ↑ Supabase가 먼저 교환해버려 우회됨
+모달 외부 컨테이너에 `pb-16 sm:pb-0`을 추가했다.
+`flex items-end` 컨테이너가 패딩을 존중하므로, 모바일에서는 시트가 네비게이션 바 높이만큼 위로 올라간다.
 
-변경: Supabase 자동 교환 → SIGNED_IN 이벤트 → 이메일 체크 → 허용/차단
-```
+### 남은 규칙
 
-허용 목록은 Supabase `allowed_emails` 테이블로 관리하며, 유효한 초대 코드를 통해 처음 로그인하는 사용자는 자동으로 테이블에 추가된다. 환경변수 방식은 Vercel 재배포 없이 멤버를 추가/제거할 수 없어 DB 방식으로 전환했다.
+- BottomNav와 같은 레벨에서 뜨는 일반 모달은 기본적으로 `pb-16 sm:pb-0`을 둔다.
 
 ---
 
-## 8. iOS Safari에서 캘린더 화면 상하 스크롤이 차단되지 않는 문제
+## 8. 탭 전환마다 스피너가 발생하던 문제
 
 ### 과제
-캘린더 화면은 `height: 100dvh`로 뷰포트 전체를 채우며, 세로 스크롤이 필요 없는 구조다. 그러나 모바일에서 화면을 위아래로 드래그하면 페이지가 따라서 움직였다.
 
-### 시도 1 — 컨테이너에 touchmove 이벤트 방지 (실패)
+캘린더, 장보기, 설정을 각각 별도 페이지로 운용할 때 탭 전환 시 언마운트/재마운트가 발생해 fetch와 스피너가 반복됐다.
+모바일 앱 같은 연속성이 깨졌다.
 
-```typescript
-el.addEventListener('touchmove', (e) => {
-  if (!isModalOpen) e.preventDefault()
-}, { passive: false })
-```
+### 해결
 
-iOS Safari에서는 `body`가 스크롤 가능한 상태이면 자식 엘리먼트에서 `e.preventDefault()`를 호출해도 body 레벨 스크롤이 막히지 않았다.
+- `/calendar`를 단일 live entry로 고정했다.
+- `TabsShell`이 세 탭을 모두 마운트한 상태로 유지하고 `display`만 전환한다.
+- 장보기 상세도 메인 흐름에서는 search param 기반으로 유지한다.
 
-### 시도 2 — document 레벨로 이벤트 이동 (실패)
+### 남은 규칙
 
-```typescript
-document.addEventListener('touchmove', (e) => {
-  if (!isModalOpen && el.contains(e.target as Node)) e.preventDefault()
-}, { passive: false })
-```
+- 탭을 다시 개별 route page로 쪼개지 않는다.
+- 독립 route가 필요하면 bridge 또는 외부 링크 호환 목적이 분명해야 한다.
 
-`body`에 `min-h-full`이 설정되어 있어 스크롤 가능한 상태인 점은 동일했다. Shopping 탭은 body 스크롤을 사용하므로 `overflow: hidden`을 전역으로 추가할 수도 없었다. 결과적으로 iOS Safari에서 여전히 스크롤이 발생했다.
+---
 
-### 해결 — CSS `touch-action: none`
+## 9. iOS Safari에서 캘린더 세로 스크롤이 막히지 않던 문제
 
-```tsx
-<div
-  style={{ height: '100dvh', touchAction: isModalOpen ? 'auto' : 'none' }}
->
-```
+### 과제
 
-JavaScript 이벤트 핸들러 방식은 iOS Safari에서 body 스크롤을 신뢰성 있게 막지 못한다. CSS `touch-action: none`은 브라우저에게 "이 요소에서 터치 기반 스크롤/줌 제스처를 처리하지 말 것"을 직접 지시하므로 JavaScript보다 앞선 레이어에서 동작한다.
+캘린더는 `100dvh` 고정 화면인데, iOS Safari에서는 `touchmove`를 막아도 body 레벨 스크롤이 계속 살아 있었다.
 
-모달이 열렸을 때(`isModalOpen: true`)는 `auto`로 복원해 모달 내부의 `overflow-y-auto` 스크롤 영역이 정상 동작하게 했다. 좌우 스와이프 월 이동은 JavaScript `touchstart`/`touchend` 이벤트로 구현되어 있어 `touch-action`의 영향을 받지 않는다.
+### 해결
 
-```
-실패: JS e.preventDefault() → iOS Safari body 스크롤 레이어에서 무시됨
-해결: CSS touch-action: none → 브라우저가 스크롤 시도 자체를 하지 않음
-```
+JS `preventDefault()` 대신 CSS `touch-action: none`을 사용했다.
+모달이 열렸을 때만 `auto`로 되돌려 모달 내부 스크롤을 허용한다.
+
+### 남은 규칙
+
+- iOS 터치 스크롤 제어는 JS 이벤트보다 CSS `touch-action`을 우선한다.
+
+---
+
+## 10. 이벤트와 리마인더를 순차 저장했을 때의 부분 실패 문제
+
+### 과제
+
+이벤트 row 저장과 `event_reminders` 저장을 클라이언트 또는 API에서 순차 처리하면, 앞 단계만 성공하고 뒤 단계가 실패하는 부분 저장 상태가 생길 수 있었다.
+또 클라이언트 direct mutation은 캘린더 write 권한과 family membership 권한 검증을 우회하기 쉬웠다.
+
+### 해결
+
+- 이벤트 생성/수정을 API route로 이동했다.
+- create/update는 각각 `create_event_with_reminders`, `update_event_with_reminders` RPC로 묶었다.
+- 해당 RPC의 anon/authenticated execute 권한을 제거해 route를 우회하지 못하게 했다.
+
+### 남은 규칙
+
+- 이벤트 생성/수정은 반드시 `/api/events` 계열 route를 통한다.
+- event와 reminder는 분리 저장하지 않는다.
+
+---
+
+## 11. 이벤트 변경 알림 fan-out을 클라이언트에서 처리할 수 없던 문제
+
+### 과제
+
+일정 생성/수정/삭제 후 관련 가족 또는 캘린더 멤버에게 push notification을 보내려면 actor 제외, 캘린더 멤버 조회, 구독 조회, 만료 구독 정리가 필요했다.
+이 흐름은 클라이언트에서 안전하게 수행할 수 없었다.
+
+### 해결
+
+- 이벤트 변경 push는 API route에서 비동기로 발송한다.
+- 캘린더 일정이면 `calendar_members`, 가족 전체 일정이면 `family_members`를 기준으로 대상을 결정한다.
+- actor 본인은 제외한다.
+- 404/410 구독은 즉시 정리한다.
+
+### 남은 규칙
+
+- cross-user notification fan-out은 클라이언트에 두지 않는다.
+- 발송 실패가 사용자 mutation 자체를 실패시키지 않도록 비동기로 분리한다.
+
+---
+
+## 언제 먼저 읽어야 하나
+
+아래 변경은 구현 전에 이 문서를 먼저 본다.
+
+- realtime 채널 구조를 바꿀 때
+- RLS 정책이나 migration을 수정할 때
+- OAuth callback, allowlist, 앱 초대 흐름을 손볼 때
+- 가족 생성/합류 로직을 바꿀 때
+- 이벤트 저장/리마인더/API route를 수정할 때
+- 탭 셸, 모달, 모바일 터치 동작을 바꿀 때
