@@ -54,54 +54,44 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-  const updates: Record<string, unknown> = {}
-  if (body.title !== undefined) updates.title = body.title
-  if (body.description !== undefined) updates.description = body.description
-  if (body.startAt !== undefined) updates.start_at = body.startAt
-  if (body.endAt !== undefined) updates.end_at = body.endAt
-  if (body.isAllDay !== undefined) updates.is_all_day = body.isAllDay
-  if (body.calendarId !== undefined) updates.calendar_id = body.calendarId
+  const newTitle = body.title ?? existing.title
+  const newDescription = body.description !== undefined ? body.description : existing.description
+  const newStartAt = body.startAt ?? existing.start_at
+  const newEndAt = body.endAt !== undefined ? body.endAt : existing.end_at
+  const newIsAllDay = body.isAllDay ?? existing.is_all_day
+  const newCalendarId = body.calendarId !== undefined ? body.calendarId : existing.calendar_id
 
-  const changed = Object.entries(updates).some(
-    ([k, v]) => existing[k as keyof typeof existing] !== v
-  )
+  const changed =
+    newTitle !== existing.title ||
+    newDescription !== existing.description ||
+    newStartAt !== existing.start_at ||
+    newEndAt !== existing.end_at ||
+    newIsAllDay !== existing.is_all_day ||
+    newCalendarId !== existing.calendar_id
 
-  const { error: updateError } = await supabaseAdmin
-    .from('events')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', eventId)
+  const { error: rpcError } = await supabaseAdmin.rpc('update_event_with_reminders', {
+    p_event_id: eventId,
+    p_title: newTitle,
+    p_description: newDescription,
+    p_start_at: newStartAt,
+    p_end_at: newEndAt,
+    p_is_all_day: newIsAllDay,
+    p_calendar_id: newCalendarId,
+    p_reminder_minutes: body.reminderMinutes ?? null,
+  })
 
-  if (updateError) {
+  if (rpcError) {
     return NextResponse.json({ error: 'Failed to update event' }, { status: 500 })
-  }
-
-  if (body.reminderMinutes !== undefined) {
-    const { error: deleteError } = await supabaseAdmin
-      .from('event_reminders')
-      .delete()
-      .eq('event_id', eventId)
-    if (deleteError) {
-      return NextResponse.json({ error: 'Failed to update reminders' }, { status: 500 })
-    }
-
-    if (body.reminderMinutes.length > 0) {
-      const { error: insertError } = await supabaseAdmin
-        .from('event_reminders')
-        .insert(body.reminderMinutes.map((m) => ({ event_id: eventId, remind_minutes_before: m })))
-      if (insertError) {
-        return NextResponse.json({ error: 'Failed to update reminders' }, { status: 500 })
-      }
-    }
   }
 
   if (changed) {
     fireEventNotification({
       familyId: existing.family_id,
-      calendarId: (updates.calendar_id !== undefined ? updates.calendar_id : existing.calendar_id) as string | null,
+      calendarId: newCalendarId,
       actorUserId,
       action: 'updated',
-      eventTitle: (updates.title ?? existing.title) as string,
-      eventStartAt: (updates.start_at ?? existing.start_at) as string,
+      eventTitle: newTitle,
+      eventStartAt: newStartAt,
     })
   }
 

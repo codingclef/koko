@@ -43,32 +43,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { data: event, error: eventError } = await supabaseAdmin
-    .from('events')
-    .insert({
-      family_id: member.family_id,
-      created_by: actorUserId,
-      calendar_id: calendarId,
-      title,
-      description,
-      start_at: startAt,
-      end_at: endAt,
-      is_all_day: isAllDay,
-    })
-    .select()
-    .single()
-
-  if (eventError || !event) {
-    return NextResponse.json({ error: 'Failed to create event' }, { status: 500 })
-  }
-
-  if (reminderMinutes.length > 0) {
-    const { error: reminderError } = await supabaseAdmin
-      .from('event_reminders')
-      .insert(reminderMinutes.map((m) => ({ event_id: event.id, remind_minutes_before: m })))
-    if (reminderError) {
-      return NextResponse.json({ error: 'Failed to save reminders' }, { status: 500 })
+  const { data: events, error: rpcError } = await supabaseAdmin.rpc(
+    'create_event_with_reminders',
+    {
+      p_family_id: member.family_id,
+      p_created_by: actorUserId,
+      p_calendar_id: calendarId,
+      p_title: title,
+      p_description: description,
+      p_start_at: startAt,
+      p_end_at: endAt,
+      p_is_all_day: isAllDay,
+      p_reminder_minutes: reminderMinutes,
     }
+  )
+
+  if (rpcError || !events?.length) {
+    return NextResponse.json({ error: 'Failed to create event' }, { status: 500 })
   }
 
   fireEventNotification({
@@ -80,5 +71,5 @@ export async function POST(req: NextRequest) {
     eventStartAt: startAt,
   })
 
-  return NextResponse.json(event, { status: 201 })
+  return NextResponse.json(events[0], { status: 201 })
 }
