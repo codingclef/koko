@@ -17,7 +17,8 @@ export async function dispatchPushNotifications(
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
+          payload,
+          { TTL: 86400, urgency: 'high' }
         )
         successIds.push(sub.id)
       } catch (err: unknown) {
