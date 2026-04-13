@@ -46,6 +46,9 @@ export async function getAuthenticatedUser(
   const accessToken = authorization.slice('Bearer '.length).trim()
   if (!accessToken) return null
 
+  // getClaims()는 로컬 JWT 검증으로 Auth 서버 왕복을 생략한다.
+  // 삭제/비활성화 사용자 반영이 토큰 만료 시점까지 지연될 수 있으나,
+  // 이 앱의 위협 모델과 짧은 JWT 만료 주기를 고려해 허용된 트레이드오프다.
   const { data, error } = await supabaseAdmin.auth.getClaims(accessToken)
 
   if (error || !data?.claims) return null
