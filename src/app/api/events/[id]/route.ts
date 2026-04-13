@@ -1,5 +1,5 @@
 import { after, NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedUserId, isFamilyMember, assertCalendarWriteAccess } from '@/lib/api-auth'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEventNotification } from '@/lib/push-utils'
 
@@ -13,20 +13,23 @@ interface UpdateEventRequest {
   reminderMinutes?: number[]
 }
 
-async function canWriteEvent(
-  existing: { calendar_id: string | null; family_id: string },
-  actorUserId: string
-): Promise<boolean> {
-  if (existing.calendar_id) {
-    return assertCalendarWriteAccess(existing.family_id, existing.calendar_id, actorUserId)
-  }
-  return isFamilyMember(existing.family_id, actorUserId)
+type UpdateResult = {
+  is_changed: boolean
+  family_id: string
+  new_calendar_id: string | null
+  new_title: string
+  new_start_at: string
+}
+
+type DeleteResult = {
+  family_id: string
+  calendar_id: string | null
+  title: string
+  start_at: string
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const t0 = Date.now()
   const actorUserId = await getAuthenticatedUserId(req)
-  console.log(`[perf] PATCH /api/events/[id] auth: ${Date.now() - t0}ms`)
   if (!actorUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -34,73 +37,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id: eventId } = await params
   const body = (await req.json()) as UpdateEventRequest
 
-  const t1 = Date.now()
-  const { data: existing, error: fetchError } = await supabaseAdmin
-    .from('events')
-    .select('id, title, start_at, end_at, description, calendar_id, is_all_day, family_id')
-    .eq('id', eventId)
-    .maybeSingle()
-  console.log(`[perf] PATCH /api/events/[id] event fetch: ${Date.now() - t1}ms`)
-
-  if (fetchError || !existing) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-  }
-
-  const t2 = Date.now()
-  if (!(await canWriteEvent(existing, actorUserId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-  console.log(`[perf] PATCH /api/events/[id] access check: ${Date.now() - t2}ms`)
-
-  // 대상 캘린더가 바뀌는 경우 target 캘린더 접근 권한도 검증
-  if (body.calendarId !== undefined && body.calendarId !== null && body.calendarId !== existing.calendar_id) {
-    const hasTargetAccess = await assertCalendarWriteAccess(existing.family_id, body.calendarId, actorUserId)
-    if (!hasTargetAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-  }
-
-  const newTitle = body.title ?? existing.title
-  const newDescription = body.description !== undefined ? body.description : existing.description
-  const newStartAt = body.startAt ?? existing.start_at
-  const newEndAt = body.endAt !== undefined ? body.endAt : existing.end_at
-  const newIsAllDay = body.isAllDay ?? existing.is_all_day
-  const newCalendarId = body.calendarId !== undefined ? body.calendarId : existing.calendar_id
-
-  const changed =
-    newTitle !== existing.title ||
-    newDescription !== existing.description ||
-    newStartAt !== existing.start_at ||
-    newEndAt !== existing.end_at ||
-    newIsAllDay !== existing.is_all_day ||
-    newCalendarId !== existing.calendar_id
-
-  const t3 = Date.now()
-  const { error: rpcError } = await supabaseAdmin.rpc('update_event_with_reminders', {
+  const { data: result, error } = await supabaseAdmin.rpc('update_event_authorized', {
+    p_actor_user_id: actorUserId,
     p_event_id: eventId,
-    p_title: newTitle,
-    p_description: newDescription,
-    p_start_at: newStartAt,
-    p_end_at: newEndAt,
-    p_is_all_day: newIsAllDay,
-    p_calendar_id: newCalendarId,
+    p_title: body.title ?? null,
+    p_description: body.description ?? null,
+    p_has_description: 'description' in body,
+    p_start_at: body.startAt ?? null,
+    p_end_at: body.endAt ?? null,
+    p_has_end_at: 'endAt' in body,
+    p_is_all_day: body.isAllDay ?? null,
+    p_calendar_id: body.calendarId ?? null,
+    p_has_calendar_id: 'calendarId' in body,
     p_reminder_minutes: body.reminderMinutes ?? null,
   })
-  console.log(`[perf] PATCH /api/events/[id] RPC: ${Date.now() - t3}ms | total: ${Date.now() - t0}ms`)
 
-  if (rpcError) {
+  if (error) {
+    if (error.message === 'not_found') return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    if (error.message === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     return NextResponse.json({ error: 'Failed to update event' }, { status: 500 })
   }
 
-  if (changed) {
+  const { is_changed, family_id, new_calendar_id, new_title, new_start_at } = result as UpdateResult
+  if (is_changed) {
     after(async () => {
       await sendEventNotification({
-        familyId: existing.family_id,
-        calendarId: newCalendarId,
+        familyId: family_id,
+        calendarId: new_calendar_id,
         actorUserId,
         action: 'updated',
-        eventTitle: newTitle,
-        eventStartAt: newStartAt,
+        eventTitle: new_title,
+        eventStartAt: new_start_at,
       })
     })
   }
@@ -109,52 +76,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const t0 = Date.now()
   const actorUserId = await getAuthenticatedUserId(req)
-  console.log(`[perf] DELETE /api/events/[id] auth: ${Date.now() - t0}ms`)
   if (!actorUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { id: eventId } = await params
 
-  const t1 = Date.now()
-  const { data: existing, error: fetchError } = await supabaseAdmin
-    .from('events')
-    .select('id, title, start_at, calendar_id, family_id')
-    .eq('id', eventId)
-    .maybeSingle()
-  console.log(`[perf] DELETE /api/events/[id] event fetch: ${Date.now() - t1}ms`)
+  const { data: deleted, error } = await supabaseAdmin.rpc('delete_event_authorized', {
+    p_actor_user_id: actorUserId,
+    p_event_id: eventId,
+  })
 
-  if (fetchError || !existing) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-  }
-
-  const t2 = Date.now()
-  if (!(await canWriteEvent(existing, actorUserId))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-  console.log(`[perf] DELETE /api/events/[id] access check: ${Date.now() - t2}ms`)
-
-  const t3 = Date.now()
-  const { error: deleteError } = await supabaseAdmin
-    .from('events')
-    .delete()
-    .eq('id', eventId)
-  console.log(`[perf] DELETE /api/events/[id] delete: ${Date.now() - t3}ms | total: ${Date.now() - t0}ms`)
-
-  if (deleteError) {
+  if (error) {
+    if (error.message === 'not_found') return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    if (error.message === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     return NextResponse.json({ error: 'Failed to delete event' }, { status: 500 })
   }
 
+  const { family_id, calendar_id, title, start_at } = deleted as DeleteResult
   after(async () => {
     await sendEventNotification({
-      familyId: existing.family_id,
-      calendarId: existing.calendar_id,
+      familyId: family_id,
+      calendarId: calendar_id,
       actorUserId,
       action: 'deleted',
-      eventTitle: existing.title,
-      eventStartAt: existing.start_at,
+      eventTitle: title,
+      eventStartAt: start_at,
     })
   })
 

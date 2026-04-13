@@ -579,6 +579,55 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_event_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_calendar_id: string | null
+          p_title: string
+          p_description: string | null
+          p_start_at: string
+          p_end_at: string | null
+          p_is_all_day: boolean
+          p_reminder_minutes: number[]
+        }
+        Returns: {
+          id: string
+          family_id: string
+          created_by: string
+          calendar_id: string | null
+          title: string
+          description: string | null
+          start_at: string
+          end_at: string | null
+          is_all_day: boolean
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      update_event_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_event_id: string
+          p_title: string | null
+          p_description: string | null
+          p_has_description: boolean
+          p_start_at: string | null
+          p_end_at: string | null
+          p_has_end_at: boolean
+          p_is_all_day: boolean | null
+          p_calendar_id: string | null
+          p_has_calendar_id: boolean
+          p_reminder_minutes: number[] | null
+        }
+        Returns: Json
+      }
+      delete_event_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_event_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
