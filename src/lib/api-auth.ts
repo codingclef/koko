@@ -46,11 +46,10 @@ export async function getAuthenticatedUser(
   const accessToken = authorization.slice('Bearer '.length).trim()
   if (!accessToken) return null
 
-  const {
-    data: { user },
-    error,
-  } = await supabaseAdmin.auth.getUser(accessToken)
+  const { data, error } = await supabaseAdmin.auth.getClaims(accessToken)
 
-  if (error || !user?.email) return null
-  return { id: user.id, email: user.email }
+  if (error || !data?.claims) return null
+  const { sub: id, email } = data.claims as { sub?: string; email?: string }
+  if (!id || !email) return null
+  return { id, email }
 }
