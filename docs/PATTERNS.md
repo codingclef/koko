@@ -52,6 +52,9 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 가족 합류는 `/api/family/join` -> `join_family_by_invite_code` RPC로 처리한다.
 - 가족 조회에는 `/api/family/me` -> `get_my_family` RPC를 사용한다.
 - 클라이언트에서 select 후 insert로 가족 생성/합류를 흉내 내지 않는다.
+- 이벤트 mutation API는 응답 지연을 줄이기 위해 `getUser()` 대신 `getClaims()` 기반 인증 경로를 사용할 수 있다.
+- 이 경로는 Auth 서버 재조회보다 빠르지만, 삭제/비활성화된 사용자의 반영이 access token 만료 시점까지 지연될 수 있다.
+- 가족 앱의 위협 모델과 짧은 JWT 만료 주기를 고려해, 이벤트 mutation 경로에서는 이 trade-off를 허용한다.
 
 ## 5. Realtime Pattern
 
