@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import type { RecurrenceFreq, RecurrenceRule } from '@/types/recurrence'
-import { buildRecurrenceLabel, DOW_KR } from '@/types/recurrence'
+import { buildRecurrenceLabel, DOW_KR, getRecurrenceIntervalUnit } from '@/types/recurrence'
 
 interface Props {
   initial: RecurrenceRule | null
@@ -44,7 +44,7 @@ function addYears(date: string, n: number): string {
 
 export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Props) {
   const [freq, setFreq] = useState<RecurrenceFreq>(initial?.freq ?? 'weekly')
-  const interval = initial?.interval ?? 1
+  const [interval, setInterval] = useState(initial?.interval ?? 1)
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(
     initial?.daysOfWeek ?? defaultDaysOfWeek(startDate)
   )
@@ -79,6 +79,16 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
   }
 
   const freqLabel = FREQ_OPTIONS.find((f) => f.value === freq)?.label ?? '매주'
+  const intervalUnit = getRecurrenceIntervalUnit(freq)
+
+  const handleIntervalChange = (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setInterval(1)
+      return
+    }
+    setInterval(parsed)
+  }
 
   return (
     <div className="fixed inset-0 z-[90] bg-white dark:bg-stone-900 flex flex-col">
@@ -128,9 +138,36 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
           )}
           <div className="flex items-center justify-between px-4 py-3.5 text-sm">
             <span className="text-stone-700 dark:text-stone-300">반복</span>
-            <span className="text-stone-500 dark:text-stone-400">
-              {interval}{freq === 'daily' ? '일' : freq === 'weekly' ? '주' : freq === 'monthly' ? '개월' : '년'}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="반복 간격 감소"
+                onClick={() => setInterval((prev) => Math.max(1, prev - 1))}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200 text-stone-600 transition-colors hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-200 dark:hover:bg-stone-600"
+              >
+                -
+              </button>
+              <label className="flex items-center gap-1 text-stone-500 dark:text-stone-400">
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  aria-label="반복 간격"
+                  value={interval}
+                  onChange={(e) => handleIntervalChange(e.target.value)}
+                  className="w-14 rounded-lg border border-stone-200 bg-white px-2 py-1 text-right text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-accent-400 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-100"
+                />
+                <span>{intervalUnit}</span>
+              </label>
+              <button
+                type="button"
+                aria-label="반복 간격 증가"
+                onClick={() => setInterval((prev) => prev + 1)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200 text-stone-600 transition-colors hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-200 dark:hover:bg-stone-600"
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
 
@@ -186,15 +223,28 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
 }
 
 function Toggle({ on, onClick }: { on: boolean; onClick?: () => void }) {
+  const className = `relative w-11 h-6 rounded-full transition-colors ${on ? 'bg-accent-400' : 'bg-stone-200 dark:bg-stone-600'}`
+  const knob = (
+    <span
+      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : 'translate-x-0'}`}
+    />
+  )
+
+  if (!onClick) {
+    return (
+      <span aria-hidden="true" className={className}>
+        {knob}
+      </span>
+    )
+  }
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative w-11 h-6 rounded-full transition-colors ${on ? 'bg-accent-400' : 'bg-stone-200 dark:bg-stone-600'}`}
+      className={className}
     >
-      <span
-        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : 'translate-x-0'}`}
-      />
+      {knob}
     </button>
   )
 }

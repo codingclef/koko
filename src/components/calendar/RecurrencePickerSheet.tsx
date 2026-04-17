@@ -27,7 +27,8 @@ function isSameRule(a: RecurrenceRule | null, b: RecurrenceRule | null): boolean
     a.freq === b.freq &&
     a.interval === b.interval &&
     (a.daysOfWeek ?? []).join(',') === (b.daysOfWeek ?? []).join(',') &&
-    (a.dayOfMonth ?? null) === (b.dayOfMonth ?? null)
+    (a.dayOfMonth ?? null) === (b.dayOfMonth ?? null) &&
+    (a.endDate ?? null) === (b.endDate ?? null)
   )
 }
 

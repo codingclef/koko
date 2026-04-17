@@ -240,4 +240,36 @@ describe('EventFormModal', () => {
     expect((dateInputs[1] as HTMLInputElement).disabled).toBe(true)
     expect(screen.getByText('이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.')).toBeInTheDocument()
   })
+
+  it('사용자화 반복 간격을 수정해 저장할 수 있다', async () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-04-17T00:00:00')} />)
+
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '반복 회의' } })
+    fireEvent.click(screen.getByText('안 함'))
+    fireEvent.click(screen.getByText('사용자화'))
+
+    const intervalInput = screen.getByLabelText('반복 간격') as HTMLInputElement
+    fireEvent.change(intervalInput, { target: { value: '2' } })
+
+    expect(intervalInput.value).toBe('2')
+    expect(screen.getByText('2주마다 금요일')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('완료'))
+    expect(screen.getByText('2주마다 금요일')).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '반복 회의',
+        recurrence: expect.objectContaining({
+          freq: 'weekly',
+          interval: 2,
+          daysOfWeek: [5],
+        }),
+      })
+    )
+  })
 })

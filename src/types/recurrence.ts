@@ -20,6 +20,19 @@ const FREQ_LABEL: Record<RecurrenceFreq, string> = {
 
 export const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
 
+export function getRecurrenceIntervalUnit(freq: RecurrenceFreq): string {
+  switch (freq) {
+    case 'daily':
+      return '일'
+    case 'weekly':
+      return '주'
+    case 'monthly':
+      return '개월'
+    case 'yearly':
+      return '년'
+  }
+}
+
 export function buildRecurrenceLabel(rule: RecurrenceRule): string {
   const freq = FREQ_LABEL[rule.freq]
   const interval = rule.interval > 1 ? `${rule.interval}` : ''
@@ -32,7 +45,7 @@ export function buildRecurrenceLabel(rule: RecurrenceRule): string {
     return interval ? `${interval}개월마다 ${rule.dayOfMonth}일` : `매월 ${rule.dayOfMonth}일`
   }
   if (interval) {
-    return `${interval}${rule.freq === 'daily' ? '일' : rule.freq === 'weekly' ? '주' : rule.freq === 'monthly' ? '개월' : '년'}마다`
+    return `${interval}${getRecurrenceIntervalUnit(rule.freq)}마다`
   }
   return freq
 }
