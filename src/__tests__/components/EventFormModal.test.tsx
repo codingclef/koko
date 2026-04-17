@@ -214,4 +214,30 @@ describe('EventFormModal', () => {
     fireEvent.click(screen.getByText('09:00'))
     expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
   })
+
+  it('반복 일정 이후/전체 편집에서는 날짜 input이 비활성화된다', () => {
+    const initial = {
+      id: 'evt-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '반복 일정',
+      description: null,
+      start_at: '2026-03-31T09:00:00.000Z',
+      end_at: '2026-03-31T10:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      series_id: 'series-1',
+      series_occurrence_date: '2026-03-31',
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} recurrenceScope="following" />)
+
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    expect((dateInputs[0] as HTMLInputElement).disabled).toBe(true)
+    expect((dateInputs[1] as HTMLInputElement).disabled).toBe(true)
+    expect(screen.getByText('이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.')).toBeInTheDocument()
+  })
 })

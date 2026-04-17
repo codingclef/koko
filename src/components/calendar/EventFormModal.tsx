@@ -6,7 +6,7 @@ import { REMINDER_OPTIONS, type Calendar, type CalendarEvent } from '@/lib/calen
 import { TimeWheelPicker } from './TimeWheelPicker'
 import { RecurrencePickerSheet } from './RecurrencePickerSheet'
 import { RecurrenceCustomModal } from './RecurrenceCustomModal'
-import { buildRecurrenceLabel, type RecurrenceRule } from '@/types/recurrence'
+import { buildRecurrenceLabel, type RecurrenceRule, type RecurrenceScope } from '@/types/recurrence'
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -44,6 +44,7 @@ interface Props {
   initial?: CalendarEvent
   initialDate?: Date
   initialReminderMinutes?: number[]
+  recurrenceScope?: RecurrenceScope
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -58,7 +59,15 @@ interface Props {
   }) => Promise<void>
 }
 
-export function EventFormModal({ initial, initialDate, initialReminderMinutes = [], calendars, onClose, onSave }: Props) {
+export function EventFormModal({
+  initial,
+  initialDate,
+  initialReminderMinutes = [],
+  recurrenceScope,
+  calendars,
+  onClose,
+  onSave,
+}: Props) {
   const defaultDate = initialDate ?? new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const defaultDateStr = `${defaultDate.getFullYear()}-${pad(defaultDate.getMonth() + 1)}-${pad(defaultDate.getDate())}`
@@ -101,6 +110,8 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
   const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(null)
   const [customRule, setCustomRule] = useState<RecurrenceRule | null>(null)
   const [recurrenceModal, setRecurrenceModal] = useState<'picker' | 'custom' | null>(null)
+  const isScopedRecurringEdit = Boolean(initial?.series_id && recurrenceScope && recurrenceScope !== 'single')
+  const canEditOccurrenceDate = !isScopedRecurringEdit
 
   const titleInputRef = useRef<HTMLInputElement>(null)
 
@@ -282,6 +293,11 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
 
         {/* 날짜/시간 */}
         <div className="space-y-3">
+          {isScopedRecurringEdit && (
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.
+            </p>
+          )}
           {/* 시작 */}
           <div>
             <label className="text-xs text-stone-500 mb-1.5 block">시작</label>
@@ -291,8 +307,9 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
                 <input
                   type="date"
                   value={startDate}
+                  disabled={!canEditOccurrenceDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  className={`absolute inset-0 opacity-0 w-full h-full ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                 />
               </div>
               {!isAllDay && (
@@ -324,8 +341,9 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
                 <input
                   type="date"
                   value={endDate}
+                  disabled={!canEditOccurrenceDate}
                   onChange={(e) => handleEndDateChange(e.target.value)}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  className={`absolute inset-0 opacity-0 w-full h-full ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                 />
               </div>
               {!isAllDay && (

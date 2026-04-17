@@ -148,6 +148,48 @@ describe('PATCH /api/events/[id] (series scope)', () => {
     )
   })
 
+  it('scope=single이면 update_series_authorized를 호출한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: { is_changed: true, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-18T09:00:00Z', series_id: SERIES_ID },
+      error: null,
+    })
+    const body = {
+      title: '회의',
+      scope: 'single',
+      anchorOccurrenceDate: '2026-04-17',
+      startAt: '2026-04-18T09:00:00.000Z',
+      endAt: '2026-04-18T10:00:00.000Z',
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_series_authorized',
+      expect.objectContaining({
+        p_scope: 'single',
+        p_start_at: '2026-04-18T09:00:00.000Z',
+        p_end_at: '2026-04-18T10:00:00.000Z',
+      })
+    )
+  })
+
+  it('following scope에서 날짜 이동을 요청하면 400을 반환한다', async () => {
+    const body = {
+      title: '회의',
+      scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      startAt: '2026-04-18T09:00:00.000Z',
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(400)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
   it('scope 없으면 update_event_authorized를 사용한다', async () => {
     mockRpc.mockResolvedValue({
       data: { is_changed: false, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-17T09:00:00Z' },

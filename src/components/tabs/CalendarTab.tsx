@@ -820,6 +820,7 @@ function EventFormModalWithReminders({
   }) => Promise<void>
 }) {
   const [reminderMinutes, setReminderMinutes] = useState<number[] | null>(event ? null : [])
+  const recurrenceScope = (event as (CalendarEvent & { _seriesScope?: RecurrenceScope }) | undefined)?._seriesScope
 
   useEffect(() => {
     if (!event) return
@@ -835,6 +836,7 @@ function EventFormModalWithReminders({
       initial={event}
       initialDate={date}
       initialReminderMinutes={reminderMinutes}
+      recurrenceScope={recurrenceScope}
       calendars={calendars}
       onClose={onClose}
       onSave={onSave}

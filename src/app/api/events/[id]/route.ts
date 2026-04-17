@@ -37,6 +37,10 @@ type DeleteResult = {
   scope?: string | null
 }
 
+function getIsoDatePart(value: string): string {
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const actorUserId = await getAuthenticatedUserId(req)
   if (!actorUserId) {
@@ -53,9 +57,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (scope === 'following' && !body.anchorOccurrenceDate) {
     return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
   }
+  if (
+    scope &&
+    scope !== 'single' &&
+    body.startAt &&
+    body.anchorOccurrenceDate &&
+    getIsoDatePart(body.startAt) !== body.anchorOccurrenceDate
+  ) {
+    return NextResponse.json(
+      { error: 'Changing occurrence date requires single scope' },
+      { status: 400 }
+    )
+  }
 
   // ── Series update ────────────────────────────────────────
-  if (scope && scope !== 'single') {
+  if (scope) {
     // Extract time portion from startAt / endAt if provided
     const startTime = body.startAt ? new Date(body.startAt).toISOString().slice(11, 19) : null
     const endTime   = body.endAt   ? new Date(body.endAt).toISOString().slice(11, 19)   : null
@@ -68,6 +84,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       p_title:                  body.title ?? null,
       p_description:            body.description ?? null,
       p_has_description:        'description' in body,
+      p_start_at:               body.startAt ?? null,
+      p_end_at:                 body.endAt ?? null,
+      p_has_end_at:             'endAt' in body,
       p_start_time:             startTime,
       p_end_time:               endTime,
       p_is_all_day:             body.isAllDay ?? null,
@@ -80,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (error.message === 'not_found')       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
       if (error.message === 'not_series_event') return NextResponse.json({ error: 'Not a series event' }, { status: 400 })
       if (error.message === 'forbidden')       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      return NextResponse.json({ error: 'Failed to update series' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update recurring event' }, { status: 500 })
     }
 
     const { is_changed, family_id, new_calendar_id, new_title, new_start_at } = result as UpdateResult
@@ -99,7 +118,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return new NextResponse(null, { status: 204 })
   }
 
-  // ── Single event update (includes scope='single' for series) ──
+  // ── Single event update ───────────────────────────────────
   const { data: result, error } = await supabaseAdmin.rpc('update_event_authorized', {
     p_actor_user_id:    actorUserId,
     p_event_id:         eventId,

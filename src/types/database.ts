@@ -773,6 +773,9 @@ export type Database = {
           p_title: string | null
           p_description: string | null
           p_has_description: boolean
+          p_start_at: string | null
+          p_end_at: string | null
+          p_has_end_at: boolean
           p_start_time: string | null
           p_end_time: string | null
           p_is_all_day: boolean | null

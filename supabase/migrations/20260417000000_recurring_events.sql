@@ -357,6 +357,9 @@ CREATE OR REPLACE FUNCTION update_series_authorized(
   p_title                  text,
   p_description            text,
   p_has_description        boolean,
+  p_start_at               timestamptz,
+  p_end_at                 timestamptz,
+  p_has_end_at             boolean,
   p_start_time             time,
   p_end_time               time,
   p_is_all_day             boolean,
@@ -370,6 +373,7 @@ AS $$
 DECLARE
   v_event      events%rowtype;
   v_has_access boolean;
+  v_resolved_occurrence_date date;
 BEGIN
   SELECT * INTO v_event FROM events WHERE id = p_event_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'not_found'; END IF;
@@ -400,21 +404,16 @@ BEGIN
   -- ── Apply update by scope ────────────────────────────────
 
   IF p_scope = 'single' THEN
+    v_resolved_occurrence_date := COALESCE(p_start_at, v_event.start_at)::date;
+
     UPDATE events SET
       title       = COALESCE(p_title, title),
       description = CASE WHEN p_has_description THEN p_description ELSE description END,
-      start_at    = CASE
-                      WHEN COALESCE(p_is_all_day, is_all_day) THEN (series_occurrence_date::text || 'T00:00:00Z')::timestamptz
-                      WHEN p_start_time IS NOT NULL            THEN (series_occurrence_date::text || 'T' || p_start_time::text || 'Z')::timestamptz
-                      ELSE start_at
-                    END,
-      end_at      = CASE
-                      WHEN COALESCE(p_is_all_day, is_all_day) THEN (series_occurrence_date::text || 'T00:00:00Z')::timestamptz
-                      WHEN p_end_time IS NOT NULL              THEN (series_occurrence_date::text || 'T' || p_end_time::text || 'Z')::timestamptz
-                      ELSE end_at
-                    END,
+      start_at    = COALESCE(p_start_at, start_at),
+      end_at      = CASE WHEN p_has_end_at THEN p_end_at ELSE end_at END,
       is_all_day  = COALESCE(p_is_all_day, is_all_day),
-      calendar_id = CASE WHEN p_has_calendar_id THEN p_calendar_id ELSE calendar_id END
+      calendar_id = CASE WHEN p_has_calendar_id THEN p_calendar_id ELSE calendar_id END,
+      series_occurrence_date = v_resolved_occurrence_date
     WHERE id = p_event_id;
 
     IF p_reminder_minutes IS NOT NULL THEN
@@ -448,16 +447,17 @@ BEGIN
         OR series_occurrence_date >= p_anchor_occurrence_date
       );
 
-    -- Update series template
-    UPDATE recurrence_series SET
-      title            = COALESCE(p_title, title),
-      description      = CASE WHEN p_has_description THEN p_description ELSE description END,
-      start_time       = COALESCE(p_start_time, start_time),
-      end_time         = COALESCE(p_end_time, end_time),
-      is_all_day       = COALESCE(p_is_all_day, is_all_day),
-      calendar_id      = CASE WHEN p_has_calendar_id THEN p_calendar_id ELSE calendar_id END,
-      reminder_minutes = COALESCE(p_reminder_minutes, reminder_minutes)
-    WHERE id = v_event.series_id;
+    IF p_scope = 'all' THEN
+      UPDATE recurrence_series SET
+        title            = COALESCE(p_title, title),
+        description      = CASE WHEN p_has_description THEN p_description ELSE description END,
+        start_time       = COALESCE(p_start_time, start_time),
+        end_time         = COALESCE(p_end_time, end_time),
+        is_all_day       = COALESCE(p_is_all_day, is_all_day),
+        calendar_id      = CASE WHEN p_has_calendar_id THEN p_calendar_id ELSE calendar_id END,
+        reminder_minutes = COALESCE(p_reminder_minutes, reminder_minutes)
+      WHERE id = v_event.series_id;
+    END IF;
 
     IF p_reminder_minutes IS NOT NULL THEN
       DELETE FROM event_reminders er
@@ -491,5 +491,5 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION update_series_authorized(
-  uuid, uuid, text, date, text, text, boolean, time, time, boolean, uuid, boolean, int[]
+  uuid, uuid, text, date, text, text, boolean, timestamptz, timestamptz, boolean, time, time, boolean, uuid, boolean, int[]
 ) FROM public, anon, authenticated;
