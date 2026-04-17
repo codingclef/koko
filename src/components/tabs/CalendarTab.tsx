@@ -28,6 +28,8 @@ import { EventDetailSheet } from '@/components/calendar/EventDetailSheet'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
 import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
+import { RecurrenceScopeSheet } from '@/components/calendar/RecurrenceScopeSheet'
+import type { RecurrenceScope } from '@/types/recurrence'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { postJsonWithAuth, patchJsonWithAuth, deleteWithAuth } from '@/lib/api-client'
 import type { Calendar } from '@/lib/calendar'
@@ -81,6 +83,7 @@ export function CalendarTab({
   const [showCalendarList, setShowCalendarList] = useState(false)
   const [showYearMonthPicker, setShowYearMonthPicker] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [seriesScopeTarget, setSeriesScopeTarget] = useState<{ event: CalendarEvent; mode: 'edit' | 'delete' } | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const yearMonthButtonRef = useRef<HTMLButtonElement>(null)
@@ -470,6 +473,8 @@ export function CalendarTab({
     endAt: string | null
     isAllDay: boolean
     reminderMinutes: number[]
+    recurrence: import('@/types/recurrence').RecurrenceRule | null
+    scope?: RecurrenceScope
   }) => {
     if (!familyId) return
     setMutationError(null)
@@ -478,6 +483,7 @@ export function CalendarTab({
       clearFamilyMonthEventsCache(familyId)
 
       if (editingEvent?.event) {
+        const scope = (editingEvent.event as CalendarEvent & { _seriesScope?: RecurrenceScope })._seriesScope ?? params.scope ?? 'single'
         await patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
           calendarId: params.calendarId,
           title: params.title,
@@ -486,6 +492,10 @@ export function CalendarTab({
           endAt: params.endAt,
           isAllDay: params.isAllDay,
           reminderMinutes: params.reminderMinutes,
+          ...(editingEvent.event.series_id ? {
+            scope,
+            anchorOccurrenceDate: editingEvent.event.series_occurrence_date,
+          } : {}),
         })
       } else {
         await postJsonWithAuth('/api/events', {
@@ -496,6 +506,7 @@ export function CalendarTab({
           endAt: params.endAt,
           isAllDay: params.isAllDay,
           reminderMinutes: params.reminderMinutes,
+          ...(params.recurrence ? { recurrence: params.recurrence } : {}),
         })
       }
 
@@ -509,13 +520,24 @@ export function CalendarTab({
     }
   }
 
-  const handleEventDelete = async () => {
+  const handleEventDelete = async (scope?: RecurrenceScope) => {
     if (!selectedEvent || !familyId) return
     setMutationError(null)
 
+    // Series event: show scope picker if no scope provided
+    if (selectedEvent.series_id && !scope) {
+      setSeriesScopeTarget({ event: selectedEvent, mode: 'delete' })
+      return
+    }
+
     try {
       clearFamilyMonthEventsCache(familyId)
-      await deleteWithAuth(`/api/events/${selectedEvent.id}`)
+
+      const url = selectedEvent.series_id && scope
+        ? `/api/events/${selectedEvent.id}?scope=${scope}&anchorOccurrenceDate=${selectedEvent.series_occurrence_date ?? ''}`
+        : `/api/events/${selectedEvent.id}`
+
+      await deleteWithAuth(url)
       setSelectedEvent(null)
       await refreshEvents()
       broadcast()
@@ -527,8 +549,30 @@ export function CalendarTab({
     }
   }
 
+  const handleSeriesScopeSelect = async (scope: RecurrenceScope) => {
+    const target = seriesScopeTarget
+    setSeriesScopeTarget(null)
+    if (!target) return
+
+    if (target.mode === 'delete') {
+      await handleEventDelete(scope)
+    } else {
+      // mode === 'edit': open edit form with scope context
+      setEditingEvent({ event: { ...target.event, _seriesScope: scope } as CalendarEvent & { _seriesScope: RecurrenceScope } })
+      setSelectedEvent(null)
+    }
+  }
+
   const openEditEvent = async () => {
     if (!selectedEvent) return
+
+    // Series event: show scope picker first
+    if (selectedEvent.series_id) {
+      setSeriesScopeTarget({ event: selectedEvent, mode: 'edit' })
+      setSelectedEvent(null)
+      return
+    }
+
     setEditingEvent({ event: selectedEvent })
     setSelectedEvent(null)
   }
@@ -707,6 +751,14 @@ export function CalendarTab({
         />
       )}
 
+      {seriesScopeTarget && (
+        <RecurrenceScopeSheet
+          mode={seriesScopeTarget.mode}
+          onSelect={handleSeriesScopeSelect}
+          onClose={() => setSeriesScopeTarget(null)}
+        />
+      )}
+
       {showYearMonthPicker && (
         <YearMonthPickerSheet
           year={year}
@@ -763,6 +815,8 @@ function EventFormModalWithReminders({
     endAt: string | null
     isAllDay: boolean
     reminderMinutes: number[]
+    recurrence: import('@/types/recurrence').RecurrenceRule | null
+    scope?: RecurrenceScope
   }) => Promise<void>
 }) {
   const [reminderMinutes, setReminderMinutes] = useState<number[] | null>(event ? null : [])

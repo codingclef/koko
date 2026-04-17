@@ -180,6 +180,7 @@ export async function getEventsByMonth(
     .from('events')
     .select('*')
     .eq('family_id', familyId)
+    .eq('is_cancelled', false)
     .gte('start_at', start)
     .lte('start_at', end)
     .order('start_at', { ascending: true })
