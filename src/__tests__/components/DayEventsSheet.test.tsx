@@ -19,6 +19,9 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     start_at: '2026-04-13T09:00:00',
     end_at: null,
     is_all_day: false,
+    is_cancelled: false,
+    series_id: null,
+    series_occurrence_date: null,
     ...overrides,
   }
 }

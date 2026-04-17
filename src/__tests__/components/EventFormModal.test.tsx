@@ -182,6 +182,9 @@ describe('EventFormModal', () => {
       start_at: '2026-03-31T09:00:00.000Z',
       end_at: '2026-03-31T10:00:00.000Z',
       is_all_day: false,
+      is_cancelled: false,
+      series_id: null,
+      series_occurrence_date: null,
       created_at: '',
       updated_at: '',
     }
