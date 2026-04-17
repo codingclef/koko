@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { ThemeProvider } from 'next-themes'
 import { cookies } from 'next/headers'
 import { THEME_STORAGE_KEY } from '@/lib/preferences'
@@ -15,8 +15,14 @@ export const metadata: Metadata = {
   },
   other: {
     'mobile-web-app-capable': 'yes',
-    'theme-color': '#fb923c',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafaf9' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f0e0d' },
+  ],
 }
 
 // Prevents FOUC: localStorage takes priority; cookie is the SSR-safe fallback
