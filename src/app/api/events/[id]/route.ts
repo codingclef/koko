@@ -11,6 +11,10 @@ interface UpdateEventRequest {
   description?: string | null
   startAt?: string
   endAt?: string | null
+  localStartDate?: string
+  localEndDate?: string
+  startTime?: string | null
+  endTime?: string | null
   isAllDay?: boolean
   reminderMinutes?: number[]
   // series-only
@@ -57,12 +61,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (scope === 'following' && !body.anchorOccurrenceDate) {
     return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
   }
+
+  const requestedOccurrenceDate = body.localStartDate ?? (body.startAt ? getIsoDatePart(body.startAt) : null)
   if (
     scope &&
     scope !== 'single' &&
-    body.startAt &&
+    requestedOccurrenceDate &&
     body.anchorOccurrenceDate &&
-    getIsoDatePart(body.startAt) !== body.anchorOccurrenceDate
+    requestedOccurrenceDate !== body.anchorOccurrenceDate
   ) {
     return NextResponse.json(
       { error: 'Changing occurrence date requires single scope' },
@@ -72,9 +78,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // ── Series update ────────────────────────────────────────
   if (scope) {
-    // Extract time portion from startAt / endAt if provided
-    const startTime = body.startAt ? new Date(body.startAt).toISOString().slice(11, 19) : null
-    const endTime   = body.endAt   ? new Date(body.endAt).toISOString().slice(11, 19)   : null
+    const startTime = body.startTime ?? (body.startAt ? new Date(body.startAt).toISOString().slice(11, 19) : null)
+    const endTime = body.endTime ?? (body.endAt ? new Date(body.endAt).toISOString().slice(11, 19) : null)
 
     const { data: result, error } = await supabaseAdmin.rpc('update_series_authorized', {
       p_actor_user_id:          actorUserId,

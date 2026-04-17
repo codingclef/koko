@@ -113,6 +113,8 @@ describe('EventFormModal', () => {
         isAllDay: true,
         startAt: expect.any(String),
         endAt: expect.any(String),
+        localStartDate: '2026-03-31',
+        localEndDate: '2026-03-31',
       })
     )
   })

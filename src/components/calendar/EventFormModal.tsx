@@ -53,6 +53,8 @@ interface Props {
     description: string | null
     startAt: string
     endAt: string | null
+    localStartDate: string
+    localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
     recurrence: RecurrenceRule | null
@@ -209,6 +211,8 @@ export function EventFormModal({
         description: description.trim() || null,
         startAt,
         endAt,
+        localStartDate: startDate,
+        localEndDate: endDate,
         isAllDay,
         reminderMinutes: Array.from(reminderMinutes),
         recurrence: isNewEvent ? recurrence : null,

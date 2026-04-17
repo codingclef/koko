@@ -57,13 +57,13 @@ CREATE POLICY "select_recurrence_rules" ON recurrence_rules
     EXISTS (
       SELECT 1 FROM recurrence_series rs
       WHERE rs.rule_id = recurrence_rules.id
-        AND rs.family_id = ANY(get_my_family_ids())
+        AND rs.family_id IN (SELECT get_my_family_ids())
     )
   );
 
 -- recurrence_series: readable by family members
 CREATE POLICY "select_recurrence_series" ON recurrence_series
-  FOR SELECT USING (family_id = ANY(get_my_family_ids()));
+  FOR SELECT USING (family_id IN (SELECT get_my_family_ids()));
 
 -- ── Helper: insert one series event instance ─────────────────
 

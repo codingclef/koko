@@ -136,6 +136,8 @@ describe('PATCH /api/events/[id] (series scope)', () => {
       title: '회의',
       scope: 'following',
       anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      localEndDate: '2026-04-17',
     }
     const res = await PATCH(
       makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
@@ -175,11 +177,42 @@ describe('PATCH /api/events/[id] (series scope)', () => {
     )
   })
 
+  it('scope=following인 종일 일정은 localStartDate 기준으로 날짜 유지 여부를 판단한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: { is_changed: true, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-17T00:00:00Z', series_id: SERIES_ID },
+      error: null,
+    })
+    const body = {
+      title: '회의',
+      scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      localEndDate: '2026-04-17',
+      startAt: '2026-04-16T15:00:00.000Z',
+      endAt: '2026-04-16T15:00:00.000Z',
+      isAllDay: true,
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_series_authorized',
+      expect.objectContaining({
+        p_scope: 'following',
+        p_start_time: '15:00:00',
+        p_end_time: '15:00:00',
+      })
+    )
+  })
+
   it('following scope에서 날짜 이동을 요청하면 400을 반환한다', async () => {
     const body = {
       title: '회의',
       scope: 'following',
       anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-18',
       startAt: '2026-04-18T09:00:00.000Z',
     }
     const res = await PATCH(

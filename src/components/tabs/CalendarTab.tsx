@@ -471,6 +471,8 @@ export function CalendarTab({
     description: string | null
     startAt: string
     endAt: string | null
+    localStartDate: string
+    localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
     recurrence: import('@/types/recurrence').RecurrenceRule | null
@@ -484,14 +486,21 @@ export function CalendarTab({
 
       if (editingEvent?.event) {
         const scope = (editingEvent.event as CalendarEvent & { _seriesScope?: RecurrenceScope })._seriesScope ?? params.scope ?? 'single'
+        const isScopedSeriesEdit = Boolean(editingEvent.event.series_id && scope !== 'single')
         await patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
           calendarId: params.calendarId,
           title: params.title,
           description: params.description,
-          startAt: params.startAt,
-          endAt: params.endAt,
+          startAt: isScopedSeriesEdit ? undefined : params.startAt,
+          endAt: isScopedSeriesEdit ? undefined : params.endAt,
+          localStartDate: params.localStartDate,
+          localEndDate: params.localEndDate,
           isAllDay: params.isAllDay,
           reminderMinutes: params.reminderMinutes,
+          ...(isScopedSeriesEdit && !params.isAllDay ? {
+            startTime: new Date(params.startAt).toISOString().slice(11, 19),
+            endTime: params.endAt ? new Date(params.endAt).toISOString().slice(11, 19) : null,
+          } : {}),
           ...(editingEvent.event.series_id ? {
             scope,
             anchorOccurrenceDate: editingEvent.event.series_occurrence_date,
@@ -813,6 +822,8 @@ function EventFormModalWithReminders({
     description: string | null
     startAt: string
     endAt: string | null
+    localStartDate: string
+    localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
     recurrence: import('@/types/recurrence').RecurrenceRule | null
