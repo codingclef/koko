@@ -28,6 +28,7 @@ function makeEvent(overrides: Partial<CalendarEvent>): CalendarEvent {
     end_at: null,
     is_all_day: false,
     is_cancelled: false,
+    label_color: null,
     series_id: null,
     series_occurrence_date: null,
     created_at: '',
@@ -426,5 +427,31 @@ describe('CalendarGrid', () => {
     expect(calledDate.getFullYear()).toBe(2025)
     expect(calledDate.getMonth()).toBe(5)
     expect(calledDate.getDate()).toBe(10)
+  })
+})
+
+// ── label_color 색상 우선순위 ────────────────────────────────
+
+describe('라벨 색상 우선순위', () => {
+  it('label_color가 있으면 일정 칩이 label_color를 사용한다', () => {
+    const event = makeEvent({ label_color: '#10b981', title: '에메랄드 일정' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('에메랄드 일정')
+    expect(chip.style.backgroundColor).toBe('rgb(16, 185, 129)')
+  })
+
+  it('label_color가 null이면 캘린더 색상을 사용한다', () => {
+    const event = makeEvent({ label_color: null, calendar_id: 'cal-1', title: '캘린더색 일정' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('캘린더색 일정')
+    // calendars[0].color = '#f97316'
+    expect(chip.style.backgroundColor).toBe('rgb(249, 115, 22)')
+  })
+
+  it('label_color도 없고 calendar_id도 null이면 fallback 색상을 사용한다', () => {
+    const event = makeEvent({ label_color: null, calendar_id: null, title: '폴백 일정' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('폴백 일정')
+    expect(chip.style.backgroundColor).toBe('rgb(148, 163, 184)')
   })
 })

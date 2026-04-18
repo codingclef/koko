@@ -36,6 +36,7 @@ import type { Calendar } from '@/lib/calendar'
 
 interface Props extends AuthState {
   preferences: UserPreferences | null
+  updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
   calendars: Calendar[]
   calendarsError: unknown
   reloadCalendars: () => Promise<unknown>
@@ -61,6 +62,7 @@ function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
 
 export function CalendarTab({
   preferences,
+  updatePreferences,
   user,
   familyId,
   calendars,
@@ -476,6 +478,7 @@ export function CalendarTab({
     isAllDay: boolean
     reminderMinutes: number[]
     recurrence: import('@/types/recurrence').RecurrenceRule | null
+    labelColor: string | null
     scope?: RecurrenceScope
   }) => {
     if (!familyId) return
@@ -484,39 +487,54 @@ export function CalendarTab({
     try {
       clearFamilyMonthEventsCache(familyId)
 
+      const saveLastLabelColor = (color: string | null, prev: string | null = null) => {
+        if (color !== null && color !== prev) {
+          updatePreferences({ last_label_color: color }).catch(() => {})
+        }
+      }
+
       if (editingEvent?.event) {
+        const prevLabelColor = editingEvent.event.label_color ?? null
         const scope = (editingEvent.event as CalendarEvent & { _seriesScope?: RecurrenceScope })._seriesScope ?? params.scope ?? 'single'
         const isScopedSeriesEdit = Boolean(editingEvent.event.series_id && scope !== 'single')
-        await patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
-          calendarId: params.calendarId,
-          title: params.title,
-          description: params.description,
-          startAt: isScopedSeriesEdit ? undefined : params.startAt,
-          endAt: isScopedSeriesEdit ? undefined : params.endAt,
-          localStartDate: params.localStartDate,
-          localEndDate: params.localEndDate,
-          isAllDay: params.isAllDay,
-          reminderMinutes: params.reminderMinutes,
-          ...(isScopedSeriesEdit && !params.isAllDay ? {
-            startTime: new Date(params.startAt).toISOString().slice(11, 19),
-            endTime: params.endAt ? new Date(params.endAt).toISOString().slice(11, 19) : null,
-          } : {}),
-          ...(editingEvent.event.series_id ? {
-            scope,
-            anchorOccurrenceDate: editingEvent.event.series_occurrence_date,
-          } : {}),
-        })
+        await Promise.all([
+          patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
+            calendarId: params.calendarId,
+            title: params.title,
+            description: params.description,
+            startAt: isScopedSeriesEdit ? undefined : params.startAt,
+            endAt: isScopedSeriesEdit ? undefined : params.endAt,
+            localStartDate: params.localStartDate,
+            localEndDate: params.localEndDate,
+            isAllDay: params.isAllDay,
+            reminderMinutes: params.reminderMinutes,
+            labelColor: params.labelColor,
+            ...(isScopedSeriesEdit && !params.isAllDay ? {
+              startTime: new Date(params.startAt).toISOString().slice(11, 19),
+              endTime: params.endAt ? new Date(params.endAt).toISOString().slice(11, 19) : null,
+            } : {}),
+            ...(editingEvent.event.series_id ? {
+              scope,
+              anchorOccurrenceDate: editingEvent.event.series_occurrence_date,
+            } : {}),
+          }),
+          Promise.resolve(saveLastLabelColor(params.labelColor, prevLabelColor)),
+        ])
       } else {
-        await postJsonWithAuth('/api/events', {
-          calendarId: params.calendarId,
-          title: params.title,
-          description: params.description,
-          startAt: params.startAt,
-          endAt: params.endAt,
-          isAllDay: params.isAllDay,
-          reminderMinutes: params.reminderMinutes,
-          ...(params.recurrence ? { recurrence: params.recurrence } : {}),
-        })
+        await Promise.all([
+          postJsonWithAuth('/api/events', {
+            calendarId: params.calendarId,
+            title: params.title,
+            description: params.description,
+            startAt: params.startAt,
+            endAt: params.endAt,
+            isAllDay: params.isAllDay,
+            reminderMinutes: params.reminderMinutes,
+            labelColor: params.labelColor,
+            ...(params.recurrence ? { recurrence: params.recurrence } : {}),
+          }),
+          Promise.resolve(saveLastLabelColor(params.labelColor)),
+        ])
       }
 
       await refreshEvents()
@@ -753,8 +771,10 @@ export function CalendarTab({
 
       {editingEvent && (
         <EventFormModalWithReminders
+          key={editingEvent.event?.id ?? 'new'}
           event={editingEvent.event}
           date={editingEvent.date}
+          defaultLabelColor={preferences?.last_label_color ?? null}
           calendars={calendars}
           onClose={() => setEditingEvent(null)}
           onSave={handleEventSave}
@@ -809,12 +829,14 @@ export function CalendarTab({
 function EventFormModalWithReminders({
   event,
   date,
+  defaultLabelColor,
   calendars,
   onClose,
   onSave,
 }: {
   event?: CalendarEvent
   date?: Date
+  defaultLabelColor?: string | null
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -828,6 +850,7 @@ function EventFormModalWithReminders({
     isAllDay: boolean
     reminderMinutes: number[]
     recurrence: import('@/types/recurrence').RecurrenceRule | null
+    labelColor: string | null
     scope?: RecurrenceScope
   }) => Promise<void>
 }) {
@@ -849,6 +872,7 @@ function EventFormModalWithReminders({
       initialDate={date}
       initialReminderMinutes={reminderMinutes}
       recurrenceScope={recurrenceScope}
+      defaultLabelColor={defaultLabelColor}
       calendars={calendars}
       onClose={onClose}
       onSave={onSave}

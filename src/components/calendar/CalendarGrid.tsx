@@ -185,6 +185,7 @@ export function CalendarGrid({
   }, [singleDayEvents])
 
   const getEventColor = (event: CalendarEvent): string => {
+    if (event.label_color) return event.label_color
     if (!event.calendar_id) return '#94a3b8'
     return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
   }

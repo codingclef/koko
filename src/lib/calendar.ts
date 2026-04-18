@@ -32,6 +32,8 @@ export const CALENDAR_COLOR_NAMES: Record<string, string> = {
   '#eab308': '노란색',
 }
 
+export { LABEL_COLORS, LABEL_COLOR_NAMES } from './label-colors'
+
 export type SaveResult = { status: 'success' } | { status: 'partial' }
 
 export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [

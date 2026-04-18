@@ -41,6 +41,7 @@ describe('useUserPreferences', () => {
       holiday_countries: ['KR', 'JP'],
       app_theme: 'tangerine',
       show_lunar: false,
+      last_label_color: null,
       created_at: '',
       updated_at: '',
     }
@@ -75,6 +76,7 @@ describe('useUserPreferences', () => {
       holiday_countries: ['KR'],
       app_theme: 'tangerine',
       show_lunar: false,
+      last_label_color: null,
       created_at: '',
       updated_at: '',
     }
@@ -97,6 +99,7 @@ describe('useUserPreferences', () => {
       holiday_countries: ['KR'],
       app_theme: 'ocean',
       show_lunar: false,
+      last_label_color: null,
       created_at: '',
       updated_at: '',
     }
@@ -122,6 +125,7 @@ describe('useUserPreferences', () => {
       holiday_countries: ['KR'],
       app_theme: 'violet',
       show_lunar: false,
+      last_label_color: null,
       created_at: '',
       updated_at: '',
     }
@@ -153,6 +157,7 @@ describe('useUserPreferences', () => {
       holiday_countries: ['KR'],
       app_theme: 'ocean',
       show_lunar: false,
+      last_label_color: null,
       created_at: '',
       updated_at: '',
     }

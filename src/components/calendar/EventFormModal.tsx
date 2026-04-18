@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Bell, RefreshCw } from 'lucide-react'
-import { REMINDER_OPTIONS, type Calendar, type CalendarEvent } from '@/lib/calendar'
+import { X, Bell, RefreshCw, Check, Tag } from 'lucide-react'
+import { REMINDER_OPTIONS, LABEL_COLORS, LABEL_COLOR_NAMES, type Calendar, type CalendarEvent } from '@/lib/calendar'
 import { TimeWheelPicker } from './TimeWheelPicker'
 import { RecurrencePickerSheet } from './RecurrencePickerSheet'
 import { RecurrenceCustomModal } from './RecurrenceCustomModal'
@@ -45,6 +45,7 @@ interface Props {
   initialDate?: Date
   initialReminderMinutes?: number[]
   recurrenceScope?: RecurrenceScope
+  defaultLabelColor?: string | null
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -58,6 +59,7 @@ interface Props {
     isAllDay: boolean
     reminderMinutes: number[]
     recurrence: RecurrenceRule | null
+    labelColor: string | null
   }) => Promise<void>
 }
 
@@ -66,6 +68,7 @@ export function EventFormModal({
   initialDate,
   initialReminderMinutes = [],
   recurrenceScope,
+  defaultLabelColor,
   calendars,
   onClose,
   onSave,
@@ -104,6 +107,10 @@ export function EventFormModal({
   const [reminderMinutes, setReminderMinutes] = useState<Set<number>>(
     new Set(initialReminderMinutes)
   )
+  const [labelColor, setLabelColor] = useState<string | null>(
+    initial?.label_color ?? defaultLabelColor ?? null
+  )
+  const [labelPickerOpen, setLabelPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -216,6 +223,7 @@ export function EventFormModal({
         isAllDay,
         reminderMinutes: Array.from(reminderMinutes),
         recurrence: isNewEvent ? recurrence : null,
+        labelColor,
       })
       onClose()
     } catch (e) {
@@ -293,6 +301,71 @@ export function EventFormModal({
               className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isAllDay ? 'translate-x-5' : 'translate-x-0'}`}
             />
           </button>
+        </div>
+
+        {/* 라벨 색상 */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setLabelPickerOpen((v) => !v)}
+            className="flex items-center justify-between w-full py-2.5"
+          >
+            <div className="flex items-center gap-2">
+              <Tag size={14} className="text-stone-400" />
+              <span className="text-sm text-stone-600 dark:text-stone-300">라벨 색상</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {labelColor ? (
+                <>
+                  <span
+                    className="w-4 h-4 rounded-full shrink-0"
+                    style={{ backgroundColor: labelColor }}
+                  />
+                  <span className="text-xs text-stone-500 dark:text-stone-400">
+                    {LABEL_COLOR_NAMES[labelColor] ?? labelColor}
+                  </span>
+                </>
+              ) : (
+                <span className="text-xs text-stone-400">캘린더 색상 사용</span>
+              )}
+            </div>
+          </button>
+
+          {labelPickerOpen && (
+            <div className="mt-2 mb-1">
+              <div className="flex flex-wrap gap-2.5 px-1">
+                <button
+                  type="button"
+                  onClick={() => { setLabelColor(null); setLabelPickerOpen(false) }}
+                  className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
+                    labelColor === null
+                      ? 'border-stone-400 dark:border-stone-300'
+                      : 'border-stone-200 dark:border-stone-700'
+                  } bg-gradient-to-br from-stone-200 to-stone-400 dark:from-stone-600 dark:to-stone-800`}
+                  title="캘린더 색상 사용"
+                >
+                  {labelColor === null && <Check size={12} className="text-white" strokeWidth={3} />}
+                </button>
+
+                {LABEL_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => { setLabelColor(color); setLabelPickerOpen(false) }}
+                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
+                      labelColor === color
+                        ? 'border-stone-800 dark:border-white scale-110'
+                        : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={LABEL_COLOR_NAMES[color]}
+                  >
+                    {labelColor === color && <Check size={12} className="text-white" strokeWidth={3} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 날짜/시간 */}

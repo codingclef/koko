@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEventNotification } from '@/lib/push-utils'
 import type { RecurrenceScope } from '@/types/recurrence'
 import { VALID_SCOPES } from '@/types/recurrence'
+import { ALLOWED_LABEL_COLORS } from '@/lib/label-colors'
 
 interface UpdateEventRequest {
   calendarId?: string | null
@@ -17,6 +18,7 @@ interface UpdateEventRequest {
   endTime?: string | null
   isAllDay?: boolean
   reminderMinutes?: number[]
+  labelColor?: string | null
   // series-only
   scope?: RecurrenceScope
   anchorOccurrenceDate?: string | null
@@ -58,6 +60,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (scope !== undefined && !VALID_SCOPES.includes(scope)) {
     return NextResponse.json({ error: 'Invalid scope' }, { status: 400 })
   }
+
+  if ('labelColor' in body && body.labelColor !== null && body.labelColor !== undefined
+      && !ALLOWED_LABEL_COLORS.has(body.labelColor)) {
+    return NextResponse.json({ error: 'Invalid label color' }, { status: 400 })
+  }
   if (scope === 'following' && !body.anchorOccurrenceDate) {
     return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
   }
@@ -98,6 +105,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       p_calendar_id:            body.calendarId ?? null,
       p_has_calendar_id:        'calendarId' in body,
       p_reminder_minutes:       body.reminderMinutes ?? null,
+      p_label_color:            body.labelColor ?? null,
+      p_has_label_color:        'labelColor' in body,
     })
 
     if (error) {
@@ -137,6 +146,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     p_calendar_id:      body.calendarId ?? null,
     p_has_calendar_id:  'calendarId' in body,
     p_reminder_minutes: body.reminderMinutes ?? null,
+    p_label_color:      body.labelColor ?? null,
+    p_has_label_color:  'labelColor' in body,
   })
 
   if (error) {

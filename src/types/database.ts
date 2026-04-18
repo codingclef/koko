@@ -68,6 +68,7 @@ export type Database = {
           holiday_countries: string[]
           app_theme: string
           show_lunar: boolean
+          last_label_color: string | null
           created_at: string
           updated_at: string
         }
@@ -76,6 +77,7 @@ export type Database = {
           holiday_countries?: string[]
           app_theme?: string
           show_lunar?: boolean
+          last_label_color?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -84,6 +86,7 @@ export type Database = {
           holiday_countries?: string[]
           app_theme?: string
           show_lunar?: boolean
+          last_label_color?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -234,6 +237,7 @@ export type Database = {
           id: string
           is_all_day: boolean
           is_cancelled: boolean
+          label_color: string | null
           series_id: string | null
           series_occurrence_date: string | null
           start_at: string
@@ -250,6 +254,7 @@ export type Database = {
           id?: string
           is_all_day?: boolean
           is_cancelled?: boolean
+          label_color?: string | null
           series_id?: string | null
           series_occurrence_date?: string | null
           start_at: string
@@ -266,6 +271,7 @@ export type Database = {
           id?: string
           is_all_day?: boolean
           is_cancelled?: boolean
+          label_color?: string | null
           series_id?: string | null
           series_occurrence_date?: string | null
           start_at?: string
