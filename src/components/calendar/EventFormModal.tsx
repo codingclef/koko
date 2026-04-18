@@ -108,7 +108,7 @@ export function EventFormModal({
     new Set(initialReminderMinutes)
   )
   const [labelColor, setLabelColor] = useState<string | null>(
-    initial?.label_color ?? defaultLabelColor ?? null
+    initial ? initial.label_color : (defaultLabelColor ?? null)
   )
   const [labelPickerOpen, setLabelPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
