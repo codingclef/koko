@@ -286,6 +286,12 @@ describe('CalendarGrid', () => {
     expect(defaultProps.onSelectDate).toHaveBeenCalledTimes(1)
   })
 
+  it('날짜 셀에 aria-label이 있다', () => {
+    render(<CalendarGrid {...defaultProps} />)
+    // 2025년 6월 15일 셀 확인
+    expect(screen.getByRole('button', { name: '2025년 6월 15일' })).toBeInTheDocument()
+  })
+
   it('단일 이벤트 pill이 렌더링된다', () => {
     render(<CalendarGrid {...defaultProps} />)
     expect(screen.getByText('생일파티')).toBeInTheDocument()
@@ -448,11 +454,12 @@ describe('라벨 색상 우선순위', () => {
     expect(chip.style.backgroundColor).toBe('rgb(249, 115, 22)')
   })
 
-  it('label_color도 없고 calendar_id도 null이면 fallback 색상을 사용한다', () => {
+  it('label_color도 없고 calendar_id도 null이면 fallback CSS 변수를 사용한다', () => {
     const event = makeEvent({ is_all_day: true, label_color: null, calendar_id: null, title: '폴백 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('폴백 일정')
-    expect(chip.style.backgroundColor).toBe('rgb(148, 163, 184)')
+    // jsdom does not resolve CSS variables — value stays as the var() string
+    expect(chip.style.backgroundColor).toContain('stone-400')
   })
 })
 
@@ -471,14 +478,14 @@ describe('칩 variant', () => {
     expect(chip.className).toContain('text-white')
   })
 
-  it('is_all_day=false 단일 일정은 tint 배경 + colored text + inset boxShadow로 렌더된다', () => {
+  it('is_all_day=false 단일 일정은 tint 배경 + colored text로 렌더된다', () => {
     const event = makeEvent({ is_all_day: false, title: '시간일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('시간일정')
     // jsdom normalizes hex → rgb/rgba
     expect(chip.style.backgroundColor).toBe('rgba(249, 115, 22, 0.094)')
     expect(chip.style.color).toBe('rgb(249, 115, 22)')
-    expect(chip.style.boxShadow).toContain('2px 0 0')
+    expect(chip.style.boxShadow).toBe('')
     expect(chip.className).not.toContain('text-white')
   })
 

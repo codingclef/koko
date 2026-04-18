@@ -186,17 +186,13 @@ export function CalendarGrid({
 
   const getEventColor = (event: CalendarEvent): string => {
     if (event.label_color) return event.label_color
-    if (!event.calendar_id) return '#94a3b8'
-    return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
+    if (!event.calendar_id) return 'var(--color-stone-400)'
+    return calendarMap.get(event.calendar_id)?.color ?? 'var(--color-stone-400)'
   }
 
   const getChipStyle = (isAllDay: boolean, color: string): CSSProperties => {
     if (isAllDay) return { backgroundColor: color }
-    return {
-      backgroundColor: color + '18',
-      color,
-      boxShadow: `inset 2px 0 0 ${color}`,
-    }
+    return { backgroundColor: color + '18', color }
   }
 
   const lunarDateMap = useMemo(() => {
@@ -259,6 +255,7 @@ export function CalendarGrid({
                     <button
                       key={colIdx}
                       onClick={() => onSelectDate(cell.date)}
+                      aria-label={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
                       className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
                         isSelected
                           ? 'bg-accent-50 dark:bg-accent-950/30'
