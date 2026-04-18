@@ -109,7 +109,6 @@ export function CalendarTab({
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [eventsError, setEventsError] = useState<unknown>(null)
-  const [hasLoadedEvents, setHasLoadedEvents] = useState(false)
   const monthEventsCacheRef = useRef(new Map<string, CalendarEvent[]>())
   const monthEventsRequestsRef = useRef(new Map<string, Promise<CalendarEvent[]>>())
   const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
@@ -201,7 +200,6 @@ export function CalendarTab({
       setEvents(nextEvents)
       setEventsError(nextError)
       setEventsLoading(false)
-      if (nextError === null) setHasLoadedEvents(true)
     }
 
     if (cached) {
@@ -241,7 +239,6 @@ export function CalendarTab({
         setEvents([])
         setEventsError(null)
         setEventsLoading(false)
-        setHasLoadedEvents(false)
       })
       previousFamilyIdRef.current = null
       return
@@ -255,7 +252,6 @@ export function CalendarTab({
         setEvents([])
         setEventsError(null)
         setEventsLoading(true)
-        setHasLoadedEvents(false)
       })
     }
 
