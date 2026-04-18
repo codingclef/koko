@@ -455,12 +455,22 @@ describe('라벨 색상 우선순위', () => {
     expect(chip.style.backgroundColor).toBe('rgb(232, 148, 84)')
   })
 
-  it('label_color도 없고 calendar_id도 null이면 fallback CSS 변수를 사용한다', () => {
+  it('label_color도 없고 calendar_id도 null이면 fallback hex 색상을 사용한다', () => {
     const event = makeEvent({ is_all_day: true, label_color: null, calendar_id: null, title: '폴백 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('폴백 일정')
-    // jsdom does not resolve CSS variables — value stays as the var() string
-    expect(chip.style.backgroundColor).toContain('stone-400')
+    // fallback #94a3b8 = rgb(148, 163, 184)
+    expect(chip.style.backgroundColor).toBe('rgb(148, 163, 184)')
+  })
+
+  it('calendar_id=null, label_color=null, is_all_day=false 이벤트는 fallback 색 텍스트로 렌더된다', () => {
+    const event = makeEvent({ is_all_day: false, label_color: null, calendar_id: null, title: '폴백 timed' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('폴백 timed')
+    // timed: transparent bg + fallback color text (no var() concatenation bug)
+    expect(chip.style.backgroundColor).toBe('transparent')
+    expect(chip.style.color).toBe('rgb(148, 163, 184)')
+    expect(chip.className).not.toContain('text-white')
   })
 })
 
@@ -480,12 +490,11 @@ describe('칩 variant', () => {
     expect(chip.className).toContain('text-white')
   })
 
-  it('is_all_day=false 단일 일정은 tint 배경 + colored text로 렌더된다', () => {
+  it('is_all_day=false 단일 일정은 transparent 배경 + colored text로 렌더된다', () => {
     const event = makeEvent({ is_all_day: false, title: '시간일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('시간일정')
-    // #e89454 with 18 (9% opacity) → rgba(232, 148, 84, 0.094)
-    expect(chip.style.backgroundColor).toBe('rgba(232, 148, 84, 0.094)')
+    expect(chip.style.backgroundColor).toBe('transparent')
     expect(chip.style.color).toBe('rgb(232, 148, 84)')
     expect(chip.style.boxShadow).toBe('')
     expect(chip.className).not.toContain('text-white')
@@ -501,7 +510,7 @@ describe('칩 variant', () => {
     expect(allDayChip.className).toContain('text-white')
 
     const timedChip = screen.getByText('시간')
-    expect(timedChip.style.backgroundColor).toBe('rgba(232, 148, 84, 0.094)')
+    expect(timedChip.style.backgroundColor).toBe('transparent')
     expect(timedChip.style.color).toBe('rgb(232, 148, 84)')
   })
 
