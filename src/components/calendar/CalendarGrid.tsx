@@ -3,6 +3,7 @@
 import { type CSSProperties, useMemo } from 'react'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 import type { Holiday } from '@/hooks/useHolidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
@@ -185,9 +186,10 @@ export function CalendarGrid({
   }, [singleDayEvents])
 
   const getEventColor = (event: CalendarEvent): string => {
-    if (event.label_color) return event.label_color
-    if (!event.calendar_id) return 'var(--color-stone-400)'
-    return calendarMap.get(event.calendar_id)?.color ?? 'var(--color-stone-400)'
+    const raw = event.label_color
+      ?? calendarMap.get(event.calendar_id ?? '')?.color
+      ?? null
+    return raw ? toDisplayColor(raw) : 'var(--color-stone-400)'
   }
 
   const getChipStyle = (isAllDay: boolean, color: string): CSSProperties => {

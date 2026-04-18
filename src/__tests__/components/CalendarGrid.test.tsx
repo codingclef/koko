@@ -439,19 +439,20 @@ describe('CalendarGrid', () => {
 // ── label_color 색상 우선순위 (is_all_day=true 기준: solid fill) ──
 
 describe('라벨 색상 우선순위', () => {
-  it('label_color가 있으면 일정 칩이 label_color를 사용한다', () => {
+  it('label_color가 있으면 일정 칩이 label_color의 display 색상을 사용한다', () => {
     const event = makeEvent({ is_all_day: true, label_color: '#10b981', title: '에메랄드 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('에메랄드 일정')
-    expect(chip.style.backgroundColor).toBe('rgb(16, 185, 129)')
+    // #10b981 → toDisplayColor → #30b87c = rgb(48, 184, 124)
+    expect(chip.style.backgroundColor).toBe('rgb(48, 184, 124)')
   })
 
-  it('label_color가 null이면 캘린더 색상을 사용한다', () => {
+  it('label_color가 null이면 캘린더 색상의 display 색상을 사용한다', () => {
     const event = makeEvent({ is_all_day: true, label_color: null, calendar_id: 'cal-1', title: '캘린더색 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('캘린더색 일정')
-    // calendars[0].color = '#f97316'
-    expect(chip.style.backgroundColor).toBe('rgb(249, 115, 22)')
+    // calendars[0].color = '#f97316' → toDisplayColor → #e89454 = rgb(232, 148, 84)
+    expect(chip.style.backgroundColor).toBe('rgb(232, 148, 84)')
   })
 
   it('label_color도 없고 calendar_id도 null이면 fallback CSS 변수를 사용한다', () => {
@@ -472,7 +473,8 @@ describe('칩 variant', () => {
     const event = makeEvent({ is_all_day: true, title: '종일일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('종일일정')
-    expect(chip.style.backgroundColor).toBe('rgb(249, 115, 22)')
+    // #f97316 → toDisplayColor → #e89454 = rgb(232, 148, 84)
+    expect(chip.style.backgroundColor).toBe('rgb(232, 148, 84)')
     expect(chip.style.color).toBe('')
     expect(chip.style.boxShadow).toBe('')
     expect(chip.className).toContain('text-white')
@@ -482,9 +484,9 @@ describe('칩 variant', () => {
     const event = makeEvent({ is_all_day: false, title: '시간일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('시간일정')
-    // jsdom normalizes hex → rgb/rgba
-    expect(chip.style.backgroundColor).toBe('rgba(249, 115, 22, 0.094)')
-    expect(chip.style.color).toBe('rgb(249, 115, 22)')
+    // #e89454 with 18 (9% opacity) → rgba(232, 148, 84, 0.094)
+    expect(chip.style.backgroundColor).toBe('rgba(232, 148, 84, 0.094)')
+    expect(chip.style.color).toBe('rgb(232, 148, 84)')
     expect(chip.style.boxShadow).toBe('')
     expect(chip.className).not.toContain('text-white')
   })
@@ -495,12 +497,12 @@ describe('칩 variant', () => {
     render(<CalendarGrid {...defaultProps} events={[allDay, timed]} />)
 
     const allDayChip = screen.getByText('종일')
-    expect(allDayChip.style.backgroundColor).toBe('rgb(249, 115, 22)')
+    expect(allDayChip.style.backgroundColor).toBe('rgb(232, 148, 84)')
     expect(allDayChip.className).toContain('text-white')
 
     const timedChip = screen.getByText('시간')
-    expect(timedChip.style.backgroundColor).toBe('rgba(249, 115, 22, 0.094)')
-    expect(timedChip.style.color).toBe('rgb(249, 115, 22)')
+    expect(timedChip.style.backgroundColor).toBe('rgba(232, 148, 84, 0.094)')
+    expect(timedChip.style.color).toBe('rgb(232, 148, 84)')
   })
 
   it('공휴일 칩은 variant 영향 없이 기존 red solid를 유지한다', () => {

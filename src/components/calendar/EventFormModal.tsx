@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Bell, RefreshCw, Check, Tag } from 'lucide-react'
 import { REMINDER_OPTIONS, LABEL_COLORS, LABEL_COLOR_NAMES, type Calendar, type CalendarEvent } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 import { TimeWheelPicker } from './TimeWheelPicker'
 import { RecurrencePickerSheet } from './RecurrencePickerSheet'
 import { RecurrenceCustomModal } from './RecurrenceCustomModal'
@@ -357,7 +358,7 @@ export function EventFormModal({
                         ? 'border-stone-800 dark:border-white scale-110'
                         : 'border-transparent'
                     }`}
-                    style={{ backgroundColor: color }}
+                    style={{ backgroundColor: toDisplayColor(color) }}
                     title={LABEL_COLOR_NAMES[color]}
                   >
                     {labelColor === color && <Check size={12} className="text-white" strokeWidth={3} />}
