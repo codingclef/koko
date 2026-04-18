@@ -190,6 +190,7 @@ const mockCalendars = [{
 
 const defaultProps = {
   preferences: null,
+  updatePreferences: jest.fn().mockResolvedValue(undefined),
   user: { id: 'user-1' } as User,
   familyId: 'fam-1',
   isInitializing: false,

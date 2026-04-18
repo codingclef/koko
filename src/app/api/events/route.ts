@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEventNotification } from '@/lib/push-utils'
+import { ALLOWED_LABEL_COLORS } from '@/lib/label-colors'
 
 interface RecurrenceInput {
   freq: 'daily' | 'weekly' | 'monthly' | 'yearly'
@@ -20,6 +21,7 @@ interface CreateEventRequest {
   isAllDay: boolean
   reminderMinutes: number[]
   recurrence?: RecurrenceInput | null
+  labelColor?: string | null
 }
 
 export async function POST(req: NextRequest) {
@@ -29,10 +31,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json()) as CreateEventRequest
-  const { calendarId, title, description, startAt, endAt, isAllDay, reminderMinutes, recurrence } = body
+  const { calendarId, title, description, startAt, endAt, isAllDay, reminderMinutes, recurrence, labelColor } = body
 
   if (!title || !startAt) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  if (labelColor !== undefined && labelColor !== null && !ALLOWED_LABEL_COLORS.has(labelColor)) {
+    return NextResponse.json({ error: 'Invalid label color' }, { status: 400 })
   }
 
   // ── Recurring event ──────────────────────────────────────
@@ -51,6 +57,7 @@ export async function POST(req: NextRequest) {
       p_days_of_week:     recurrence.daysOfWeek ?? [],
       p_day_of_month:     recurrence.dayOfMonth ?? null,
       p_end_date:         recurrence.endDate ?? null,
+      p_label_color:      labelColor ?? null,
     })
 
     if (error) {
@@ -98,6 +105,7 @@ export async function POST(req: NextRequest) {
     p_end_at:           endAt,
     p_is_all_day:       isAllDay,
     p_reminder_minutes: reminderMinutes,
+    p_label_color:      labelColor ?? null,
   })
 
   if (error) {

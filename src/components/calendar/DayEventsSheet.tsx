@@ -80,7 +80,7 @@ export function DayEventsSheet({ date, events, calendars, onClose, onSelectEvent
                   >
                     <div
                       className="w-1 self-stretch rounded-full shrink-0"
-                      style={{ backgroundColor: cal?.color ?? '#94a3b8' }}
+                      style={{ backgroundColor: evt.label_color ?? cal?.color ?? '#94a3b8' }}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
