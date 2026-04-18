@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useAsyncData } from '@/hooks/useAsyncData'
@@ -107,6 +107,7 @@ export function CalendarTab({
   })
 
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [adjacentMonthEvents, setAdjacentMonthEvents] = useState<CalendarEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [eventsError, setEventsError] = useState<unknown>(null)
   const monthEventsCacheRef = useRef(new Map<string, CalendarEvent[]>())
@@ -169,13 +170,34 @@ export function CalendarTab({
     return request
   }, [storeMonthEvents])
 
+  const syncAdjacentFromCache = useCallback((
+    targetFamilyId: string, targetYear: number, targetMonth: number
+  ) => {
+    const expectedKey = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
+    if (visibleMonthKeyRef.current !== expectedKey) return
+
+    const prev = getAdjacentMonth(targetYear, targetMonth, -1)
+    const next = getAdjacentMonth(targetYear, targetMonth, 1)
+    const prevEvents = monthEventsCacheRef.current.get(
+      getMonthEventsKey(targetFamilyId, prev.year, prev.month)
+    ) ?? []
+    const nextEvents = monthEventsCacheRef.current.get(
+      getMonthEventsKey(targetFamilyId, next.year, next.month)
+    ) ?? []
+    setAdjacentMonthEvents([...prevEvents, ...nextEvents])
+  }, [])
+
   const prefetchAdjacentMonths = useCallback((targetFamilyId: string, targetYear: number, targetMonth: number) => {
     const prev = getAdjacentMonth(targetYear, targetMonth, -1)
     const next = getAdjacentMonth(targetYear, targetMonth, 1)
 
-    void fetchMonthEvents(targetFamilyId, prev.year, prev.month).catch(() => {})
-    void fetchMonthEvents(targetFamilyId, next.year, next.month).catch(() => {})
-  }, [fetchMonthEvents])
+    void Promise.all([
+      fetchMonthEvents(targetFamilyId, prev.year, prev.month).catch(() => {}),
+      fetchMonthEvents(targetFamilyId, next.year, next.month).catch(() => {}),
+    ]).then(() => {
+      syncAdjacentFromCache(targetFamilyId, targetYear, targetMonth)
+    })
+  }, [fetchMonthEvents, syncAdjacentFromCache])
 
   const loadMonthEvents = useCallback(async ({
     targetFamilyId,
@@ -204,12 +226,14 @@ export function CalendarTab({
 
     if (cached) {
       applyMonthState(cached)
+      syncAdjacentFromCache(targetFamilyId, targetYear, targetMonth)
       prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
       return cached
     }
 
     if (!silent && isVisibleMonth()) {
       setEvents([])
+      setAdjacentMonthEvents([])
       setEventsLoading(true)
     }
     if (isVisibleMonth()) setEventsError(null)
@@ -217,19 +241,21 @@ export function CalendarTab({
     try {
       const nextEvents = await fetchMonthEvents(targetFamilyId, targetYear, targetMonth, { force })
       applyMonthState(nextEvents)
+      syncAdjacentFromCache(targetFamilyId, targetYear, targetMonth)
       prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
       return nextEvents
     } catch (error) {
       console.error('[CalendarTab] loadEvents failed:', error)
       if (isVisibleMonth()) {
         setEvents([])
+        setAdjacentMonthEvents([])
         setEventsError(error)
         setEventsLoading(false)
       }
       if (throwOnError) throw error
       return []
     }
-  }, [fetchMonthEvents, prefetchAdjacentMonths])
+  }, [fetchMonthEvents, prefetchAdjacentMonths, syncAdjacentFromCache])
 
   useEffect(() => {
     visibleMonthKeyRef.current = familyId ? getMonthEventsKey(familyId, year, month) : null
@@ -237,6 +263,7 @@ export function CalendarTab({
     if (!familyId) {
       queueMicrotask(() => {
         setEvents([])
+        setAdjacentMonthEvents([])
         setEventsError(null)
         setEventsLoading(false)
       })
@@ -250,6 +277,7 @@ export function CalendarTab({
     if (familyChanged) {
       queueMicrotask(() => {
         setEvents([])
+        setAdjacentMonthEvents([])
         setEventsError(null)
         setEventsLoading(true)
       })
@@ -264,6 +292,12 @@ export function CalendarTab({
     })
   }, [familyId, year, month, loadMonthEvents])
 
+  const mergedEvents = useMemo(() => {
+    if (adjacentMonthEvents.length === 0) return events
+    const seen = new Set(events.map((e) => e.id))
+    return [...events, ...adjacentMonthEvents.filter((e) => !seen.has(e.id))]
+  }, [events, adjacentMonthEvents])
+
   const reloadEvents = useCallback(async () => {
     if (!familyId) return
     await loadMonthEvents({
@@ -277,6 +311,14 @@ export function CalendarTab({
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
+    const prev = getAdjacentMonth(year, month, -1)
+    const next = getAdjacentMonth(year, month, 1)
+    const prevKey = getMonthEventsKey(familyId, prev.year, prev.month)
+    const nextKey = getMonthEventsKey(familyId, next.year, next.month)
+    monthEventsCacheRef.current.delete(prevKey)
+    monthEventsCacheRef.current.delete(nextKey)
+    monthEventsRequestsRef.current.delete(prevKey)
+    monthEventsRequestsRef.current.delete(nextKey)
     await loadMonthEvents({
       targetFamilyId: familyId,
       targetYear: year,
@@ -720,7 +762,7 @@ export function CalendarTab({
         <CalendarGrid
           year={year}
           month={month}
-          events={events}
+          events={mergedEvents}
           calendars={calendars}
           activeIds={activeIds}
           holidays={holidays}
@@ -745,7 +787,7 @@ export function CalendarTab({
       {selectedDate && !selectedEvent && !editingEvent && !calendarForm && (
         <DayEventsSheet
           date={selectedDate}
-          events={events}
+          events={mergedEvents}
           calendars={calendars}
           onClose={() => setSelectedDate(null)}
           onSelectEvent={setSelectedEvent}
