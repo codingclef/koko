@@ -97,8 +97,6 @@ export function CalendarTab({
 
   const {
     value: familyMembers,
-    loading: familyMembersLoading,
-    error: familyMembersError,
     reload: reloadFamilyMembers,
   } = useAsyncData<FamilyMember[]>({
     enabled: Boolean(familyId),
