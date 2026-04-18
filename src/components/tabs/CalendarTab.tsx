@@ -529,22 +529,23 @@ export function CalendarTab({
     }
   }
 
-  const handleEventDelete = async (scope?: RecurrenceScope) => {
-    if (!selectedEvent || !familyId) return
+  const handleEventDelete = async (scope?: RecurrenceScope, eventOverride?: CalendarEvent) => {
+    const targetEvent = eventOverride ?? selectedEvent
+    if (!targetEvent || !familyId) return
     setMutationError(null)
 
     // Series event: show scope picker if no scope provided
-    if (selectedEvent.series_id && !scope) {
-      setSeriesScopeTarget({ event: selectedEvent, mode: 'delete' })
+    if (targetEvent.series_id && !scope) {
+      setSeriesScopeTarget({ event: targetEvent, mode: 'delete' })
       return
     }
 
     try {
       clearFamilyMonthEventsCache(familyId)
 
-      const url = selectedEvent.series_id && scope
-        ? `/api/events/${selectedEvent.id}?scope=${scope}&anchorOccurrenceDate=${selectedEvent.series_occurrence_date ?? ''}`
-        : `/api/events/${selectedEvent.id}`
+      const url = targetEvent.series_id && scope
+        ? `/api/events/${targetEvent.id}?scope=${scope}&anchorOccurrenceDate=${targetEvent.series_occurrence_date ?? ''}`
+        : `/api/events/${targetEvent.id}`
 
       await deleteWithAuth(url)
       setSelectedEvent(null)
@@ -564,7 +565,7 @@ export function CalendarTab({
     if (!target) return
 
     if (target.mode === 'delete') {
-      await handleEventDelete(scope)
+      await handleEventDelete(scope, target.event)
     } else {
       // mode === 'edit': open edit form with scope context
       setEditingEvent({ event: { ...target.event, _seriesScope: scope } as CalendarEvent & { _seriesScope: RecurrenceScope } })
