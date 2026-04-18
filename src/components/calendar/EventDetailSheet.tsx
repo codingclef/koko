@@ -83,7 +83,7 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
             {(event.label_color || cal) && (
               <span
                 className="w-3 h-3 rounded-full shrink-0"
-                style={{ backgroundColor: toDisplayColor(event.label_color ?? cal?.color ?? '') || undefined }}
+                style={{ backgroundColor: (event.label_color ?? cal?.color) ? toDisplayColor(event.label_color ?? cal!.color) : undefined }}
               />
             )}
             <h3 className="font-bold text-lg text-stone-800 dark:text-stone-100 truncate">

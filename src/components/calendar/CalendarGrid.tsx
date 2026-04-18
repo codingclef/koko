@@ -64,6 +64,11 @@ export function isEventOnDate(event: CalendarEvent, date: Date): boolean {
   return target.getTime() === start.getTime()
 }
 
+function getChipStyle(isAllDay: boolean, color: string): CSSProperties {
+  if (isAllDay) return { backgroundColor: color }
+  return { backgroundColor: color + '18', color }
+}
+
 interface EventSegment {
   event: CalendarEvent
   colStart: number // 0–6 within this row
@@ -186,15 +191,9 @@ export function CalendarGrid({
   }, [singleDayEvents])
 
   const getEventColor = (event: CalendarEvent): string => {
-    const raw = event.label_color
-      ?? calendarMap.get(event.calendar_id ?? '')?.color
-      ?? null
-    return raw ? toDisplayColor(raw) : 'var(--color-stone-400)'
-  }
-
-  const getChipStyle = (isAllDay: boolean, color: string): CSSProperties => {
-    if (isAllDay) return { backgroundColor: color }
-    return { backgroundColor: color + '18', color }
+    if (event.label_color) return toDisplayColor(event.label_color)
+    const calColor = event.calendar_id ? calendarMap.get(event.calendar_id)?.color : null
+    return calColor ? toDisplayColor(calColor) : 'var(--color-stone-400)'
   }
 
   const lunarDateMap = useMemo(() => {

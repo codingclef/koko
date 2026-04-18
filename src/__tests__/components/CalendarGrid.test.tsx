@@ -506,8 +506,6 @@ describe('칩 variant', () => {
   })
 
   it('공휴일 칩은 variant 영향 없이 기존 red solid를 유지한다', () => {
-    const { Holiday: _H, ...rest } = { Holiday: null, ...defaultProps }
-    void _H
     const holidays = [{ date: '2025-06-06', localName: '현충일', countryCode: 'KR' }]
     render(<CalendarGrid {...defaultProps} holidays={holidays} />)
     const chip = screen.getByText('현충일')
