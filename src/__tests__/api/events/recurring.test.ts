@@ -177,6 +177,36 @@ describe('PATCH /api/events/[id] (series scope)', () => {
     )
   })
 
+  it('scope=all이면 update_series_authorized를 호출한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: { is_changed: true, family_id: FAMILY_ID, new_calendar_id: null, new_title: '전체 회의', new_start_at: '2026-04-17T11:00:00Z', series_id: SERIES_ID },
+      error: null,
+    })
+    const body = {
+      title: '전체 회의',
+      scope: 'all',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      localEndDate: '2026-04-17',
+      startTime: '11:00:00',
+      endTime: '12:00:00',
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_series_authorized',
+      expect.objectContaining({
+        p_scope: 'all',
+        p_anchor_occurrence_date: '2026-04-17',
+        p_start_time: '11:00:00',
+        p_end_time: '12:00:00',
+      })
+    )
+  })
+
   it('scope=following인 종일 일정은 localStartDate 기준으로 날짜 유지 여부를 판단한다', async () => {
     mockRpc.mockResolvedValue({
       data: { is_changed: true, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-17T00:00:00Z', series_id: SERIES_ID },
@@ -290,6 +320,22 @@ describe('DELETE /api/events/[id] (series scope)', () => {
     expect(mockRpc).toHaveBeenCalledWith(
       'delete_series_authorized',
       expect.objectContaining({ p_scope: 'single' })
+    )
+  })
+
+  it('scope=following이면 delete_series_authorized(following)을 호출한다', async () => {
+    mockRpc.mockResolvedValue({ data: { ...seriesDeleteResult, scope: 'following' }, error: null })
+    const res = await DELETE(
+      makeRequest('DELETE', `http://localhost/api/events/${EVENT_ID}?scope=following&anchorOccurrenceDate=2026-04-24`),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'delete_series_authorized',
+      expect.objectContaining({
+        p_scope: 'following',
+        p_anchor_occurrence_date: '2026-04-24',
+      })
     )
   })
 
