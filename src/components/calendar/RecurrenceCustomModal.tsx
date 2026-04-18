@@ -137,7 +137,7 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
             </div>
           )}
           <div className="flex items-center justify-between px-4 py-3.5 text-sm">
-            <span className="text-stone-700 dark:text-stone-300">반복</span>
+            <span className="text-stone-700 dark:text-stone-300">반복 간격</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -216,6 +216,11 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
               </div>
             )}
           </div>
+          {!hasEndDate && (
+            <p className="mt-2 px-1 text-xs text-stone-400">
+              종료일을 설정하지 않으면 시작일 기준 1년 동안 반복 일정을 생성해요.
+            </p>
+          )}
         </div>
       </div>
     </div>

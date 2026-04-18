@@ -254,7 +254,9 @@ describe('EventFormModal', () => {
     fireEvent.change(intervalInput, { target: { value: '2' } })
 
     expect(intervalInput.value).toBe('2')
+    expect(screen.getByText('반복 간격')).toBeInTheDocument()
     expect(screen.getByText('2주마다 금요일')).toBeInTheDocument()
+    expect(screen.getByText('종료일을 설정하지 않으면 시작일 기준 1년 동안 반복 일정을 생성해요.')).toBeInTheDocument()
 
     fireEvent.click(screen.getByText('완료'))
     expect(screen.getByText('2주마다 금요일')).toBeInTheDocument()

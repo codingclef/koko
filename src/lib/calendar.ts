@@ -1,11 +1,14 @@
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
+import type { RecurrenceRule } from '@/types/recurrence'
 
 export type Calendar = Database['public']['Tables']['calendars']['Row']
 export type CalendarMember = Database['public']['Tables']['calendar_members']['Row']
 export type CalendarEvent = Database['public']['Tables']['events']['Row']
 export type EventReminder = Database['public']['Tables']['event_reminders']['Row']
 export type FamilyMember = Database['public']['Tables']['family_members']['Row']
+type RecurrenceRuleRow = Database['public']['Tables']['recurrence_rules']['Row']
+type RecurrenceSeriesRow = Database['public']['Tables']['recurrence_series']['Row']
 
 export const CALENDAR_COLORS = [
   '#f97316', // orange
@@ -199,4 +202,34 @@ export async function getReminders(eventId: string): Promise<EventReminder[]> {
     .order('remind_minutes_before', { ascending: true })
   if (error) throw error
   return data ?? []
+}
+
+function toRecurrenceRule(rule: RecurrenceRuleRow): RecurrenceRule {
+  return {
+    freq: rule.freq,
+    interval: rule.interval,
+    ...(rule.days_of_week ? { daysOfWeek: rule.days_of_week } : {}),
+    ...(rule.day_of_month ? { dayOfMonth: rule.day_of_month } : {}),
+    ...(rule.end_date ? { endDate: rule.end_date } : {}),
+  }
+}
+
+export async function getRecurrenceRule(seriesId: string): Promise<RecurrenceRule | null> {
+  const { data: series, error: seriesError } = await supabase
+    .from('recurrence_series')
+    .select('rule_id')
+    .eq('id', seriesId)
+    .maybeSingle<Pick<RecurrenceSeriesRow, 'rule_id'>>()
+
+  if (seriesError) throw seriesError
+  if (!series) return null
+
+  const { data: rule, error: ruleError } = await supabase
+    .from('recurrence_rules')
+    .select('*')
+    .eq('id', series.rule_id)
+    .maybeSingle<RecurrenceRuleRow>()
+
+  if (ruleError) throw ruleError
+  return rule ? toRecurrenceRule(rule) : null
 }

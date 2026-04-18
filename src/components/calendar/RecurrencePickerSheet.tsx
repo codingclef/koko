@@ -90,6 +90,10 @@ export function RecurrencePickerSheet({ value, onSelect, onCustomize, customRule
             </div>
           </button>
         </div>
+
+        <p className="mx-5 mb-5 text-xs text-stone-400">
+          종료일을 따로 설정하지 않으면 시작일 기준 1년 동안 반복 일정을 생성해요.
+        </p>
       </div>
     </div>
   )

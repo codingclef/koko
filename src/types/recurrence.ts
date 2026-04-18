@@ -49,3 +49,20 @@ export function buildRecurrenceLabel(rule: RecurrenceRule): string {
   }
   return freq
 }
+
+export function formatRecurrenceDate(date: string): string {
+  const value = new Date(date + 'T00:00:00')
+  return `${value.getFullYear()}년 ${value.getMonth() + 1}월 ${value.getDate()}일`
+}
+
+export function buildRecurrenceEndLabel(
+  rule: RecurrenceRule,
+  options: { defaultGenerationYears?: number } = {}
+): string {
+  if (rule.endDate) {
+    return `${formatRecurrenceDate(rule.endDate)}까지`
+  }
+
+  const defaultGenerationYears = options.defaultGenerationYears ?? 1
+  return `종료일 미설정 · 시작일 기준 ${defaultGenerationYears}년 생성`
+}
