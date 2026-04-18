@@ -32,6 +32,14 @@ jest.mock('@/lib/supabase', () => ({
     removeChannel: jest.fn(),
   },
 }))
+
+let capturedRefresh: (() => Promise<void>) | null = null
+jest.mock('@/hooks/useRealtimeSync', () => ({
+  useRealtimeSync: (_channel: unknown, refresh: () => Promise<void>) => {
+    capturedRefresh = refresh
+    return jest.fn()
+  },
+}))
 jest.mock('next/navigation', () => ({ useRouter: () => ({ replace: jest.fn() }) }))
 jest.mock('@/components/calendar/CalendarFilter', () => ({ CalendarFilter: () => <div /> }))
 jest.mock('@/components/calendar/EventDetailSheet', () => ({ EventDetailSheet: () => <div /> }))
@@ -98,6 +106,7 @@ const defaultProps = {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  capturedRefresh = null
   jest.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -176,5 +185,48 @@ describe('CalendarTab — 인접 월 이벤트 표시', () => {
     const ids = getByTestId('calendar-grid').getAttribute('data-event-ids') ?? ''
     expect(ids).not.toContain('mar-1')
     expect(ids).toContain('may-1')
+  })
+})
+
+describe('CalendarTab — refreshEvents 인접 월 invalidation', () => {
+  it('broadcast refresh 시 in-flight 상태의 인접 월 요청을 무효화하고 새로 fetch한다', async () => {
+    // today = April (month=3). prev = March (2), next = May (4)
+    const aprilEvent = makeEvent('apr-1', '2026-04-15T09:00:00Z')
+    const marchFresh = makeEvent('mar-fresh', '2026-03-28T09:00:00Z')
+
+    let marchCallCount = 0
+    mockGetEventsByMonth.mockImplementation((_fid, _year, month) => {
+      if (month === 3) return Promise.resolve([aprilEvent])
+      if (month === 2) {
+        marchCallCount++
+        if (marchCallCount === 1) {
+          // 1st call: never resolves — stays in-flight during refresh
+          return new Promise(() => {})
+        }
+        // 2nd call (after invalidation): resolves with fresh data
+        return Promise.resolve([marchFresh])
+      }
+      return Promise.resolve([])
+    })
+
+    const { getByTestId } = render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    // 초기 prefetch: March 1st call이 in-flight 상태 (resolve 안 됨)
+    expect(marchCallCount).toBe(1)
+
+    // broadcast refresh 트리거 — March in-flight 이 resolve되기 전에 실행
+    expect(capturedRefresh).not.toBeNull()
+    await act(async () => { await capturedRefresh!() })
+
+    // refreshEvents가 monthEventsRequestsRef 에서 March를 제거했으므로
+    // prefetchAdjacentMonths가 새 fetch를 시작해야 함
+    expect(marchCallCount).toBe(2)
+
+    // 새 fetch의 fresh 데이터가 표시돼야 함
+    await waitFor(() => {
+      const ids = getByTestId('calendar-grid').getAttribute('data-event-ids') ?? ''
+      expect(ids).toContain('mar-fresh')
+    }, { timeout: 3000 })
   })
 })
