@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { type CSSProperties, useMemo } from 'react'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
@@ -190,6 +190,15 @@ export function CalendarGrid({
     return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
   }
 
+  const getChipStyle = (isAllDay: boolean, color: string): CSSProperties => {
+    if (isAllDay) return { backgroundColor: color }
+    return {
+      backgroundColor: color + '18',
+      color,
+      boxShadow: `inset 2px 0 0 ${color}`,
+    }
+  }
+
   const lunarDateMap = useMemo(() => {
     if (!showLunar) return new Map<number, string>()
     const map = new Map<number, string>()
@@ -311,15 +320,18 @@ export function CalendarGrid({
 
                       {/* 단일 일정 pills */}
                       <div className="w-full space-y-0.5">
-                        {daySingleEvents.slice(0, 3).map((evt) => (
-                          <div
-                            key={evt.id}
-                            className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap"
-                            style={{ backgroundColor: getEventColor(evt) }}
-                          >
-                            {evt.title}
-                          </div>
-                        ))}
+                        {daySingleEvents.slice(0, 3).map((evt) => {
+                          const color = getEventColor(evt)
+                          return (
+                            <div
+                              key={evt.id}
+                              className={`w-full rounded text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap${evt.is_all_day ? ' text-white' : ''}`}
+                              style={getChipStyle(evt.is_all_day, color)}
+                            >
+                              {evt.title}
+                            </div>
+                          )
+                        })}
                         {daySingleEvents.length > 3 && (
                           <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium px-1">
                             +{daySingleEvents.length - 3}

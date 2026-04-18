@@ -430,18 +430,18 @@ describe('CalendarGrid', () => {
   })
 })
 
-// ── label_color 색상 우선순위 ────────────────────────────────
+// ── label_color 색상 우선순위 (is_all_day=true 기준: solid fill) ──
 
 describe('라벨 색상 우선순위', () => {
   it('label_color가 있으면 일정 칩이 label_color를 사용한다', () => {
-    const event = makeEvent({ label_color: '#10b981', title: '에메랄드 일정' })
+    const event = makeEvent({ is_all_day: true, label_color: '#10b981', title: '에메랄드 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('에메랄드 일정')
     expect(chip.style.backgroundColor).toBe('rgb(16, 185, 129)')
   })
 
   it('label_color가 null이면 캘린더 색상을 사용한다', () => {
-    const event = makeEvent({ label_color: null, calendar_id: 'cal-1', title: '캘린더색 일정' })
+    const event = makeEvent({ is_all_day: true, label_color: null, calendar_id: 'cal-1', title: '캘린더색 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('캘린더색 일정')
     // calendars[0].color = '#f97316'
@@ -449,9 +449,67 @@ describe('라벨 색상 우선순위', () => {
   })
 
   it('label_color도 없고 calendar_id도 null이면 fallback 색상을 사용한다', () => {
-    const event = makeEvent({ label_color: null, calendar_id: null, title: '폴백 일정' })
+    const event = makeEvent({ is_all_day: true, label_color: null, calendar_id: null, title: '폴백 일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('폴백 일정')
     expect(chip.style.backgroundColor).toBe('rgb(148, 163, 184)')
+  })
+})
+
+// ── 칩 variant: allDay vs timed ──────────────────────────────
+
+describe('칩 variant', () => {
+  const color = '#f97316' // calendars[0].color
+
+  it('is_all_day=true 단일 일정은 solid fill + white text로 렌더된다', () => {
+    const event = makeEvent({ is_all_day: true, title: '종일일정' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('종일일정')
+    expect(chip.style.backgroundColor).toBe('rgb(249, 115, 22)')
+    expect(chip.style.color).toBe('')
+    expect(chip.style.boxShadow).toBe('')
+    expect(chip.className).toContain('text-white')
+  })
+
+  it('is_all_day=false 단일 일정은 tint 배경 + colored text + inset boxShadow로 렌더된다', () => {
+    const event = makeEvent({ is_all_day: false, title: '시간일정' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('시간일정')
+    // jsdom normalizes hex → rgb/rgba
+    expect(chip.style.backgroundColor).toBe('rgba(249, 115, 22, 0.094)')
+    expect(chip.style.color).toBe('rgb(249, 115, 22)')
+    expect(chip.style.boxShadow).toContain('2px 0 0')
+    expect(chip.className).not.toContain('text-white')
+  })
+
+  it('같은 날 allDay + timed 이벤트가 함께 있을 때 둘 다 올바른 variant로 렌더된다', () => {
+    const allDay = makeEvent({ id: 'a1', is_all_day: true, title: '종일', start_at: '2025-06-15T00:00:00Z' })
+    const timed = makeEvent({ id: 'a2', is_all_day: false, title: '시간', start_at: '2025-06-15T10:00:00Z' })
+    render(<CalendarGrid {...defaultProps} events={[allDay, timed]} />)
+
+    const allDayChip = screen.getByText('종일')
+    expect(allDayChip.style.backgroundColor).toBe('rgb(249, 115, 22)')
+    expect(allDayChip.className).toContain('text-white')
+
+    const timedChip = screen.getByText('시간')
+    expect(timedChip.style.backgroundColor).toBe('rgba(249, 115, 22, 0.094)')
+    expect(timedChip.style.color).toBe('rgb(249, 115, 22)')
+  })
+
+  it('공휴일 칩은 variant 영향 없이 기존 red solid를 유지한다', () => {
+    const { Holiday: _H, ...rest } = { Holiday: null, ...defaultProps }
+    void _H
+    const holidays = [{ date: '2025-06-06', localName: '현충일', countryCode: 'KR' }]
+    render(<CalendarGrid {...defaultProps} holidays={holidays} />)
+    const chip = screen.getByText('현충일')
+    expect(chip.className).toContain('bg-red-400')
+  })
+
+  it('긴 제목의 timed 칩도 overflow-hidden whitespace-nowrap을 유지한다', () => {
+    const event = makeEvent({ is_all_day: false, title: '제목이매우긴시간지정일정입니다넘치면어떻게되나요' })
+    render(<CalendarGrid {...defaultProps} events={[event]} />)
+    const chip = screen.getByText('제목이매우긴시간지정일정입니다넘치면어떻게되나요')
+    expect(chip.className).toContain('overflow-hidden')
+    expect(chip.className).toContain('whitespace-nowrap')
   })
 })
