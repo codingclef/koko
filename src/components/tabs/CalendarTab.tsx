@@ -233,6 +233,7 @@ export function CalendarTab({
 
     if (!silent && isVisibleMonth()) {
       setEvents([])
+      setAdjacentMonthEvents([])
       setEventsLoading(true)
     }
     if (isVisibleMonth()) setEventsError(null)
@@ -247,6 +248,7 @@ export function CalendarTab({
       console.error('[CalendarTab] loadEvents failed:', error)
       if (isVisibleMonth()) {
         setEvents([])
+        setAdjacentMonthEvents([])
         setEventsError(error)
         setEventsLoading(false)
       }
@@ -309,6 +311,10 @@ export function CalendarTab({
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
+    const prev = getAdjacentMonth(year, month, -1)
+    const next = getAdjacentMonth(year, month, 1)
+    monthEventsCacheRef.current.delete(getMonthEventsKey(familyId, prev.year, prev.month))
+    monthEventsCacheRef.current.delete(getMonthEventsKey(familyId, next.year, next.month))
     await loadMonthEvents({
       targetFamilyId: familyId,
       targetYear: year,
