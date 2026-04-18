@@ -2,9 +2,14 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { EventDetailSheet } from '@/components/calendar/EventDetailSheet'
 
 jest.mock('@/lib/calendar', () => ({
+  getRecurrenceRule: jest.fn(),
   getReminders: jest.fn().mockResolvedValue([]),
   REMINDER_OPTIONS: [],
 }))
+
+const { getRecurrenceRule } = jest.requireMock('@/lib/calendar') as {
+  getRecurrenceRule: jest.Mock
+}
 
 const defaultProps = {
   event: {
@@ -17,6 +22,9 @@ const defaultProps = {
     start_at: '2026-04-08T09:00:00.000Z',
     end_at: '2026-04-08T10:00:00.000Z',
     is_all_day: false,
+    is_cancelled: false,
+    series_id: null,
+    series_occurrence_date: null,
     created_at: '',
     updated_at: '',
   },
@@ -39,6 +47,7 @@ const defaultProps = {
 describe('EventDetailSheet', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    getRecurrenceRule.mockResolvedValue(null)
   })
 
   it('삭제 실패 시 에러 메시지를 표시하고 닫지 않는다', async () => {
@@ -52,5 +61,28 @@ describe('EventDetailSheet', () => {
 
     expect(await screen.findByText('삭제에 실패했습니다. 다시 시도해주세요.')).toBeInTheDocument()
     expect(defaultProps.onClose).not.toHaveBeenCalled()
+  })
+
+  it('반복 일정이면 반복 규칙과 종료 정보를 표시한다', async () => {
+    getRecurrenceRule.mockResolvedValue({
+      freq: 'weekly',
+      interval: 1,
+      daysOfWeek: [3],
+    })
+
+    render(
+      <EventDetailSheet
+        {...defaultProps}
+        event={{
+          ...defaultProps.event,
+          series_id: 'series-1',
+          series_occurrence_date: '2026-04-08',
+        }}
+      />
+    )
+
+    expect(await screen.findByText('반복 일정')).toBeInTheDocument()
+    expect(screen.getByText('매주 수요일')).toBeInTheDocument()
+    expect(screen.getByText('종료일 미설정 · 시작일 기준 1년 생성')).toBeInTheDocument()
   })
 })

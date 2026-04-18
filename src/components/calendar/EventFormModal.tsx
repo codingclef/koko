@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Bell } from 'lucide-react'
+import { X, Bell, RefreshCw } from 'lucide-react'
 import { REMINDER_OPTIONS, type Calendar, type CalendarEvent } from '@/lib/calendar'
 import { TimeWheelPicker } from './TimeWheelPicker'
+import { RecurrencePickerSheet } from './RecurrencePickerSheet'
+import { RecurrenceCustomModal } from './RecurrenceCustomModal'
+import { buildRecurrenceLabel, type RecurrenceRule, type RecurrenceScope } from '@/types/recurrence'
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -41,6 +44,7 @@ interface Props {
   initial?: CalendarEvent
   initialDate?: Date
   initialReminderMinutes?: number[]
+  recurrenceScope?: RecurrenceScope
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -49,12 +53,23 @@ interface Props {
     description: string | null
     startAt: string
     endAt: string | null
+    localStartDate: string
+    localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
+    recurrence: RecurrenceRule | null
   }) => Promise<void>
 }
 
-export function EventFormModal({ initial, initialDate, initialReminderMinutes = [], calendars, onClose, onSave }: Props) {
+export function EventFormModal({
+  initial,
+  initialDate,
+  initialReminderMinutes = [],
+  recurrenceScope,
+  calendars,
+  onClose,
+  onSave,
+}: Props) {
   const defaultDate = initialDate ?? new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const defaultDateStr = `${defaultDate.getFullYear()}-${pad(defaultDate.getMonth() + 1)}-${pad(defaultDate.getDate())}`
@@ -91,6 +106,14 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Recurrence state (only for new events — editing uses scope sheet in parent)
+  const isNewEvent = !initial
+  const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(null)
+  const [customRule, setCustomRule] = useState<RecurrenceRule | null>(null)
+  const [recurrenceModal, setRecurrenceModal] = useState<'picker' | 'custom' | null>(null)
+  const isScopedRecurringEdit = Boolean(initial?.series_id && recurrenceScope && recurrenceScope !== 'single')
+  const canEditOccurrenceDate = !isScopedRecurringEdit
 
   const titleInputRef = useRef<HTMLInputElement>(null)
 
@@ -188,8 +211,11 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
         description: description.trim() || null,
         startAt,
         endAt,
+        localStartDate: startDate,
+        localEndDate: endDate,
         isAllDay,
         reminderMinutes: Array.from(reminderMinutes),
+        recurrence: isNewEvent ? recurrence : null,
       })
       onClose()
     } catch (e) {
@@ -271,6 +297,11 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
 
         {/* 날짜/시간 */}
         <div className="space-y-3">
+          {isScopedRecurringEdit && (
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.
+            </p>
+          )}
           {/* 시작 */}
           <div>
             <label className="text-xs text-stone-500 mb-1.5 block">시작</label>
@@ -280,8 +311,9 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
                 <input
                   type="date"
                   value={startDate}
+                  disabled={!canEditOccurrenceDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  className={`absolute inset-0 opacity-0 w-full h-full ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                 />
               </div>
               {!isAllDay && (
@@ -313,8 +345,9 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
                 <input
                   type="date"
                   value={endDate}
+                  disabled={!canEditOccurrenceDate}
                   onChange={(e) => handleEndDateChange(e.target.value)}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  className={`absolute inset-0 opacity-0 w-full h-full ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                 />
               </div>
               {!isAllDay && (
@@ -346,6 +379,22 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           rows={2}
           className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 text-base resize-none"
         />
+
+        {/* 반복 (새 일정만) */}
+        {isNewEvent && (
+          <button
+            onClick={() => setRecurrenceModal('picker')}
+            className="flex items-center justify-between w-full py-2.5"
+          >
+            <div className="flex items-center gap-1.5">
+              <RefreshCw size={14} className="text-stone-400" />
+              <span className="text-xs text-stone-500">반복</span>
+            </div>
+            <span className="text-xs text-stone-500 dark:text-stone-400">
+              {recurrence ? buildRecurrenceLabel(recurrence) : '안 함'}
+            </span>
+          </button>
+        )}
 
         {/* 알림 */}
         <div>
@@ -387,6 +436,25 @@ export function EventFormModal({ initial, initialDate, initialReminderMinutes = 
           저장
         </button>
       </div>
+
+      {recurrenceModal === 'picker' && (
+        <RecurrencePickerSheet
+          value={recurrence}
+          customRule={customRule}
+          onSelect={(rule) => { setRecurrence(rule); setRecurrenceModal(null) }}
+          onCustomize={() => setRecurrenceModal('custom')}
+          onClose={() => setRecurrenceModal(null)}
+        />
+      )}
+
+      {recurrenceModal === 'custom' && (
+        <RecurrenceCustomModal
+          initial={customRule ?? recurrence}
+          startDate={startDate}
+          onSave={(rule) => { setCustomRule(rule); setRecurrence(rule); setRecurrenceModal(null) }}
+          onBack={() => setRecurrenceModal('picker')}
+        />
+      )}
     </div>
   )
 }

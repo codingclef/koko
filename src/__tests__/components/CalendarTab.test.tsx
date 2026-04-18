@@ -2,6 +2,7 @@ import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 import { getCalendarMembers, getEventsByMonth, getFamilyMembers, setCalendarMembers, updateCalendar } from '@/lib/calendar'
+import { deleteWithAuth } from '@/lib/api-client'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
 const mockReloadCalendars = jest.fn()
@@ -70,13 +71,53 @@ jest.mock('@/components/calendar/CalendarFilter', () => ({
   ),
 }))
 jest.mock('@/components/calendar/CalendarGrid', () => ({
-  CalendarGrid: () => <div data-testid="calendar-grid" />,
+  CalendarGrid: ({ onSelectDate }: { onSelectDate: (date: Date) => void }) => (
+    <div data-testid="calendar-grid">
+      <button data-testid="select-date" onClick={() => onSelectDate(new Date('2026-04-17T00:00:00Z'))}>date</button>
+    </div>
+  ),
 }))
 jest.mock('@/components/calendar/DayEventsSheet', () => ({
-  DayEventsSheet: () => <div />,
+  DayEventsSheet: ({ onSelectEvent }: { onSelectEvent: (event: unknown) => void }) => (
+    <div data-testid="day-events-sheet">
+      <button
+        data-testid="select-recurring-event"
+        onClick={() => onSelectEvent({
+          id: 'evt-series-1',
+          family_id: 'fam-1',
+          calendar_id: 'cal-1',
+          title: '반복 일정',
+          description: null,
+          start_at: '2026-04-17T09:00:00.000Z',
+          end_at: '2026-04-17T10:00:00.000Z',
+          is_all_day: false,
+          created_by: 'user-1',
+          created_at: '',
+          updated_at: '',
+          series_id: 'series-1',
+          series_occurrence_date: '2026-04-17',
+          is_cancelled: false,
+        })}
+      >
+        event
+      </button>
+    </div>
+  ),
 }))
 jest.mock('@/components/calendar/EventDetailSheet', () => ({
-  EventDetailSheet: () => <div />,
+  EventDetailSheet: ({ onDelete, onClose }: { onDelete: () => Promise<void>; onClose: () => void }) => (
+    <div data-testid="event-detail-sheet">
+      <button
+        data-testid="detail-delete"
+        onClick={async () => {
+          await onDelete()
+          onClose()
+        }}
+      >
+        delete
+      </button>
+    </div>
+  ),
 }))
 jest.mock('@/components/calendar/EventFormModal', () => ({
   EventFormModal: () => <div />,
@@ -98,6 +139,18 @@ jest.mock('@/components/calendar/CalendarListSheet', () => ({
       <button data-testid="list-delete" onClick={() => onDelete('cal-1')} />
     </div>
   ),
+}))
+jest.mock('@/components/calendar/RecurrenceScopeSheet', () => ({
+  RecurrenceScopeSheet: ({ onSelect }: { onSelect: (scope: 'single' | 'following' | 'all') => void }) => (
+    <div data-testid="recurrence-scope-sheet">
+      <button data-testid="scope-all" onClick={() => onSelect('all')}>all</button>
+    </div>
+  ),
+}))
+jest.mock('@/lib/api-client', () => ({
+  postJsonWithAuth: jest.fn(),
+  patchJsonWithAuth: jest.fn(),
+  deleteWithAuth: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock('@/components/calendar/YearMonthPickerSheet', () => ({
   YearMonthPickerSheet: ({
@@ -123,6 +176,7 @@ const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getF
 const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof getCalendarMembers>
 const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof setCalendarMembers>
 const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
+const mockDeleteWithAuth = deleteWithAuth as jest.MockedFunction<typeof deleteWithAuth>
 let consoleErrorSpy: jest.SpyInstance
 const mockCalendars = [{
   id: 'cal-1',
@@ -158,6 +212,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     mockGetEventsByMonth.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
+    mockDeleteWithAuth.mockResolvedValue(undefined)
   })
 
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
@@ -296,6 +351,22 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
     await act(async () => {
       resolvePrefetch?.([])
+    })
+  })
+
+  it('반복 일정 삭제 scope 선택 후에도 대상 이벤트를 유지해 all 삭제를 호출한다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByTestId('select-date'))
+    fireEvent.click(screen.getByTestId('select-recurring-event'))
+    fireEvent.click(screen.getByTestId('detail-delete'))
+    fireEvent.click(await screen.findByTestId('scope-all'))
+
+    await waitFor(() => {
+      expect(mockDeleteWithAuth).toHaveBeenCalledWith(
+        '/api/events/evt-series-1?scope=all&anchorOccurrenceDate=2026-04-17'
+      )
     })
   })
 })

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, Pencil, Trash2, X, Calendar as CalendarIcon, Clock } from 'lucide-react'
-import { getReminders, REMINDER_OPTIONS, type Calendar, type CalendarEvent, type EventReminder } from '@/lib/calendar'
+import { Bell, Pencil, Trash2, X, Calendar as CalendarIcon, Clock, RefreshCw } from 'lucide-react'
+import { getRecurrenceRule, getReminders, REMINDER_OPTIONS, type Calendar, type CalendarEvent, type EventReminder } from '@/lib/calendar'
+import { buildRecurrenceEndLabel, buildRecurrenceLabel, type RecurrenceRule } from '@/types/recurrence'
 
 function formatDatetime(isoString: string, isAllDay: boolean): string {
   const d = new Date(isoString)
@@ -25,6 +26,7 @@ interface Props {
 
 export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }: Props) {
   const [reminders, setReminders] = useState<EventReminder[]>([])
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -34,6 +36,17 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
   useEffect(() => {
     getReminders(event.id).then(setReminders).catch(() => {})
   }, [event.id])
+
+  useEffect(() => {
+    if (!event.series_id) {
+      setRecurrenceRule(null)
+      return
+    }
+
+    getRecurrenceRule(event.series_id)
+      .then(setRecurrenceRule)
+      .catch(() => setRecurrenceRule(null))
+  }, [event.series_id])
 
   const reminderLabel = (minutes: number) =>
     REMINDER_OPTIONS.find((o) => o.minutes === minutes)?.label ?? `${minutes}분 전`
@@ -108,6 +121,19 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
             <div className="flex items-center gap-3">
               <CalendarIcon size={16} className="text-stone-400 shrink-0" />
               <span className="text-sm text-stone-600 dark:text-stone-300">{cal.name}</span>
+            </div>
+          )}
+
+          {recurrenceRule && (
+            <div className="flex items-start gap-3">
+              <RefreshCw size={16} className="text-stone-400 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-stone-700 dark:text-stone-200">반복 일정</p>
+                <p className="text-sm text-stone-600 dark:text-stone-300">{buildRecurrenceLabel(recurrenceRule)}</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500">
+                  {buildRecurrenceEndLabel(recurrenceRule)}
+                </p>
+              </div>
             </div>
           )}
 
