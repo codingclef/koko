@@ -67,9 +67,7 @@ export function ShoppingDetailView({
       .catch((e) => console.error('[ShoppingDetailView] getShoppingItems failed:', e))
   }, [listId, syncPreview])
 
-  const broadcast = useRealtimeSync(`list_items_${listId}`, refreshItems, {
-    refreshOnSubscribed: false,
-  })
+  const broadcast = useRealtimeSync(`list_items_${listId}`, refreshItems)
 
   const fetchDetailData = useCallback(async () => {
     const shoppingList = await getShoppingList(listId)
