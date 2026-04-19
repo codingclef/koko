@@ -567,6 +567,24 @@ export type Database = {
           },
         ]
       }
+      daily_digest_log: {
+        Row: {
+          user_id: string
+          sent_date: string
+          sent_at: string
+        }
+        Insert: {
+          user_id: string
+          sent_date: string
+          sent_at?: string
+        }
+        Update: {
+          user_id?: string
+          sent_date?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
       shopping_lists: {
         Row: {
           created_at: string
