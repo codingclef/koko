@@ -132,10 +132,12 @@ async function handleDailyDigest(req: NextRequest) {
     return NextResponse.json({ error: 'DB error' }, { status: 500 })
   }
 
+  const todayStartMs = new Date(todayStart).getTime()
+
   // end_at=null 종일 이벤트는 DB .or() 필터를 통과하므로 메모리에서 보정
   const allEvents = [...familyEvents, ...calEvents].filter((e) => {
     if (!e.is_all_day) return true
-    return (e.end_at ?? e.start_at) >= todayStart
+    return new Date(e.end_at ?? e.start_at).getTime() >= todayStartMs
   })
 
   const subsByUser = new Map<string, PushSubRow[]>()
