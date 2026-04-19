@@ -233,14 +233,17 @@ export function CalendarGrid({
       </div>
 
       {/* 주 단위 행 */}
-      <div className="flex flex-col flex-1 min-h-0">
+      <div
+        className="flex-1 min-h-0 grid"
+        style={{ gridTemplateRows: `repeat(${rows.length}, minmax(0, 1fr))` }}
+      >
         {rows.map((row, rowIdx) => {
           const segments = computeSegments(row, multiDayEvents)
           const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
           const laneAreaHeight = laneCount * LANE_HEIGHT
 
           return (
-            <div key={rowIdx} className="relative flex-1 min-h-0">
+            <div key={rowIdx} className="relative min-h-0">
               {/* 날짜 셀 그리드 */}
               <div className="grid grid-cols-7 h-full">
                 {row.map((cell, colIdx) => {
