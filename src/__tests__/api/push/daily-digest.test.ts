@@ -120,7 +120,6 @@ function makeGetRequest(secret = 'test-secret') {
     headers: { Authorization: `Bearer ${secret}` },
   })
 }
-
 // ── tests ──────────────────────────────────────────────────────
 
 describe('POST /api/cron/daily-digest', () => {
