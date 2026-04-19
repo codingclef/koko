@@ -130,6 +130,50 @@ describe('POST /api/cron/daily-digest', () => {
     expect(mockDispatch).not.toHaveBeenCalled()
   })
 
+  it('push_subscriptions DB 오류 시 500을 반환한다', async () => {
+    setupFromSequence([fail({ message: 'connection error', code: '500' })])
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(500)
+    expect(mockDispatch).not.toHaveBeenCalled()
+  })
+
+  it('daily_digest_log 사전조회 DB 오류 시 500을 반환한다', async () => {
+    setupFromSequence([
+      [{ user_id: 'u1' }],
+      fail({ message: 'connection error', code: '500' }),
+    ])
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(500)
+    expect(mockDispatch).not.toHaveBeenCalled()
+  })
+
+  it('family_members DB 오류 시 500을 반환한다', async () => {
+    setupFromSequence([
+      [{ user_id: 'u1' }],
+      [],
+      fail({ message: 'connection error', code: '500' }), // family_members
+      [],                                                  // calendar_members
+      [SUB],
+    ])
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(500)
+    expect(mockDispatch).not.toHaveBeenCalled()
+  })
+
+  it('events DB 오류 시 500을 반환한다', async () => {
+    setupFromSequence([
+      [{ user_id: 'u1' }],
+      [],
+      [{ user_id: 'u1', family_id: 'fam-1' }],
+      [],
+      [SUB],
+      fail({ message: 'connection error', code: '500' }), // events(family)
+    ])
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(500)
+    expect(mockDispatch).not.toHaveBeenCalled()
+  })
+
   it('이벤트가 있으면 push를 발송하고 sentUsers=1을 반환한다', async () => {
     setupHappyPath()
     const res = await POST(makeRequest())
@@ -243,7 +287,7 @@ describe('POST /api/cron/daily-digest', () => {
         .mockImplementationOnce(() => captureOrBuilder([makeEvent()])) // events(family)
         .mockImplementationOnce(() => makeBuilder({ data: [{ user_id: 'u1' }], error: null }))
       await POST(makeRequest())
-      expect(capturedOrArgs.some((arg) => arg.includes('end_at.is.null'))).toBe(true)
+      expect(capturedOrArgs.some((arg) => arg.includes('end_at.is.null,start_at.gte.'))).toBe(true)
     })
   })
 

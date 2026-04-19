@@ -61,7 +61,7 @@ async function queryTodayEvents(
     .lte('start_at', todayEnd)
     .or([
       `and(is_all_day.eq.true,end_at.gte.${todayStart})`,      // 멀티데이 종일
-      `and(is_all_day.eq.true,end_at.is.null)`,                // 단일 종일 (end_at=null, start_at은 위 lte로 이미 오늘 이내)
+      `and(is_all_day.eq.true,end_at.is.null,start_at.gte.${todayStart})`, // 단일 종일
       `and(is_all_day.eq.false,start_at.gte.${todayStart})`,   // 시간 이벤트
     ].join(','))
 
@@ -70,7 +70,8 @@ async function queryTodayEvents(
       ? base.in('family_id', filter.ids).is('calendar_id', null)
       : base.in('calendar_id', filter.ids)
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) throw new Error(`queryTodayEvents failed: ${error.message}`)
   return (data ?? []) as EventRow[]
 }
 
@@ -81,15 +82,17 @@ export async function POST(req: NextRequest) {
 
   const { start: todayStart, end: todayEnd, date: sentDate } = getTodayKST()
 
-  const { data: subRows } = await supabaseAdmin.from('push_subscriptions').select('user_id')
+  const { data: subRows, error: subError } = await supabaseAdmin.from('push_subscriptions').select('user_id')
+  if (subError) return NextResponse.json({ error: 'DB error' }, { status: 500 })
   const allUserIds = [...new Set((subRows ?? []).map((r) => r.user_id).filter(Boolean))] as string[]
   if (allUserIds.length === 0) return NextResponse.json({ sentUsers: 0, skippedUsers: 0 })
 
-  const { data: sentLogs } = await supabaseAdmin
+  const { data: sentLogs, error: sentLogsError } = await supabaseAdmin
     .from('daily_digest_log')
     .select('user_id')
     .eq('sent_date', sentDate)
     .in('user_id', allUserIds)
+  if (sentLogsError) return NextResponse.json({ error: 'DB error' }, { status: 500 })
   const alreadySentSet = new Set((sentLogs ?? []).map((r) => r.user_id))
   const pendingUserIds = allUserIds.filter((id) => !alreadySentSet.has(id))
   if (pendingUserIds.length === 0) return NextResponse.json({ sentUsers: 0, skippedUsers: allUserIds.length })
@@ -99,6 +102,9 @@ export async function POST(req: NextRequest) {
     supabaseAdmin.from('calendar_members').select('user_id, calendar_id').in('user_id', pendingUserIds),
     supabaseAdmin.from('push_subscriptions').select('id, endpoint, p256dh, auth, user_id').in('user_id', pendingUserIds),
   ])
+  if (memberRows.error || calMemberRows.error || allSubsRows.error) {
+    return NextResponse.json({ error: 'DB error' }, { status: 500 })
+  }
 
   const userFamilyMap = new Map<string, string>()
   for (const row of memberRows.data ?? []) {
@@ -116,10 +122,15 @@ export async function POST(req: NextRequest) {
   const familyIds = [...new Set([...userFamilyMap.values()])]
   const calendarIds = [...new Set([...userCalendarMap.values()].flat())]
 
-  const [familyEvents, calEvents] = await Promise.all([
-    familyIds.length > 0 ? queryTodayEvents({ type: 'family', ids: familyIds }, todayStart, todayEnd) : Promise.resolve([]),
-    calendarIds.length > 0 ? queryTodayEvents({ type: 'calendar', ids: calendarIds }, todayStart, todayEnd) : Promise.resolve([]),
-  ])
+  let familyEvents: EventRow[], calEvents: EventRow[]
+  try {
+    ;[familyEvents, calEvents] = await Promise.all([
+      familyIds.length > 0 ? queryTodayEvents({ type: 'family', ids: familyIds }, todayStart, todayEnd) : Promise.resolve([]),
+      calendarIds.length > 0 ? queryTodayEvents({ type: 'calendar', ids: calendarIds }, todayStart, todayEnd) : Promise.resolve([]),
+    ])
+  } catch {
+    return NextResponse.json({ error: 'DB error' }, { status: 500 })
+  }
 
   // end_at=null 종일 이벤트는 DB .or() 필터를 통과하므로 메모리에서 보정
   const allEvents = [...familyEvents, ...calEvents].filter((e) => {
