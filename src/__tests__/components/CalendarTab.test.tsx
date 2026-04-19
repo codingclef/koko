@@ -216,6 +216,14 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     mockDeleteWithAuth.mockResolvedValue(undefined)
   })
 
+  it('가족 단위 채널명을 사용하고 연/월을 포함하지 않는다', async () => {
+    const { supabase: mockSupabase } = jest.requireMock('@/lib/supabase') as { supabase: { channel: jest.Mock } }
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+    expect(mockSupabase.channel).toHaveBeenCalledWith('family_events_fam-1')
+    expect(mockSupabase.channel).not.toHaveBeenCalledWith(expect.stringMatching(/_\d{4}_\d{1,2}$/))
+  })
+
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {
     const { container } = render(
       <CalendarTab {...defaultProps} />

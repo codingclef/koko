@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
-/**
- * Supabase Realtime broadcast 구독을 관리하는 훅.
- * - channelName이 null이면 구독하지 않는다.
- * - 기본적으로 SUBSCRIBED 시점과 broadcast 수신 시 onRefresh를 호출한다.
- * - broadcast()는 채널이 SUBSCRIBED 상태일 때만 전송한다 (PATTERNS.md 참조).
- */
+function sendBroadcast(channel: ReturnType<typeof supabase.channel> | null) {
+  if (!channel) return
+  channel.send({ type: 'broadcast', event: 'refresh', payload: {} })
+    .then((result) => {
+      if (result !== 'ok') {
+        console.error('[useRealtimeSync] broadcast failed:', result)
+      }
+    })
+    .catch((e) => console.error('[useRealtimeSync] broadcast error:', e))
+}
+
 export function useRealtimeSync(
   channelName: string | null,
   onRefresh: () => void,
@@ -22,6 +27,7 @@ export function useRealtimeSync(
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const channelReadyRef = useRef(false)
+  const pendingBroadcastRef = useRef(false)
 
   useEffect(() => {
     if (!channelName) return
@@ -36,6 +42,10 @@ export function useRealtimeSync(
           if (refreshOnSubscribed) {
             onRefreshRef.current()
           }
+          if (pendingBroadcastRef.current) {
+            pendingBroadcastRef.current = false
+            sendBroadcast(channel)
+          }
         }
       })
     channelRef.current = channel
@@ -43,13 +53,16 @@ export function useRealtimeSync(
     return () => {
       channelReadyRef.current = false
       channelRef.current = null
+      pendingBroadcastRef.current = false
       supabase.removeChannel(channel)
     }
   }, [channelName, refreshOnSubscribed])
 
   return useCallback(() => {
     if (channelReadyRef.current) {
-      channelRef.current?.send({ type: 'broadcast', event: 'refresh', payload: {} })
+      sendBroadcast(channelRef.current)
+    } else {
+      pendingBroadcastRef.current = true
     }
   }, [])
 }

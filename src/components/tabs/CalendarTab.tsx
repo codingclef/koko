@@ -332,8 +332,8 @@ export function CalendarTab({
     await Promise.allSettled([reloadCalendars(), reloadFamilyMembers()])
   }, [reloadCalendars, reloadFamilyMembers])
 
-  const channelName = familyId ? `family_events_${familyId}_${year}_${month}` : null
-  const broadcast = useRealtimeSync(channelName, refreshEvents, { refreshOnSubscribed: false })
+  const channelName = familyId ? `family_events_${familyId}` : null
+  const broadcast = useRealtimeSync(channelName, refreshEvents)
 
   const prevMonth = () => {
     setSlideDir('right')
