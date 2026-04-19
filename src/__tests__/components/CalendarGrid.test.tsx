@@ -463,12 +463,13 @@ describe('라벨 색상 우선순위', () => {
     expect(chip.style.backgroundColor).toBe('rgb(148, 163, 184)')
   })
 
-  it('calendar_id=null, label_color=null, is_all_day=false 이벤트는 fallback 색 텍스트로 렌더된다', () => {
+  it('calendar_id=null, label_color=null, is_all_day=false 이벤트는 fallback 색 tint 배경으로 렌더된다', () => {
     const event = makeEvent({ is_all_day: false, label_color: null, calendar_id: null, title: '폴백 timed' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('폴백 timed')
-    // timed: transparent bg + fallback color text (no var() concatenation bug)
-    expect(chip.style.backgroundColor).toBe('transparent')
+    // timed: color+'26' tint bg + fallback color text (no var() concatenation bug)
+    // #94a3b826 → rgba(148, 163, 184, 0.15)
+    expect(chip.style.backgroundColor).toBe('rgba(148, 163, 184, 0.15)')
     expect(chip.style.color).toBe('rgb(148, 163, 184)')
     expect(chip.className).not.toContain('text-white')
   })
@@ -490,11 +491,12 @@ describe('칩 variant', () => {
     expect(chip.className).toContain('text-white')
   })
 
-  it('is_all_day=false 단일 일정은 transparent 배경 + colored text로 렌더된다', () => {
+  it('is_all_day=false 단일 일정은 tint 배경 + colored text로 렌더된다', () => {
     const event = makeEvent({ is_all_day: false, title: '시간일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
     const chip = screen.getByText('시간일정')
-    expect(chip.style.backgroundColor).toBe('transparent')
+    // #e8945426 → rgba(232, 148, 84, 0.15)
+    expect(chip.style.backgroundColor).toBe('rgba(232, 148, 84, 0.15)')
     expect(chip.style.color).toBe('rgb(232, 148, 84)')
     expect(chip.style.boxShadow).toBe('')
     expect(chip.className).not.toContain('text-white')
@@ -510,7 +512,7 @@ describe('칩 variant', () => {
     expect(allDayChip.className).toContain('text-white')
 
     const timedChip = screen.getByText('시간')
-    expect(timedChip.style.backgroundColor).toBe('transparent')
+    expect(timedChip.style.backgroundColor).toBe('rgba(232, 148, 84, 0.15)')
     expect(timedChip.style.color).toBe('rgb(232, 148, 84)')
   })
 

@@ -66,7 +66,7 @@ export function isEventOnDate(event: CalendarEvent, date: Date): boolean {
 
 function getChipStyle(isAllDay: boolean, color: string): CSSProperties {
   if (isAllDay) return { backgroundColor: color }
-  return { backgroundColor: 'transparent', color }
+  return { backgroundColor: color + '26', color }
 }
 
 interface EventSegment {
