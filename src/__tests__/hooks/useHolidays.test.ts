@@ -11,9 +11,10 @@ describe('useHolidays', () => {
     expect(result.current).toEqual([])
   })
 
-  it('지정한 월의 공휴일만 반환한다', () => {
+  it('현재 월 공휴일을 포함해 반환한다', () => {
     const { result } = renderHook(() => useHolidays(2026, 2, ['KR'])) // month=2 → March
-    expect(result.current.every((h) => h.date.startsWith('2026-03'))).toBe(true)
+    const march = result.current.filter((h) => h.date.startsWith('2026-03'))
+    expect(march.length).toBeGreaterThan(0)
   })
 
   describe('KR 대체공휴일', () => {
@@ -62,6 +63,34 @@ describe('useHolidays', () => {
       const may5 = result.current.find((h) => h.date === '2026-05-05')
       expect(may4?.localName).not.toBe('振替休日')
       expect(may5?.localName).not.toBe('振替休日')
+    })
+  })
+
+  describe('인접 월 휴일 포함 — 그리드 범위 대응', () => {
+    it('5월 뷰에서 4/29 昭和の日가 반환된다', () => {
+      const { result } = renderHook(() => useHolidays(2026, 4, ['JP'])) // month=4 → May
+      const apr29 = result.current.find((h) => h.date === '2026-04-29')
+      expect(apr29).toBeDefined()
+      expect(apr29?.localName).toBe('昭和の日')
+    })
+
+    it('1월 뷰에서 전년 12월 크리스마스(KR)가 반환된다 — 연도 경계', () => {
+      const { result } = renderHook(() => useHolidays(2026, 0, ['KR'])) // month=0 → January 2026
+      const christmas = result.current.find((h) => h.date === '2025-12-25')
+      expect(christmas).toBeDefined()
+      expect(christmas?.localName).toBe('기독탄신일')
+    })
+
+    it('12월 뷰에서 다음 연도 1월 元日(JP)이 반환된다 — 연도 경계', () => {
+      const { result } = renderHook(() => useHolidays(2025, 11, ['JP'])) // month=11 → December 2025
+      const jan1 = result.current.find((h) => h.date === '2026-01-01')
+      expect(jan1).toBeDefined()
+    })
+
+    it('현재 월 휴일이 기존과 동일하게 포함된다', () => {
+      const { result } = renderHook(() => useHolidays(2026, 2, ['KR'])) // month=2 → March
+      const samil = result.current.find((h) => h.date === '2026-03-01')
+      expect(samil).toBeDefined()
     })
   })
 

@@ -108,12 +108,25 @@ export function useHolidays(
   const countryKey = countryCodes.join(',')
   return useMemo(() => {
     if (!countryKey) return []
-    return countryKey
-      .split(',')
-      .flatMap((cc) => getYearHolidays(year, cc))
+
+    const prevYear  = month === 0  ? year - 1 : year
+    const prevMonth = month === 0  ? 11       : month - 1
+    const nextYear  = month === 11 ? year + 1 : year
+    const nextMonth = month === 11 ? 0        : month + 1
+
+    const years = [...new Set([prevYear, year, nextYear])]
+    const codes = countryKey.split(',')
+
+    return codes
+      .flatMap((cc) => years.flatMap((y) => getYearHolidays(y, cc)))
       .filter((h) => {
         const [y, m] = h.date.split('-').map(Number)
-        return y === year && m - 1 === month
+        const m0 = m - 1
+        return (
+          (y === prevYear && m0 === prevMonth) ||
+          (y === year     && m0 === month)     ||
+          (y === nextYear && m0 === nextMonth)
+        )
       })
   }, [year, month, countryKey])
 }
