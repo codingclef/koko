@@ -59,7 +59,11 @@ async function queryTodayEvents(
     .select('id, family_id, calendar_id, title, start_at, end_at, is_all_day')
     .eq('is_cancelled', false)
     .lte('start_at', todayEnd)
-    .or(`and(is_all_day.eq.true,end_at.gte.${todayStart}),and(is_all_day.eq.false,start_at.gte.${todayStart})`)
+    .or([
+      `and(is_all_day.eq.true,end_at.gte.${todayStart})`,      // 멀티데이 종일
+      `and(is_all_day.eq.true,end_at.is.null)`,                // 단일 종일 (end_at=null, start_at은 위 lte로 이미 오늘 이내)
+      `and(is_all_day.eq.false,start_at.gte.${todayStart})`,   // 시간 이벤트
+    ].join(','))
 
   const query =
     filter.type === 'family'
@@ -154,12 +158,17 @@ export async function POST(req: NextRequest) {
         url: '/',
       })
 
-      // INSERT ON CONFLICT DO NOTHING: 빈 배열이면 다른 실행이 이미 선점
-      const { data: inserted } = await supabaseAdmin
+      // ignoreDuplicates: true → 충돌 시 빈 배열, 실제 오류 시 error 필드로 구분
+      const { data: inserted, error: insertError } = await supabaseAdmin
         .from('daily_digest_log')
-        .insert({ user_id: userId, sent_date: sentDate })
+        .upsert({ user_id: userId, sent_date: sentDate }, { onConflict: 'user_id,sent_date', ignoreDuplicates: true })
         .select('user_id')
-      if (!inserted || inserted.length === 0) { skippedUsers++; return }
+      if (insertError) {
+        console.error('[daily-digest] log insert failed for user:', userId, insertError)
+        skippedUsers++
+        return
+      }
+      if (!inserted || inserted.length === 0) { skippedUsers++; return } // 다른 실행이 이미 선점
 
       try {
         const { sent } = await dispatchPushNotifications(userSubs, payload)

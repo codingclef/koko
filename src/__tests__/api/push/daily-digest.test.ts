@@ -22,21 +22,30 @@ jest.mock('@/lib/supabase-admin', () => ({
 
 // ── builder helper ───────────────────────────────────────────
 
-function makeBuilder(data: unknown) {
+type BuilderResult = { data: unknown; error: unknown }
+
+function makeBuilder(result: BuilderResult) {
   const builder: Record<string, unknown> = {}
-  ;['select', 'eq', 'in', 'is', 'lte', 'gte', 'or', 'insert', 'delete', 'update'].forEach((m) => {
+  ;['select', 'eq', 'in', 'is', 'lte', 'gte', 'or', 'insert', 'upsert', 'delete', 'update'].forEach((m) => {
     builder[m] = jest.fn().mockReturnValue(builder)
   })
   builder['then'] = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
-    Promise.resolve({ data, error: null }).then(onFulfilled, onRejected)
+    Promise.resolve(result).then(onFulfilled, onRejected)
   builder['catch'] = (onRejected: (e: unknown) => unknown) =>
-    Promise.resolve({ data, error: null }).catch(onRejected)
+    Promise.resolve(result).catch(onRejected)
   return builder
 }
 
-function setupFromSequence(sequence: unknown[]) {
-  sequence.forEach((data) => {
-    mockFrom.mockImplementationOnce(() => makeBuilder(data))
+/** setupFromSequence에 전달할 error 결과 */
+function fail(error: unknown): BuilderResult { return { data: null, error } }
+
+function setupFromSequence(sequence: (BuilderResult | unknown)[]) {
+  sequence.forEach((item) => {
+    const result: BuilderResult =
+      item !== null && typeof item === 'object' && 'data' in (item as object) && 'error' in (item as object)
+        ? (item as BuilderResult)
+        : { data: item, error: null }
+    mockFrom.mockImplementationOnce(() => makeBuilder(result))
   })
 }
 
@@ -215,6 +224,27 @@ describe('POST /api/cron/daily-digest', () => {
       await POST(makeRequest())
       expect(mockDispatch).toHaveBeenCalledTimes(1)
     })
+
+    it('queryTodayEvents .or() 조건에 end_at.is.null 분기가 포함된다', async () => {
+      const capturedOrArgs: string[] = []
+      // setupHappyPath와 동일한 시퀀스, 단 events(family) builder에서 .or() 인자를 캡처
+      const captureOrBuilder = (data: unknown) => {
+        const builder = makeBuilder({ data, error: null })
+        const origOr = builder['or'] as jest.Mock
+        builder['or'] = jest.fn((arg: string) => { capturedOrArgs.push(arg); return origOr(arg) })
+        return builder
+      }
+      mockFrom
+        .mockImplementationOnce(() => makeBuilder({ data: [{ user_id: 'u1' }], error: null }))
+        .mockImplementationOnce(() => makeBuilder({ data: [], error: null }))
+        .mockImplementationOnce(() => makeBuilder({ data: [{ user_id: 'u1', family_id: 'fam-1' }], error: null }))
+        .mockImplementationOnce(() => makeBuilder({ data: [], error: null }))
+        .mockImplementationOnce(() => makeBuilder({ data: [SUB], error: null }))
+        .mockImplementationOnce(() => captureOrBuilder([makeEvent()])) // events(family)
+        .mockImplementationOnce(() => makeBuilder({ data: [{ user_id: 'u1' }], error: null }))
+      await POST(makeRequest())
+      expect(capturedOrArgs.some((arg) => arg.includes('end_at.is.null'))).toBe(true)
+    })
   })
 
   describe('멀티데이 종일 일정', () => {
@@ -242,7 +272,7 @@ describe('POST /api/cron/daily-digest', () => {
       expect(mockDispatch).not.toHaveBeenCalled()
     })
 
-    it('INSERT ON CONFLICT 충돌 시 push를 보내지 않는다', async () => {
+    it('upsert ON CONFLICT 충돌 시 push를 보내지 않는다', async () => {
       setupFromSequence([
         [{ user_id: 'u1' }],
         [],
@@ -250,7 +280,23 @@ describe('POST /api/cron/daily-digest', () => {
         [],
         [SUB],
         [makeEvent()],
-        [], // insert 충돌 → 빈 배열
+        [], // upsert 충돌 → 빈 배열
+      ])
+      const res = await POST(makeRequest())
+      expect(res.status).toBe(200)
+      expect(mockDispatch).not.toHaveBeenCalled()
+      expect((await res.json()).skippedUsers).toBeGreaterThan(0)
+    })
+
+    it('upsert 실제 DB 오류 시 error를 인식하고 skip한다', async () => {
+      setupFromSequence([
+        [{ user_id: 'u1' }],
+        [],
+        [{ user_id: 'u1', family_id: 'fam-1' }],
+        [],
+        [SUB],
+        [makeEvent()],
+        fail({ message: 'db error', code: '500' }), // upsert 실패
       ])
       const res = await POST(makeRequest())
       expect(res.status).toBe(200)
