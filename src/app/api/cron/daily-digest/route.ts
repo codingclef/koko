@@ -75,7 +75,7 @@ async function queryTodayEvents(
   return (data ?? []) as EventRow[]
 }
 
-export async function POST(req: NextRequest) {
+async function handleDailyDigest(req: NextRequest) {
   if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -198,4 +198,12 @@ export async function POST(req: NextRequest) {
   )
 
   return NextResponse.json({ sentUsers, skippedUsers })
+}
+
+export async function GET(req: NextRequest) {
+  return handleDailyDigest(req)
+}
+
+export async function POST(req: NextRequest) {
+  return handleDailyDigest(req)
 }

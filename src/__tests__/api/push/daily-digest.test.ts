@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { POST } from '@/app/api/cron/daily-digest/route'
+import { GET, POST } from '@/app/api/cron/daily-digest/route'
 import { NextRequest } from 'next/server'
 
 // ── mocks ────────────────────────────────────────────────────
@@ -110,6 +110,13 @@ beforeEach(() => {
 function makeRequest(secret = 'test-secret') {
   return new NextRequest('http://localhost/api/cron/daily-digest', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${secret}` },
+  })
+}
+
+function makeGetRequest(secret = 'test-secret') {
+  return new NextRequest('http://localhost/api/cron/daily-digest', {
+    method: 'GET',
     headers: { Authorization: `Bearer ${secret}` },
   })
 }
@@ -383,5 +390,20 @@ describe('POST /api/cron/daily-digest', () => {
       expect(res.status).toBe(200)
       expect(mockFrom).toHaveBeenCalledTimes(8)
     })
+  })
+})
+
+describe('GET /api/cron/daily-digest', () => {
+  it('CRON_SECRET 불일치 시 401을 반환한다', async () => {
+    const res = await GET(makeGetRequest('wrong'))
+    expect(res.status).toBe(401)
+  })
+
+  it('이벤트가 있으면 push를 발송하고 sentUsers=1을 반환한다', async () => {
+    setupHappyPath()
+    const res = await GET(makeGetRequest())
+    expect(res.status).toBe(200)
+    expect((await res.json()).sentUsers).toBe(1)
+    expect(mockDispatch).toHaveBeenCalledTimes(1)
   })
 })
