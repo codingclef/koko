@@ -233,7 +233,7 @@ export function CalendarGrid({
       </div>
 
       {/* 주 단위 행 */}
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 min-h-0">
         {rows.map((row, rowIdx) => {
           const segments = computeSegments(row, multiDayEvents)
           const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
