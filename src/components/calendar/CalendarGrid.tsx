@@ -251,6 +251,7 @@ export function CalendarGrid({
                   const dow = cell.date.getDay()
                   const isSun = dow === 0
                   const isSat = dow === 6
+                  const hasHolidaysAndEvents = dayHolidays.length > 0 && daySingleEvents.length > 0
 
                   return (
                     <button
@@ -317,7 +318,7 @@ export function CalendarGrid({
                       </div>
 
                       {/* 단일 일정 pills */}
-                      <div className="w-full space-y-0.5">
+                      <div className={`w-full space-y-0.5${hasHolidaysAndEvents ? ' mt-0.5' : ''}`}>
                         {daySingleEvents.slice(0, 3).map((evt) => {
                           const color = getEventColor(evt)
                           return (
