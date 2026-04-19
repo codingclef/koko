@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { Plus } from 'lucide-react'
 import type { Calendar } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 
 const LONG_PRESS_MS = 500
 
@@ -54,11 +55,11 @@ export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }
                 ? 'text-white border-transparent'
                 : 'bg-transparent text-stone-500 dark:text-stone-400 border-stone-200 dark:border-stone-700'
             }`}
-            style={active ? { backgroundColor: cal.color, borderColor: cal.color } : {}}
+            style={active ? { backgroundColor: toDisplayColor(cal.color), borderColor: toDisplayColor(cal.color) } : {}}
           >
             <span
               className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : cal.color }}
+              style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : toDisplayColor(cal.color) }}
             />
             {cal.name}
           </button>

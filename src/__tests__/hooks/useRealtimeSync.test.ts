@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
-const mockSend = jest.fn()
+const mockSend = jest.fn().mockResolvedValue('ok')
 const mockRemoveChannel = jest.fn()
 let subscribeCb: ((status: string) => void) | undefined
 let broadcastCb: (() => void) | undefined
@@ -116,6 +116,64 @@ describe('useRealtimeSync', () => {
     })
   })
 
+  it('SUBSCRIBED 전 broadcast() 호출 시 전송하지 않고 pending으로 예약한다', () => {
+    const onRefresh = jest.fn()
+    const { result } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    act(() => { result.current() })
+
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('pending broadcast가 있을 때 SUBSCRIBED가 되면 1회 flush한다', async () => {
+    const onRefresh = jest.fn()
+    const { result } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    act(() => { result.current() })
+    expect(mockSend).not.toHaveBeenCalled()
+
+    await act(async () => { subscribeCb?.('SUBSCRIBED') })
+
+    expect(mockSend).toHaveBeenCalledTimes(1)
+    expect(mockSend).toHaveBeenCalledWith({ type: 'broadcast', event: 'refresh', payload: {} })
+  })
+
+  it('SUBSCRIBED 전 broadcast()를 여러 번 호출해도 flush는 1회만 한다', async () => {
+    const onRefresh = jest.fn()
+    const { result } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    act(() => {
+      result.current()
+      result.current()
+      result.current()
+    })
+
+    await act(async () => { subscribeCb?.('SUBSCRIBED') })
+
+    expect(mockSend).toHaveBeenCalledTimes(1)
+  })
+
+  it('pending이 없으면 SUBSCRIBED 시 flush하지 않는다', async () => {
+    const onRefresh = jest.fn()
+    renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    await act(async () => { subscribeCb?.('SUBSCRIBED') })
+
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('flush 후 두 번째 SUBSCRIBED에서 재flush하지 않는다', async () => {
+    const onRefresh = jest.fn()
+    const { result } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    act(() => { result.current() })
+    await act(async () => { subscribeCb?.('SUBSCRIBED') })
+    expect(mockSend).toHaveBeenCalledTimes(1)
+
+    await act(async () => { subscribeCb?.('SUBSCRIBED') })
+    expect(mockSend).toHaveBeenCalledTimes(1)
+  })
+
   it('언마운트 시 채널을 제거한다', () => {
     const onRefresh = jest.fn()
     const { unmount } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
@@ -123,6 +181,28 @@ describe('useRealtimeSync', () => {
     unmount()
 
     expect(mockSupabaseRemoveChannel).toHaveBeenCalledWith(mockChannel)
+  })
+
+  it('언마운트 시 pending broadcast가 있으면 채널 제거 전에 전송한다', () => {
+    const onRefresh = jest.fn()
+    const { result, unmount } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    act(() => { result.current() }) // pending=true, 미구독 상태
+
+    unmount()
+
+    expect(mockSend).toHaveBeenCalledTimes(1)
+    expect(mockSend).toHaveBeenCalledWith({ type: 'broadcast', event: 'refresh', payload: {} })
+    expect(mockSupabaseRemoveChannel).toHaveBeenCalledWith(mockChannel)
+  })
+
+  it('언마운트 시 pending이 없으면 전송하지 않는다', () => {
+    const onRefresh = jest.fn()
+    const { unmount } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    unmount()
+
+    expect(mockSend).not.toHaveBeenCalled()
   })
 
   it('channelName 변경 시 이전 채널을 제거하고 새 채널을 구독한다', () => {

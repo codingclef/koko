@@ -8,6 +8,12 @@ jest.mock('@/lib/calendar', () => ({
     { minutes: 10, label: '10분 전' },
     { minutes: 30, label: '30분 전' },
   ],
+  LABEL_COLORS: ['#f97316', '#3b82f6', '#10b981'],
+  LABEL_COLOR_NAMES: {
+    '#f97316': '주황색',
+    '#3b82f6': '파란색',
+    '#10b981': '에메랄드',
+  },
 }))
 jest.mock('@/lib/supabase', () => ({
   supabase: {},
@@ -174,7 +180,7 @@ describe('EventFormModal', () => {
   })
 
   it('initial event가 있을 때 편집 타이틀이 표시된다', () => {
-    const initial = {
+    const initial: import('@/lib/calendar').CalendarEvent = {
       id: 'evt-1',
       family_id: 'fam-1',
       calendar_id: 'cal-1',
@@ -185,6 +191,7 @@ describe('EventFormModal', () => {
       end_at: '2026-03-31T10:00:00.000Z',
       is_all_day: false,
       is_cancelled: false,
+      label_color: null,
       series_id: null,
       series_occurrence_date: null,
       created_at: '',
@@ -229,6 +236,7 @@ describe('EventFormModal', () => {
       end_at: '2026-03-31T10:00:00.000Z',
       is_all_day: false,
       is_cancelled: false,
+      label_color: null,
       series_id: 'series-1',
       series_occurrence_date: '2026-03-31',
       created_at: '',
@@ -274,6 +282,88 @@ describe('EventFormModal', () => {
           daysOfWeek: [5],
         }),
       })
+    )
+  })
+})
+
+// ── 라벨 색상 ────────────────────────────────────────────────
+
+describe('라벨 색상', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+  })
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('기본값이 없으면 "캘린더 색상 사용"으로 표시된다', () => {
+    render(<EventFormModal {...defaultProps} />)
+    expect(screen.getByText('캘린더 색상 사용')).toBeInTheDocument()
+  })
+
+  it('defaultLabelColor가 있으면 색상 이름이 표시된다', () => {
+    render(<EventFormModal {...defaultProps} defaultLabelColor="#10b981" />)
+    expect(screen.getByText('에메랄드')).toBeInTheDocument()
+  })
+
+  it('기존 이벤트의 label_color가 defaultLabelColor보다 우선한다', () => {
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-1', family_id: 'fam-1', calendar_id: 'cal-1', created_by: 'user-1',
+      title: '테스트', description: null, start_at: '2026-04-18T09:00:00Z',
+      end_at: null, is_all_day: false, label_color: '#3b82f6',
+      series_id: null, series_occurrence_date: null, is_cancelled: false,
+      created_at: '', updated_at: '',
+    }
+    render(<EventFormModal {...defaultProps} initial={initial} defaultLabelColor="#10b981" />)
+    expect(screen.getByText('파란색')).toBeInTheDocument()
+  })
+
+  it('기존 이벤트의 label_color가 null이면 defaultLabelColor를 무시하고 null을 유지한다', async () => {
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-1', family_id: 'fam-1', calendar_id: 'cal-1', created_by: 'user-1',
+      title: '테스트', description: null, start_at: '2026-04-18T00:00:00Z',
+      end_at: null, is_all_day: true, label_color: null,
+      series_id: null, series_occurrence_date: null, is_cancelled: false,
+      created_at: '', updated_at: '',
+    }
+    render(<EventFormModal {...defaultProps} initial={initial} defaultLabelColor="#f97316" />)
+    expect(screen.getByText('캘린더 색상 사용')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByText('저장')) })
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ labelColor: null })
+    )
+  })
+
+  it('라벨 색상 버튼 클릭 시 팔레트가 열린다', () => {
+    render(<EventFormModal {...defaultProps} />)
+    fireEvent.click(screen.getByText('라벨 색상'))
+    expect(screen.getByTitle('주황색')).toBeInTheDocument()
+  })
+
+  it('저장 시 onSave에 labelColor가 포함된다', async () => {
+    render(<EventFormModal {...defaultProps} defaultLabelColor="#f97316" />)
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '테스트 일정' } })
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ labelColor: '#f97316' })
+    )
+  })
+
+  it('null 선택 시 onSave에 labelColor: null이 포함된다', async () => {
+    render(<EventFormModal {...defaultProps} defaultLabelColor="#f97316" />)
+    // 팔레트 열기
+    fireEvent.click(screen.getByText('라벨 색상'))
+    // null 선택 (캘린더 색상 사용)
+    fireEvent.click(screen.getByTitle('캘린더 색상 사용'))
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '테스트' } })
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ labelColor: null })
     )
   })
 })

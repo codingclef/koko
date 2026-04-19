@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import { ShoppingTab, clearShoppingTabCache } from '@/components/tabs/ShoppingTab'
@@ -9,6 +9,7 @@ const mockDeleteShoppingList = jest.fn()
 const mockRenameShoppingList = jest.fn()
 const mockReorderShoppingLists = jest.fn()
 const mockBroadcast = jest.fn()
+const mockUseRealtimeSync = jest.fn((_c: unknown, _r: unknown, _o: unknown) => mockBroadcast)
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 let mockListParam: string | null = null
@@ -23,7 +24,8 @@ jest.mock('@/lib/shopping', () => ({
 }))
 
 jest.mock('@/hooks/useRealtimeSync', () => ({
-  useRealtimeSync: () => mockBroadcast,
+  useRealtimeSync: (channelName: unknown, refresh: unknown, options: unknown) =>
+    mockUseRealtimeSync(channelName, refresh, options),
 }))
 
 jest.mock('next/navigation', () => ({
@@ -82,6 +84,16 @@ describe('ShoppingTab', () => {
 
   afterAll(() => {
     consoleErrorSpy.mockRestore()
+  })
+
+  it('refreshOnSubscribed: false를 전달하지 않는다', async () => {
+    render(
+      <ShoppingTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
+    )
+    await act(async () => {})
+    const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, unknown, { refreshOnSubscribed?: boolean } | undefined]>
+    const options = calls[0]?.[2]
+    expect(options?.refreshOnSubscribed).not.toBe(false)
   })
 
   it('목록 생성 실패 시 optimistic 항목을 롤백하고 에러를 표시한다', async () => {

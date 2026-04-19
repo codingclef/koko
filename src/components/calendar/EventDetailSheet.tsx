@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, Pencil, Trash2, X, Calendar as CalendarIcon, Clock, RefreshCw } from 'lucide-react'
 import { getRecurrenceRule, getReminders, REMINDER_OPTIONS, type Calendar, type CalendarEvent, type EventReminder } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 import { buildRecurrenceEndLabel, buildRecurrenceLabel, type RecurrenceRule } from '@/types/recurrence'
 
 function formatDatetime(isoString: string, isAllDay: boolean): string {
@@ -79,10 +80,10 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
         {/* 헤더 */}
         <div className="flex items-start justify-between px-5 py-3">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            {cal && (
+            {(event.label_color || cal) && (
               <span
                 className="w-3 h-3 rounded-full shrink-0"
-                style={{ backgroundColor: cal.color }}
+                style={{ backgroundColor: (event.label_color ?? cal?.color) ? toDisplayColor(event.label_color ?? cal!.color) : undefined }}
               />
             )}
             <h3 className="font-bold text-lg text-stone-800 dark:text-stone-100 truncate">
