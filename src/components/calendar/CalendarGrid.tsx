@@ -217,9 +217,12 @@ export function CalendarGrid({
   const effectiveDateHeaderHeight = DATE_HEADER_HEIGHT + (showLunar ? LUNAR_DATE_HEIGHT : 0)
 
   return (
-    <div className={`flex flex-col w-full ${className ?? ''}`}>
-      {/* 요일 헤더 */}
-      <div className="grid grid-cols-7 shrink-0">
+    <div
+      className={`w-full grid ${className ?? ''}`}
+      style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))` }}
+    >
+      {/* 요일 헤더 — auto 트랙 */}
+      <div className="grid grid-cols-7">
         {DOW.map((d, i) => (
           <div
             key={d}
@@ -232,18 +235,14 @@ export function CalendarGrid({
         ))}
       </div>
 
-      {/* 주 단위 행 */}
-      <div
-        className="flex-1 min-h-0 grid"
-        style={{ gridTemplateRows: `repeat(${rows.length}, minmax(0, 1fr))` }}
-      >
-        {rows.map((row, rowIdx) => {
-          const segments = computeSegments(row, multiDayEvents)
-          const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
-          const laneAreaHeight = laneCount * LANE_HEIGHT
+      {/* 주 단위 행 — minmax(0,1fr) 트랙 */}
+      {rows.map((row, rowIdx) => {
+        const segments = computeSegments(row, multiDayEvents)
+        const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
+        const laneAreaHeight = laneCount * LANE_HEIGHT
 
-          return (
-            <div key={rowIdx} className="relative min-h-0">
+        return (
+            <div key={rowIdx} className="relative">
               {/* 날짜 셀 그리드 */}
               <div className="grid grid-cols-7 h-full">
                 {row.map((cell, colIdx) => {
@@ -393,7 +392,6 @@ export function CalendarGrid({
             </div>
           )
         })}
-      </div>
     </div>
   )
 }
