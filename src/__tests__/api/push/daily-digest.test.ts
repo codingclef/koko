@@ -275,6 +275,16 @@ describe('POST /api/cron/daily-digest', () => {
       expect(mockDispatch).toHaveBeenCalledTimes(1)
     })
 
+    it('DB가 Z 포맷으로 반환해도 오늘 종일 일정은 포함된다', async () => {
+      const todayUtc = new Date(`${TODAY_KST}T00:00:00+09:00`).toISOString()
+      const ev = makeEvent({ is_all_day: true, end_at: null, start_at: todayUtc })
+      setupHappyPath([ev])
+      await POST(makeRequest())
+      const body = JSON.parse(mockDispatch.mock.calls[0][1]).body as string
+      expect(body).toContain('하루종일')
+      expect(body).toContain('테스트 일정')
+    })
+
     it('queryTodayEvents .or() 조건에 end_at.is.null 분기가 포함된다', async () => {
       const capturedOrArgs: string[] = []
       // setupHappyPath와 동일한 시퀀스, 단 events(family) builder에서 .or() 인자를 캡처
