@@ -649,6 +649,12 @@ export type Database = {
           family_id: string
         }[]
       }
+      cleanup_sent_event_reminders: {
+        Args: {
+          p_retention_days?: number
+        }
+        Returns: number
+      }
       create_event_with_reminders: {
         Args: {
           p_family_id: string
