@@ -531,3 +531,29 @@ describe('칩 variant', () => {
     expect(chip.className).toContain('whitespace-nowrap')
   })
 })
+
+// ── 공휴일·이벤트 칩 간격 ────────────────────────────────────
+
+describe('공휴일-이벤트 칩 간격', () => {
+  it('공휴일과 이벤트가 같은 날에 있으면 이벤트 블록에 mt-0.5가 적용된다', () => {
+    const holidays: Holiday[] = [{ date: '2025-06-15', localName: '테스트공휴일', countryCode: 'KR' }]
+    const event = makeEvent({ title: '테스트일정', start_at: '2025-06-15T10:00:00Z' })
+    render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
+    const chip = screen.getByText('테스트일정')
+    expect(chip.parentElement).toHaveClass('mt-0.5')
+  })
+
+  it('이벤트만 있고 같은 날 공휴일이 없으면 이벤트 블록에 mt-0.5가 없다', () => {
+    render(<CalendarGrid {...defaultProps} />)
+    const chip = screen.getByText('생일파티')
+    expect(chip.parentElement).not.toHaveClass('mt-0.5')
+  })
+
+  it('공휴일이 다른 날에 있으면 이벤트 날짜의 블록에 mt-0.5가 없다', () => {
+    const holidays: Holiday[] = [{ date: '2025-06-06', localName: '현충일', countryCode: 'KR' }]
+    render(<CalendarGrid {...defaultProps} holidays={holidays} />)
+    // 이벤트(생일파티)는 6/15, 공휴일은 6/6 → 6/15 이벤트 블록에 mt-0.5 없어야 함
+    const chip = screen.getByText('생일파티')
+    expect(chip.parentElement).not.toHaveClass('mt-0.5')
+  })
+})
