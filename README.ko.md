@@ -105,6 +105,7 @@ supabase/
 - [`src/app/api/family/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/route.ts): 원자적 가족 생성/조회
 - [`src/app/api/family/join/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/join/route.ts): 초대 코드 기반 가족 합류
 - [`src/app/api/cron/send-reminders/route.ts`](/Users/codingclef/workspace/koko/src/app/api/cron/send-reminders/route.ts): 예약 리마인더 발송
+- [`src/app/api/cron/cleanup-reminders/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/cleanup-reminders/route.ts): 지난 발송 완료 리마인더 정리
 
 ## 환경 변수
 
@@ -126,7 +127,7 @@ CRON_SECRET=
 - `SUPABASE_SERVICE_ROLE_KEY`: RPC와 보호 테이블 접근용 서버 admin client
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: 브라우저 푸시 구독 등록
 - `VAPID_PRIVATE_KEY`: 서버 측 푸시 발송
-- `CRON_SECRET`: 리마인더 cron endpoint 보호
+- `CRON_SECRET`: cron endpoint 보호
 
 ## 로컬 개발
 
