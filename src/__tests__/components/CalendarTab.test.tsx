@@ -34,7 +34,7 @@ jest.mock('@/lib/supabase', () => ({
     channel: jest.fn(() => ({
       on: jest.fn().mockReturnThis(),
       subscribe: jest.fn().mockReturnThis(),
-      send: jest.fn(),
+      send: jest.fn().mockResolvedValue('ok'),
     })),
     removeChannel: jest.fn(),
   },
@@ -222,6 +222,61 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
     expect(mockSupabase.channel).toHaveBeenCalledWith('family_events_fam-1')
     expect(mockSupabase.channel).not.toHaveBeenCalledWith(expect.stringMatching(/_\d{4}_\d{1,2}$/))
+  })
+
+  it('broadcast 수신 시 인접하지 않은 달의 캐시도 무효화하여 재탐색 시 새로 불러온다', async () => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = today.getMonth()
+    let farYear = y, farMonth = m + 2
+    if (farMonth > 11) { farYear += 1; farMonth -= 12 }
+
+    let broadcastCb: (() => void) | undefined
+    const { supabase: mockSupabase } = jest.requireMock('@/lib/supabase') as {
+      supabase: { channel: jest.Mock }
+    }
+    const channelStub = {
+      on: jest.fn().mockImplementation((_t: string, _f: unknown, cb: () => void) => {
+        broadcastCb = cb
+        return channelStub
+      }),
+      subscribe: jest.fn().mockReturnThis(),
+      send: jest.fn().mockResolvedValue('ok'),
+    }
+    mockSupabase.channel.mockReturnValueOnce(channelStub)
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    // month+2를 방문해 캐시에 올린다
+    fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
+    await act(async () => {})
+
+    // 현재 달로 돌아온다
+    fireEvent.click(screen.getByRole('button', { name: '이전 달' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: '이전 달' }))
+    await act(async () => {})
+
+    const callsBefore = mockGetEventsByMonth.mock.calls.filter(
+      ([, ey, em]) => ey === farYear && em === farMonth
+    ).length
+
+    // broadcast 수신 → 전체 캐시 무효화
+    await act(async () => { broadcastCb?.() })
+
+    // month+1로 이동 (이때 month+2 prefetch 발생)
+    fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
+    await act(async () => {})
+
+    const callsAfter = mockGetEventsByMonth.mock.calls.filter(
+      ([, ey, em]) => ey === farYear && em === farMonth
+    ).length
+
+    // 캐시가 무효화됐으므로 broadcast 후 재탐색 시 새로 불러온 횟수가 증가해야 한다
+    expect(callsAfter).toBeGreaterThan(callsBefore)
   })
 
   it('모달이 없을 때 컨테이너에 touch-action: none이 적용된다', async () => {

@@ -53,7 +53,10 @@ export function useRealtimeSync(
     return () => {
       channelReadyRef.current = false
       channelRef.current = null
-      pendingBroadcastRef.current = false
+      if (pendingBroadcastRef.current) {
+        pendingBroadcastRef.current = false
+        sendBroadcast(channel)
+      }
       supabase.removeChannel(channel)
     }
   }, [channelName, refreshOnSubscribed])

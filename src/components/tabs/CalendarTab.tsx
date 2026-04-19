@@ -311,14 +311,13 @@ export function CalendarTab({
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
-    const prev = getAdjacentMonth(year, month, -1)
-    const next = getAdjacentMonth(year, month, 1)
-    const prevKey = getMonthEventsKey(familyId, prev.year, prev.month)
-    const nextKey = getMonthEventsKey(familyId, next.year, next.month)
-    monthEventsCacheRef.current.delete(prevKey)
-    monthEventsCacheRef.current.delete(nextKey)
-    monthEventsRequestsRef.current.delete(prevKey)
-    monthEventsRequestsRef.current.delete(nextKey)
+    const prefix = `${familyId}:`
+    for (const key of monthEventsCacheRef.current.keys()) {
+      if (key.startsWith(prefix)) monthEventsCacheRef.current.delete(key)
+    }
+    for (const key of monthEventsRequestsRef.current.keys()) {
+      if (key.startsWith(prefix)) monthEventsRequestsRef.current.delete(key)
+    }
     await loadMonthEvents({
       targetFamilyId: familyId,
       targetYear: year,

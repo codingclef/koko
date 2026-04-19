@@ -183,6 +183,28 @@ describe('useRealtimeSync', () => {
     expect(mockSupabaseRemoveChannel).toHaveBeenCalledWith(mockChannel)
   })
 
+  it('언마운트 시 pending broadcast가 있으면 채널 제거 전에 전송한다', () => {
+    const onRefresh = jest.fn()
+    const { result, unmount } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    act(() => { result.current() }) // pending=true, 미구독 상태
+
+    unmount()
+
+    expect(mockSend).toHaveBeenCalledTimes(1)
+    expect(mockSend).toHaveBeenCalledWith({ type: 'broadcast', event: 'refresh', payload: {} })
+    expect(mockSupabaseRemoveChannel).toHaveBeenCalledWith(mockChannel)
+  })
+
+  it('언마운트 시 pending이 없으면 전송하지 않는다', () => {
+    const onRefresh = jest.fn()
+    const { unmount } = renderHook(() => useRealtimeSync('test-channel', onRefresh))
+
+    unmount()
+
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
   it('channelName 변경 시 이전 채널을 제거하고 새 채널을 구독한다', () => {
     const onRefresh = jest.fn()
     const { rerender } = renderHook(
