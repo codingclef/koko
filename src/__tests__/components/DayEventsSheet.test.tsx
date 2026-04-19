@@ -20,6 +20,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     end_at: null,
     is_all_day: false,
     is_cancelled: false,
+    label_color: null,
     series_id: null,
     series_occurrence_date: null,
     ...overrides,

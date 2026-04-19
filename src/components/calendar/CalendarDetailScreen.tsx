@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Check } from 'lucide-react'
 import { CALENDAR_COLORS, CALENDAR_COLOR_NAMES, type Calendar, type FamilyMember, type SaveResult } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
   calendar: Calendar
@@ -160,9 +161,9 @@ export function CalendarDetailScreen({
                   <span
                     className="w-8 h-8 rounded-full block"
                     style={{
-                      backgroundColor: c,
+                      backgroundColor: toDisplayColor(c),
                       transform: color === c ? 'scale(1.25)' : 'scale(1)',
-                      outline: color === c ? `2px solid ${c}` : 'none',
+                      outline: color === c ? `2px solid ${toDisplayColor(c)}` : 'none',
                       outlineOffset: '2px',
                       transition: 'transform 150ms ease-out',
                     }}

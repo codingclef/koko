@@ -65,7 +65,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 구독 훅은 `src/hooks/useRealtimeSync.ts` 패턴을 재사용한다.
 - 채널명은 기능 경계가 드러나야 한다.
 - 가족 범위 데이터는 `family_*_${familyId}` 형식을 우선한다.
-- 월별 이벤트는 `family_events_${familyId}_${year}_${month}`처럼 조회 범위와 맞춘다.
+- 이벤트 동기화 채널은 `family_events_${familyId}`처럼 가족 단위로 유지한다. 연/월을 채널명에 포함하면 다른 달을 보는 클라이언트가 broadcast를 수신하지 못한다.
 - 상세/부분 범위 데이터는 `list_items_${listId}`처럼 더 좁은 범위를 사용한다.
 
 ## 6. Calendar Patterns

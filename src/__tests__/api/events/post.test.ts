@@ -118,4 +118,27 @@ describe('POST /api/events', () => {
     const res = await POST(makeRequest(baseBody))
     expect(res.status).toBe(500)
   })
+
+  it('허용된 labelColor가 있으면 p_label_color를 RPC에 전달한다', async () => {
+    mockSendEventNotification.mockResolvedValue(undefined)
+    await POST(makeRequest({ ...baseBody, labelColor: '#10b981' }))
+    expect(mockRpc).toHaveBeenCalledWith(
+      'create_event_authorized',
+      expect.objectContaining({ p_label_color: '#10b981' })
+    )
+  })
+
+  it('허용되지 않은 labelColor면 400을 반환한다', async () => {
+    const res = await POST(makeRequest({ ...baseBody, labelColor: '#123456' }))
+    expect(res.status).toBe(400)
+  })
+
+  it('labelColor가 null이면 p_label_color를 null로 전달한다', async () => {
+    mockSendEventNotification.mockResolvedValue(undefined)
+    await POST(makeRequest({ ...baseBody, labelColor: null }))
+    expect(mockRpc).toHaveBeenCalledWith(
+      'create_event_authorized',
+      expect.objectContaining({ p_label_color: null })
+    )
+  })
 })

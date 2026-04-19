@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { type CSSProperties, useMemo } from 'react'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 import type { Holiday } from '@/hooks/useHolidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
@@ -61,6 +62,11 @@ export function isEventOnDate(event: CalendarEvent, date: Date): boolean {
     return target >= start && target <= end
   }
   return target.getTime() === start.getTime()
+}
+
+function getChipStyle(isAllDay: boolean, color: string): CSSProperties {
+  if (isAllDay) return { backgroundColor: color }
+  return { backgroundColor: color + '26', color }
 }
 
 interface EventSegment {
@@ -185,8 +191,9 @@ export function CalendarGrid({
   }, [singleDayEvents])
 
   const getEventColor = (event: CalendarEvent): string => {
-    if (!event.calendar_id) return '#94a3b8'
-    return calendarMap.get(event.calendar_id)?.color ?? '#94a3b8'
+    if (event.label_color) return toDisplayColor(event.label_color)
+    const calColor = event.calendar_id ? calendarMap.get(event.calendar_id)?.color : null
+    return calColor ? toDisplayColor(calColor) : '#94a3b8'
   }
 
   const lunarDateMap = useMemo(() => {
@@ -244,11 +251,13 @@ export function CalendarGrid({
                   const dow = cell.date.getDay()
                   const isSun = dow === 0
                   const isSat = dow === 6
+                  const hasHolidaysAndEvents = dayHolidays.length > 0 && daySingleEvents.length > 0
 
                   return (
                     <button
                       key={colIdx}
                       onClick={() => onSelectDate(cell.date)}
+                      aria-label={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
                       className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
                         isSelected
                           ? 'bg-accent-50 dark:bg-accent-950/30'
@@ -309,16 +318,19 @@ export function CalendarGrid({
                       </div>
 
                       {/* 단일 일정 pills */}
-                      <div className="w-full space-y-0.5">
-                        {daySingleEvents.slice(0, 3).map((evt) => (
-                          <div
-                            key={evt.id}
-                            className="w-full rounded text-white text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap"
-                            style={{ backgroundColor: getEventColor(evt) }}
-                          >
-                            {evt.title}
-                          </div>
-                        ))}
+                      <div className={`w-full space-y-0.5${hasHolidaysAndEvents ? ' mt-0.5' : ''}`}>
+                        {daySingleEvents.slice(0, 3).map((evt) => {
+                          const color = getEventColor(evt)
+                          return (
+                            <div
+                              key={evt.id}
+                              className={`w-full rounded text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap${evt.is_all_day ? ' text-white' : ''}`}
+                              style={getChipStyle(evt.is_all_day, color)}
+                            >
+                              {evt.title}
+                            </div>
+                          )
+                        })}
                         {daySingleEvents.length > 3 && (
                           <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium px-1">
                             +{daySingleEvents.length - 3}

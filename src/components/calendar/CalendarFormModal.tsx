@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { CALENDAR_COLORS, type Calendar, type FamilyMember } from '@/lib/calendar'
+import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
   initial?: Calendar
@@ -127,9 +128,9 @@ export function CalendarFormModal({
                   onClick={() => setColor(c)}
                   className="w-8 h-8 rounded-full transition-transform"
                   style={{
-                    backgroundColor: c,
+                    backgroundColor: toDisplayColor(c),
                     transform: color === c ? 'scale(1.25)' : 'scale(1)',
-                    outline: color === c ? `2px solid ${c}` : 'none',
+                    outline: color === c ? `2px solid ${toDisplayColor(c)}` : 'none',
                     outlineOffset: '2px',
                   }}
                 />

@@ -1,14 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import { ShoppingDetailView } from '@/components/shopping/ShoppingDetailView'
 import { getShoppingItems, getShoppingList } from '@/lib/shopping'
 
 const mockBroadcast = jest.fn()
+const mockUseRealtimeSync = jest.fn((_c: unknown, _r: unknown, _o: unknown) => mockBroadcast)
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
 
 jest.mock('@/hooks/useRealtimeSync', () => ({
-  useRealtimeSync: () => mockBroadcast,
+  useRealtimeSync: (channelName: unknown, refresh: unknown, options: unknown) =>
+    mockUseRealtimeSync(channelName, refresh, options),
 }))
 
 jest.mock('@/lib/shopping', () => ({
@@ -71,6 +73,21 @@ describe('ShoppingDetailView', () => {
 
   afterAll(() => {
     consoleErrorSpy.mockRestore()
+  })
+
+  it('refreshOnSubscribed: false를 전달하지 않는다', async () => {
+    render(
+      <ShoppingDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+    await act(async () => {})
+    const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, unknown, { refreshOnSubscribed?: boolean } | undefined]>
+    const options = calls[0]?.[2]
+    expect(options?.refreshOnSubscribed).not.toBe(false)
   })
 
   it('정상 로드 시 상세 헤더를 렌더링한다', async () => {

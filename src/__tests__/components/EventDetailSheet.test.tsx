@@ -23,6 +23,7 @@ const defaultProps = {
     end_at: '2026-04-08T10:00:00.000Z',
     is_all_day: false,
     is_cancelled: false,
+    label_color: null,
     series_id: null,
     series_occurrence_date: null,
     created_at: '',

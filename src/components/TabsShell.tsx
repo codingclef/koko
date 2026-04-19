@@ -110,6 +110,7 @@ export function TabsShell() {
       <div style={{ display: activeTab === 'calendar' ? 'contents' : 'none' }}>
         <CalendarTab
           preferences={preferences}
+          updatePreferences={updatePreferences}
           user={user}
           familyId={familyId}
           isInitializing={isInitializing}
