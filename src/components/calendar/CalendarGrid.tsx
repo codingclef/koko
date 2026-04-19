@@ -240,7 +240,7 @@ export function CalendarGrid({
           const laneAreaHeight = laneCount * LANE_HEIGHT
 
           return (
-            <div key={rowIdx} className="relative flex-1">
+            <div key={rowIdx} className="relative flex-1 min-h-0">
               {/* 날짜 셀 그리드 */}
               <div className="grid grid-cols-7 h-full">
                 {row.map((cell, colIdx) => {
@@ -273,7 +273,7 @@ export function CalendarGrid({
                               : isSelected
                               ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
                                   !cell.isCurrentMonth
-                                    ? 'text-stone-300 dark:text-stone-600'
+                                    ? 'text-stone-400 dark:text-stone-400'
                                     : isSun
                                     ? 'text-red-400'
                                     : isSat
@@ -281,7 +281,7 @@ export function CalendarGrid({
                                     : 'text-stone-700 dark:text-stone-200'
                                 )
                               : !cell.isCurrentMonth
-                              ? 'text-stone-300 dark:text-stone-600'
+                              ? 'text-stone-400 dark:text-stone-400'
                               : isSun
                               ? 'text-red-400 dark:text-red-400'
                               : isSat
@@ -294,7 +294,7 @@ export function CalendarGrid({
                         {showLunar && (
                           <span className={`text-[9px] leading-tight ${
                             !cell.isCurrentMonth
-                              ? 'text-stone-300 dark:text-stone-600'
+                              ? 'text-stone-400 dark:text-stone-400'
                               : 'text-stone-400 dark:text-stone-500'
                           }`}>
                             {lunarDateMap.get(cell.date.getTime())}
