@@ -756,7 +756,7 @@ export function CalendarTab({
 
       <div
         key={slideKey}
-        className={`flex-1 overflow-hidden${slideDir === 'left' ? ' calendar-slide-from-right' : slideDir === 'right' ? ' calendar-slide-from-left' : ''}`}
+        className={`flex-1 min-h-0 flex flex-col overflow-hidden${slideDir === 'left' ? ' calendar-slide-from-right' : slideDir === 'right' ? ' calendar-slide-from-left' : ''}`}
       >
         <CalendarGrid
           year={year}
@@ -772,7 +772,7 @@ export function CalendarTab({
             )
           }}
           showLunar={preferences?.show_lunar ?? false}
-          className="h-full pb-16"
+          className="flex-1 min-h-0 pb-16"
         />
       </div>
 
