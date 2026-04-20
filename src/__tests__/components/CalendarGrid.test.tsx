@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { CalendarGrid, isMultiDayAllDay, isEventOnDate, computeSegments } from '@/components/calendar/CalendarGrid'
+import { CalendarGrid, buildGrid, isMultiDayAllDay, isEventOnDate, computeSegments } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
@@ -555,5 +555,28 @@ describe('공휴일-이벤트 칩 간격', () => {
     // 이벤트(생일파티)는 6/15, 공휴일은 6/6 → 6/15 이벤트 블록에 mt-0.5 없어야 함
     const chip = screen.getByText('생일파티')
     expect(chip.parentElement).not.toHaveClass('mt-0.5')
+  })
+})
+
+describe('buildGrid — trailing adjacent-month cells', () => {
+  it('2026년 4월 뷰에서 5/2(토)가 그리드에 포함된다', () => {
+    const cells = buildGrid(2026, 3) // month=3 → April
+    const dates = cells.map((c) => `${c.date.getFullYear()}-${c.date.getMonth() + 1}-${c.date.getDate()}`)
+    expect(dates).toContain('2026-5-2')
+  })
+
+  it('2026년 5월 뷰에서 6/4~6/6이 그리드에 포함된다', () => {
+    const cells = buildGrid(2026, 4) // month=4 → May
+    const dates = cells.map((c) => `${c.date.getFullYear()}-${c.date.getMonth() + 1}-${c.date.getDate()}`)
+    expect(dates).toContain('2026-6-4')
+    expect(dates).toContain('2026-6-5')
+    expect(dates).toContain('2026-6-6')
+  })
+
+  it('그리드 총 셀 수는 항상 7의 배수다', () => {
+    for (const [year, month] of [[2026, 0], [2026, 3], [2026, 4], [2026, 11]] as [number, number][]) {
+      const cells = buildGrid(year, month)
+      expect(cells.length % 7).toBe(0)
+    }
   })
 })

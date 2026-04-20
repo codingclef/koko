@@ -16,7 +16,7 @@ interface DayCell {
   isCurrentMonth: boolean
 }
 
-function buildGrid(year: number, month: number): DayCell[] {
+export function buildGrid(year: number, month: number): DayCell[] {
   const firstDay = new Date(year, month, 1)
   const startDow = firstDay.getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -31,7 +31,8 @@ function buildGrid(year: number, month: number): DayCell[] {
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ date: new Date(year, month, d), isCurrentMonth: true })
   }
-  for (let d = 1; d <= totalCells - cells.length; d++) {
+  const trailingDays = totalCells - cells.length
+  for (let d = 1; d <= trailingDays; d++) {
     cells.push({ date: new Date(year, month + 1, d), isCurrentMonth: false })
   }
   return cells
@@ -136,10 +137,6 @@ export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[])
   return segments
 }
 
-function getHolidaysForDay(date: Date, holidays: Holiday[]): Holiday[] {
-  const ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  return holidays.filter((h) => h.date === ymd)
-}
 
 interface Props {
   year: number
@@ -178,7 +175,16 @@ export function CalendarGrid({
     return { multiDayEvents: multi, singleDayEvents: single }
   }, [visibleEvents])
 
-  // Map for O(1) lookup instead of O(n) filter per cell
+  const holidaysByDate = useMemo(() => {
+    const map = new Map<string, Holiday[]>()
+    for (const h of holidays) {
+      const arr = map.get(h.date)
+      if (arr) arr.push(h)
+      else map.set(h.date, [h])
+    }
+    return map
+  }, [holidays])
+
   const singleEventsByDate = useMemo(() => {
     const map = new Map<number, CalendarEvent[]>()
     for (const e of singleDayEvents) {
@@ -217,9 +223,12 @@ export function CalendarGrid({
   const effectiveDateHeaderHeight = DATE_HEADER_HEIGHT + (showLunar ? LUNAR_DATE_HEIGHT : 0)
 
   return (
-    <div className={`flex flex-col w-full ${className ?? ''}`}>
-      {/* 요일 헤더 */}
-      <div className="grid grid-cols-7 shrink-0">
+    <div
+      className={`w-full grid ${className ?? ''}`}
+      style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))`, height: '100%' }}
+    >
+      {/* 요일 헤더 — auto 트랙 */}
+      <div className="grid grid-cols-7">
         {DOW.map((d, i) => (
           <div
             key={d}
@@ -232,20 +241,21 @@ export function CalendarGrid({
         ))}
       </div>
 
-      {/* 주 단위 행 */}
-      <div className="flex flex-col flex-1">
-        {rows.map((row, rowIdx) => {
-          const segments = computeSegments(row, multiDayEvents)
-          const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
-          const laneAreaHeight = laneCount * LANE_HEIGHT
+      {/* 주 단위 행 — minmax(0,1fr) 트랙 */}
+      {rows.map((row, rowIdx) => {
+        const segments = computeSegments(row, multiDayEvents)
+        const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
+        const laneAreaHeight = laneCount * LANE_HEIGHT
 
-          return (
-            <div key={rowIdx} className="relative flex-1">
+        return (
+            <div key={rowIdx} className="relative min-h-0">
               {/* 날짜 셀 그리드 */}
-              <div className="grid grid-cols-7 h-full">
+              <div className="grid grid-cols-7 h-full min-h-0">
                 {row.map((cell, colIdx) => {
                   const daySingleEvents = singleEventsByDate.get(cell.date.getTime()) ?? []
-                  const dayHolidays = getHolidaysForDay(cell.date, holidays)
+                  const d = cell.date
+                  const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                  const dayHolidays = holidaysByDate.get(ymd) ?? []
                   const isToday = isSameDay(cell.date, today)
                   const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
                   const dow = cell.date.getDay()
@@ -258,7 +268,7 @@ export function CalendarGrid({
                       key={colIdx}
                       onClick={() => onSelectDate(cell.date)}
                       aria-label={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
-                      className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
+                      className={`relative flex flex-col items-start p-0.5 border-t transition-colors min-h-0 overflow-hidden ${
                         isSelected
                           ? 'bg-accent-50 dark:bg-accent-950/30'
                           : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'
@@ -273,7 +283,7 @@ export function CalendarGrid({
                               : isSelected
                               ? 'underline underline-offset-2 decoration-accent-400 font-bold ' + (
                                   !cell.isCurrentMonth
-                                    ? 'text-stone-300 dark:text-stone-600'
+                                    ? 'text-stone-400 dark:text-stone-400'
                                     : isSun
                                     ? 'text-red-400'
                                     : isSat
@@ -281,7 +291,7 @@ export function CalendarGrid({
                                     : 'text-stone-700 dark:text-stone-200'
                                 )
                               : !cell.isCurrentMonth
-                              ? 'text-stone-300 dark:text-stone-600'
+                              ? 'text-stone-400 dark:text-stone-400'
                               : isSun
                               ? 'text-red-400 dark:text-red-400'
                               : isSat
@@ -294,7 +304,7 @@ export function CalendarGrid({
                         {showLunar && (
                           <span className={`text-[9px] leading-tight ${
                             !cell.isCurrentMonth
-                              ? 'text-stone-300 dark:text-stone-600'
+                              ? 'text-stone-400 dark:text-stone-400'
                               : 'text-stone-400 dark:text-stone-500'
                           }`}>
                             {lunarDateMap.get(cell.date.getTime())}
@@ -390,7 +400,6 @@ export function CalendarGrid({
             </div>
           )
         })}
-      </div>
     </div>
   )
 }

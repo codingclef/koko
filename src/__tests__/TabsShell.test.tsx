@@ -119,22 +119,22 @@ describe('TabsShell', () => {
 
   it('?tab 파라미터가 없으면 캘린더 탭이 표시된다', () => {
     render(<TabsShell />)
-    expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
-    expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
+    expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.getByTestId('shopping-tab').parentElement).toHaveClass('hidden')
   })
 
   it('?tab=shopping 파라미터가 있으면 쇼핑 탭이 활성화된다', () => {
     mockTabParam = 'shopping'
     render(<TabsShell />)
-    expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'contents' })
-    expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'none' })
+    expect(screen.getByTestId('shopping-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.getByTestId('calendar-tab').parentElement).toHaveClass('hidden')
   })
 
   it('유효하지 않은 ?tab 값이면 캘린더 탭이 표시된다', () => {
     mockTabParam = 'invalid'
     render(<TabsShell />)
-    expect(screen.getByTestId('calendar-tab').parentElement).toHaveStyle({ display: 'contents' })
-    expect(screen.getByTestId('shopping-tab').parentElement).toHaveStyle({ display: 'none' })
+    expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.getByTestId('shopping-tab').parentElement).toHaveClass('hidden')
   })
 
   it('초기 진입 시 자동으로 푸시 구독을 요청하지 않는다', () => {

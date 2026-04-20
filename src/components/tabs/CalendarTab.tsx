@@ -683,8 +683,8 @@ export function CalendarTab({
   return (
     <div
       ref={containerRef}
-      className="w-full flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
-      style={{ height: '100dvh', touchAction: isModalOpen ? 'auto' : 'none' }}
+      className="w-full flex-1 min-h-0 flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
+      style={{ touchAction: isModalOpen ? 'auto' : 'none' }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -756,7 +756,7 @@ export function CalendarTab({
 
       <div
         key={slideKey}
-        className={`flex-1 overflow-hidden${slideDir === 'left' ? ' calendar-slide-from-right' : slideDir === 'right' ? ' calendar-slide-from-left' : ''}`}
+        className={`flex-1 min-h-0 flex flex-col overflow-hidden${slideDir === 'left' ? ' calendar-slide-from-right' : slideDir === 'right' ? ' calendar-slide-from-left' : ''}`}
       >
         <CalendarGrid
           year={year}
@@ -772,13 +772,14 @@ export function CalendarTab({
             )
           }}
           showLunar={preferences?.show_lunar ?? false}
-          className="h-full pb-16"
+          className="flex-1 min-h-0"
         />
       </div>
 
       <button
         onClick={() => setEditingEvent({ date: selectedDate ?? today })}
-        className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
+        className="fixed right-4 w-14 h-14 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
+        style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
       >
         <Plus size={24} />
       </button>

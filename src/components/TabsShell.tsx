@@ -106,39 +106,41 @@ export function TabsShell() {
   }
 
   return (
-    <>
-      <div style={{ display: activeTab === 'calendar' ? 'contents' : 'none' }}>
-        <CalendarTab
-          preferences={preferences}
-          updatePreferences={updatePreferences}
-          user={user}
-          familyId={familyId}
-          isInitializing={isInitializing}
-          calendars={calendars}
-          calendarsError={calendarsError}
-          reloadCalendars={reloadCalendars}
-        />
-      </div>
-      <div style={{ display: activeTab === 'shopping' ? 'contents' : 'none' }}>
-        <ShoppingTab
-          key={familyId ?? 'no-family'}
-          user={user}
-          familyId={familyId}
-          isInitializing={isInitializing}
-        />
-      </div>
-      <div style={{ display: activeTab === 'settings' ? 'contents' : 'none' }}>
-        <SettingsTab
-          onNavigateToTab={handleTabChange}
-          preferences={preferences}
-          updatePreferences={updatePreferences}
-          user={user}
-          familyId={familyId}
-          appRole={appRole}
-          isInitializing={isInitializing}
-        />
+    <div className="flex flex-col overflow-hidden" style={{ height: '100dvh' }}>
+      <div className="flex-1 min-h-0 relative">
+        <div className={`absolute inset-0 flex flex-col min-h-0 overflow-hidden${activeTab !== 'calendar' ? ' hidden' : ''}`}>
+          <CalendarTab
+            preferences={preferences}
+            updatePreferences={updatePreferences}
+            user={user}
+            familyId={familyId}
+            isInitializing={isInitializing}
+            calendars={calendars}
+            calendarsError={calendarsError}
+            reloadCalendars={reloadCalendars}
+          />
+        </div>
+        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'shopping' ? ' hidden' : ''}`}>
+          <ShoppingTab
+            key={familyId ?? 'no-family'}
+            user={user}
+            familyId={familyId}
+            isInitializing={isInitializing}
+          />
+        </div>
+        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'settings' ? ' hidden' : ''}`}>
+          <SettingsTab
+            onNavigateToTab={handleTabChange}
+            preferences={preferences}
+            updatePreferences={updatePreferences}
+            user={user}
+            familyId={familyId}
+            appRole={appRole}
+            isInitializing={isInitializing}
+          />
+        </div>
       </div>
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
-    </>
+    </div>
   )
 }
