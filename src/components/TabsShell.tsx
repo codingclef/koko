@@ -109,7 +109,7 @@ export function TabsShell() {
     <div className="flex flex-col overflow-hidden" style={{ height: '100dvh' }}>
       <div className="flex-1 min-h-0 relative">
         <div
-          className="absolute inset-0 flex flex-col overflow-hidden"
+          className="absolute inset-0 flex flex-col min-h-0 overflow-hidden"
           style={{ display: activeTab === 'calendar' ? 'flex' : 'none' }}
         >
           <CalendarTab

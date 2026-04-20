@@ -683,7 +683,7 @@ export function CalendarTab({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
+      className="w-full flex-1 min-h-0 flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
       style={{ touchAction: isModalOpen ? 'auto' : 'none' }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
