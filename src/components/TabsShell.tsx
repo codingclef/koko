@@ -108,10 +108,7 @@ export function TabsShell() {
   return (
     <div className="flex flex-col overflow-hidden" style={{ height: '100dvh' }}>
       <div className="flex-1 min-h-0 relative">
-        <div
-          className="absolute inset-0 flex flex-col min-h-0 overflow-hidden"
-          style={{ display: activeTab === 'calendar' ? 'flex' : 'none' }}
-        >
+        <div className={`absolute inset-0 flex flex-col min-h-0 overflow-hidden${activeTab !== 'calendar' ? ' hidden' : ''}`}>
           <CalendarTab
             preferences={preferences}
             updatePreferences={updatePreferences}
@@ -123,10 +120,7 @@ export function TabsShell() {
             reloadCalendars={reloadCalendars}
           />
         </div>
-        <div
-          className="absolute inset-0 overflow-y-auto"
-          style={{ display: activeTab === 'shopping' ? 'block' : 'none' }}
-        >
+        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'shopping' ? ' hidden' : ''}`}>
           <ShoppingTab
             key={familyId ?? 'no-family'}
             user={user}
@@ -134,10 +128,7 @@ export function TabsShell() {
             isInitializing={isInitializing}
           />
         </div>
-        <div
-          className="absolute inset-0 overflow-y-auto"
-          style={{ display: activeTab === 'settings' ? 'block' : 'none' }}
-        >
+        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'settings' ? ' hidden' : ''}`}>
           <SettingsTab
             onNavigateToTab={handleTabChange}
             preferences={preferences}

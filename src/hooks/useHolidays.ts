@@ -105,7 +105,7 @@ export function useHolidays(
   month: number,
   countryCodes: string[]
 ): Holiday[] {
-  const countryKey = countryCodes.join(',')
+  const countryKey = [...countryCodes].sort().join(',')
   return useMemo(() => {
     if (!countryKey) return []
 
@@ -121,11 +121,11 @@ export function useHolidays(
       .flatMap((cc) => years.flatMap((y) => getYearHolidays(y, cc)))
       .filter((h) => {
         const [y, m] = h.date.split('-').map(Number)
-        const m0 = m - 1
+        const hMonth = m - 1
         return (
-          (y === prevYear && m0 === prevMonth) ||
-          (y === year     && m0 === month)     ||
-          (y === nextYear && m0 === nextMonth)
+          (y === prevYear && hMonth === prevMonth) ||
+          (y === year     && hMonth === month)     ||
+          (y === nextYear && hMonth === nextMonth)
         )
       })
   }, [year, month, countryKey])

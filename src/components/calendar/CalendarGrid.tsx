@@ -137,10 +137,6 @@ export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[])
   return segments
 }
 
-function getHolidaysForDay(date: Date, holidays: Holiday[]): Holiday[] {
-  const ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  return holidays.filter((h) => h.date === ymd)
-}
 
 interface Props {
   year: number
@@ -179,7 +175,16 @@ export function CalendarGrid({
     return { multiDayEvents: multi, singleDayEvents: single }
   }, [visibleEvents])
 
-  // Map for O(1) lookup instead of O(n) filter per cell
+  const holidaysByDate = useMemo(() => {
+    const map = new Map<string, Holiday[]>()
+    for (const h of holidays) {
+      const arr = map.get(h.date)
+      if (arr) arr.push(h)
+      else map.set(h.date, [h])
+    }
+    return map
+  }, [holidays])
+
   const singleEventsByDate = useMemo(() => {
     const map = new Map<number, CalendarEvent[]>()
     for (const e of singleDayEvents) {
@@ -248,7 +253,9 @@ export function CalendarGrid({
               <div className="grid grid-cols-7 h-full min-h-0">
                 {row.map((cell, colIdx) => {
                   const daySingleEvents = singleEventsByDate.get(cell.date.getTime()) ?? []
-                  const dayHolidays = getHolidaysForDay(cell.date, holidays)
+                  const d = cell.date
+                  const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                  const dayHolidays = holidaysByDate.get(ymd) ?? []
                   const isToday = isSameDay(cell.date, today)
                   const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
                   const dow = cell.date.getDay()
