@@ -42,7 +42,7 @@ function buildBody(events: EventRow[]): string {
   const shown = sorted.slice(0, 5)
   const extra = sorted.length - shown.length
   const lines = shown.map((e) => {
-    const prefix = e.is_all_day ? '하루종일' : formatTime(e.start_at)
+    const prefix = e.is_all_day ? '종일' : formatTime(e.start_at)
     return `・${prefix}  ${e.title}`
   })
   if (extra > 0) lines.push(`외 ${extra}개 일정이 더 있어요`)

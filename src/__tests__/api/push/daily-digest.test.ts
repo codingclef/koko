@@ -281,7 +281,7 @@ describe('POST /api/cron/daily-digest', () => {
       setupHappyPath([ev])
       await POST(makeRequest())
       const body = JSON.parse(mockDispatch.mock.calls[0][1]).body as string
-      expect(body).toContain('하루종일')
+      expect(body).toContain('종일')
       expect(body).toContain('테스트 일정')
     })
 
