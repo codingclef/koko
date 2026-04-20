@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Koko',
   },
   other: {
@@ -20,15 +20,16 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#fafaf9' },
     { media: '(prefers-color-scheme: dark)', color: '#0f0e0d' },
   ],
 }
 
-// Prevents FOUC: localStorage takes priority; cookie is the SSR-safe fallback
-// Must run before first paint, so it lives in <head> as a blocking inline script
-const HEAD_SCRIPT = `(function(){var k='koko_theme';var ls=localStorage.getItem(k);if(ls){document.documentElement.setAttribute('data-theme',ls);return;}var m=document.cookie.match('(?:^|;)\\s*'+k+'=([^;]+)');if(m)document.documentElement.setAttribute('data-theme',m[1]);})();`
+// Applies accent theme and dark class before first paint to prevent FOUC.
+// next-themes stores dark/light preference under 'theme' key in localStorage.
+const HEAD_SCRIPT = `(function(){var de=document.documentElement;var k='koko_theme';var ls=localStorage.getItem(k);if(ls){de.setAttribute('data-theme',ls);}else{var m=document.cookie.match('(?:^|;)\\s*'+k+'=([^;]+)');if(m)de.setAttribute('data-theme',m[1]);}var t=localStorage.getItem('theme');var dark=(t==='dark')||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)de.classList.add('dark');})();`
 
 export default async function RootLayout({
   children,
@@ -57,7 +58,7 @@ export default async function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-jp.min.css"
         />
         <link rel="preload" href="/logo.webp" as="image" />
-        <style dangerouslySetInnerHTML={{ __html: `@media(prefers-color-scheme:dark){#koko-pre-splash{background:#0f0e0d}}` }} />
+        <style dangerouslySetInnerHTML={{ __html: `#koko-pre-splash{background:#fafaf9}@media(prefers-color-scheme:dark){#koko-pre-splash{background:#0f0e0d}}.dark #koko-pre-splash{background:#0f0e0d}#koko-pre-splash-logo{background:rgba(245,245,244,0.8)}@media(prefers-color-scheme:dark){#koko-pre-splash-logo{background:rgba(255,255,255,0.1)}}.dark #koko-pre-splash-logo{background:rgba(255,255,255,0.1)}` }} />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <PreHydrationSplash />
