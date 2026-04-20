@@ -124,6 +124,8 @@ export function EventFormModal({
   const canEditOccurrenceDate = !isScopedRecurringEdit
 
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const startDateInputRef = useRef<HTMLInputElement>(null)
+  const endDateInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -380,9 +382,13 @@ export function EventFormModal({
           <div>
             <label className="text-xs text-stone-500 mb-1.5 block">시작</label>
             <div className="flex gap-2">
-              <div className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}>
+              <div
+                className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}
+                onClick={() => { if (canEditOccurrenceDate) startDateInputRef.current?.showPicker?.() }}
+              >
                 <span className="relative z-10 pointer-events-none">{formatDateWithDOW(startDate)}</span>
                 <input
+                  ref={startDateInputRef}
                   type="date"
                   value={startDate}
                   disabled={!canEditOccurrenceDate}
@@ -414,9 +420,13 @@ export function EventFormModal({
           <div className={endShake ? 'shake' : ''}>
             <label className="text-xs text-stone-500 mb-1.5 block">종료</label>
             <div className="flex gap-2">
-              <div className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}>
+              <div
+                className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}
+                onClick={() => { if (canEditOccurrenceDate) endDateInputRef.current?.showPicker?.() }}
+              >
                 <span className="relative z-10 pointer-events-none">{formatDateWithDOW(endDate)}</span>
                 <input
+                  ref={endDateInputRef}
                   type="date"
                   value={endDate}
                   disabled={!canEditOccurrenceDate}
