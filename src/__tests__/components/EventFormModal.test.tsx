@@ -207,6 +207,33 @@ describe('EventFormModal', () => {
     expect(screen.getAllByText(/2026\/03\/31\(화\)/).length).toBeGreaterThan(0)
   })
 
+  it('날짜 버튼 클릭 시 showPicker()를 호출한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    const showPickerMock = jest.fn()
+    ;(dateInputs[0] as HTMLInputElement).showPicker = showPickerMock
+    ;(dateInputs[1] as HTMLInputElement).showPicker = showPickerMock
+
+    const dateBtns = document.querySelectorAll('input[type="date"]')
+    fireEvent.click(dateBtns[0].parentElement!)
+    fireEvent.click(dateBtns[1].parentElement!)
+
+    expect(showPickerMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    // showPicker 메서드가 없는 환경 시뮬레이션
+    Object.defineProperty(dateInputs[0], 'showPicker', { value: undefined, configurable: true })
+    Object.defineProperty(dateInputs[1], 'showPicker', { value: undefined, configurable: true })
+
+    expect(() => {
+      fireEvent.click(dateInputs[0].parentElement!)
+      fireEvent.click(dateInputs[1].parentElement!)
+    }).not.toThrow()
+  })
+
   it('시간 버튼 클릭 시 wheel picker가 나타난다', () => {
     render(<EventFormModal {...defaultProps} />)
     // 종일 해제

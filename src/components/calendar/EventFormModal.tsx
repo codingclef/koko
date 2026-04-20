@@ -384,7 +384,7 @@ export function EventFormModal({
             <div className="flex gap-2">
               <div
                 className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}
-                onClick={() => { if (canEditOccurrenceDate) startDateInputRef.current?.showPicker() }}
+                onClick={() => { if (canEditOccurrenceDate) startDateInputRef.current?.showPicker?.() }}
               >
                 <span className="relative z-10 pointer-events-none">{formatDateWithDOW(startDate)}</span>
                 <input
@@ -422,7 +422,7 @@ export function EventFormModal({
             <div className="flex gap-2">
               <div
                 className={`${isAllDay ? '' : 'flex-1 '}${dateBtnCls}`}
-                onClick={() => { if (canEditOccurrenceDate) endDateInputRef.current?.showPicker() }}
+                onClick={() => { if (canEditOccurrenceDate) endDateInputRef.current?.showPicker?.() }}
               >
                 <span className="relative z-10 pointer-events-none">{formatDateWithDOW(endDate)}</span>
                 <input
