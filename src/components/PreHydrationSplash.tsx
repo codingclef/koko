@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 export function PreHydrationSplash() {
-  const [hidden, setHidden] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setHidden(true)
+    const el = ref.current
+    if (el) el.style.display = 'none'
   }, [])
-
-  if (hidden) return null
 
   return (
     <div
+      ref={ref}
       role="status"
       aria-label="앱을 불러오는 중"
       id="koko-pre-splash"
