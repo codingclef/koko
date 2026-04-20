@@ -242,9 +242,9 @@ export function CalendarGrid({
         const laneAreaHeight = laneCount * LANE_HEIGHT
 
         return (
-            <div key={rowIdx} className="relative">
+            <div key={rowIdx} className="relative min-h-0">
               {/* 날짜 셀 그리드 */}
-              <div className="grid grid-cols-7 h-full">
+              <div className="grid grid-cols-7 h-full min-h-0">
                 {row.map((cell, colIdx) => {
                   const daySingleEvents = singleEventsByDate.get(cell.date.getTime()) ?? []
                   const dayHolidays = getHolidaysForDay(cell.date, holidays)
@@ -260,7 +260,7 @@ export function CalendarGrid({
                       key={colIdx}
                       onClick={() => onSelectDate(cell.date)}
                       aria-label={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
-                      className={`relative flex flex-col items-start p-0.5 border-t transition-colors ${
+                      className={`relative flex flex-col items-start p-0.5 border-t transition-colors min-h-0 overflow-hidden ${
                         isSelected
                           ? 'bg-accent-50 dark:bg-accent-950/30'
                           : 'hover:bg-stone-50 dark:hover:bg-stone-800/50'
