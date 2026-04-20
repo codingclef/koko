@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { ThemeProvider } from 'next-themes'
 import { cookies } from 'next/headers'
 import { THEME_STORAGE_KEY } from '@/lib/preferences'
+import { PreHydrationSplash } from '@/components/PreHydrationSplash'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -55,8 +56,10 @@ export default async function RootLayout({
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-jp.min.css"
         />
+        <link rel="preload" href="/logo.webp" as="image" />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
+        <PreHydrationSplash />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
