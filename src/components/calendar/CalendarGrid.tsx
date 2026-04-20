@@ -16,7 +16,7 @@ interface DayCell {
   isCurrentMonth: boolean
 }
 
-function buildGrid(year: number, month: number): DayCell[] {
+export function buildGrid(year: number, month: number): DayCell[] {
   const firstDay = new Date(year, month, 1)
   const startDow = firstDay.getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -31,7 +31,8 @@ function buildGrid(year: number, month: number): DayCell[] {
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ date: new Date(year, month, d), isCurrentMonth: true })
   }
-  for (let d = 1; d <= totalCells - cells.length; d++) {
+  const trailingDays = totalCells - cells.length
+  for (let d = 1; d <= trailingDays; d++) {
     cells.push({ date: new Date(year, month + 1, d), isCurrentMonth: false })
   }
   return cells
