@@ -15,6 +15,7 @@ export function PreHydrationSplash() {
     <div
       role="status"
       aria-label="앱을 불러오는 중"
+      id="koko-pre-splash"
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--background)]"
     >
       {/* next/image requires hydration; this splash must render before hydration */}
