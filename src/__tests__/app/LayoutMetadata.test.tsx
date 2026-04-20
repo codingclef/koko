@@ -20,6 +20,14 @@ describe('RootLayout metadata', () => {
     ])
   })
 
+  it('viewport-fit cover를 설정한다', () => {
+    expect(viewport.viewportFit).toBe('cover')
+  })
+
+  it('iOS 상태바를 black-translucent로 설정한다', () => {
+    expect(metadata.appleWebApp).toMatchObject({ statusBarStyle: 'black-translucent' })
+  })
+
   it('고정 주황색 theme-color 메타를 남기지 않는다', () => {
     expect(metadata.other).toEqual({
       'mobile-web-app-capable': 'yes',
