@@ -16,7 +16,15 @@ export function PreHydrationSplash() {
       role="status"
       aria-label="앱을 불러오는 중"
       id="koko-pre-splash"
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--background)]"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#fafaf9',
+      }}
     >
       {/* next/image requires hydration; this splash must render before hydration */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -25,7 +33,12 @@ export function PreHydrationSplash() {
         alt=""
         width={96}
         height={96}
-        className="rounded-full bg-[var(--surface-overlay)] p-6 ring-1 ring-[var(--surface-ring)]"
+        style={{
+          borderRadius: '9999px',
+          padding: '24px',
+          background: 'rgba(245,245,244,0.8)',
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.05)',
+        }}
       />
     </div>
   )
