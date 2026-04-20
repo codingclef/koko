@@ -219,7 +219,7 @@ export function CalendarGrid({
   return (
     <div
       className={`w-full grid ${className ?? ''}`}
-      style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))` }}
+      style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))`, height: '100%' }}
     >
       {/* 요일 헤더 — auto 트랙 */}
       <div className="grid grid-cols-7">
