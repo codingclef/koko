@@ -435,6 +435,54 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 })
 
+describe('CalendarTab — 캘린더 필터 localStorage 복원', () => {
+  let consoleErrorSpy: jest.SpyInstance
+
+  beforeAll(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore()
+  })
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    localStorage.clear()
+    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetFamilyMembers.mockResolvedValue([])
+    mockGetCalendarMembers.mockResolvedValue([])
+  })
+
+  it('저장된 값이 없으면 전체 선택 상태(빈 배열)를 저장한다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const saved = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-1') ?? 'null') as string[] | null
+    expect(saved).toEqual([])
+  })
+
+  it('저장된 필터 ID를 복원하고 localStorage에 저장한다', async () => {
+    localStorage.setItem('koko_calendar_filter_fam-1', JSON.stringify(['cal-1']))
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const saved = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-1') ?? '[]') as string[]
+    expect(saved).toEqual(['cal-1'])
+  })
+
+  it('더 이상 존재하지 않는 캘린더 ID는 필터링된다', async () => {
+    localStorage.setItem('koko_calendar_filter_fam-1', JSON.stringify(['cal-1', 'cal-deleted']))
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const saved = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-1') ?? '[]') as string[]
+    expect(saved).not.toContain('cal-deleted')
+  })
+})
+
 describe('CalendarTab — handleCalendarUpdate', () => {
   let consoleErrorSpy: jest.SpyInstance
 
