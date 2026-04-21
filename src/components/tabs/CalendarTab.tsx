@@ -290,7 +290,7 @@ export function CalendarTab({
 
     const calendarIdSet = new Set(calendars.map((c) => c.id))
     const validIds = new Set([...stored].filter((id) => calendarIdSet.has(id)))
-    setActiveIds(validIds)
+    queueMicrotask(() => setActiveIds(validIds))
   }, [familyId, calendars])
 
   useEffect(() => {
