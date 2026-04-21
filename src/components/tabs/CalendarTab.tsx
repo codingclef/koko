@@ -283,14 +283,18 @@ export function CalendarTab({
   useEffect(() => {
     if (!familyId || calendars.length === 0) return
     if (filterInitializedForRef.current === familyId) return
-    filterInitializedForRef.current = familyId
 
     const stored = readStoredFilter(familyId)
-    if (stored === null) return
-
     const calendarIdSet = new Set(calendars.map((c) => c.id))
-    const validIds = new Set([...stored].filter((id) => calendarIdSet.has(id)))
-    queueMicrotask(() => setActiveIds(validIds))
+    const validIds = stored
+      ? new Set([...stored].filter((id) => calendarIdSet.has(id)))
+      : new Set<string>()
+    const targetFamilyId = familyId
+
+    queueMicrotask(() => {
+      filterInitializedForRef.current = targetFamilyId
+      setActiveIds(validIds)
+    })
   }, [familyId, calendars])
 
   useEffect(() => {
