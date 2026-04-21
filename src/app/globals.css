@@ -206,5 +206,5 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .calendar-fab {
-  bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.25rem);
+  bottom: calc(4.125rem + env(safe-area-inset-bottom, 0px) + 0.25rem);
 }
