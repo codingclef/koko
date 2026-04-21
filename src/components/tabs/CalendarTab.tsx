@@ -298,6 +298,11 @@ export function CalendarTab({
     return [...events, ...adjacentMonthEvents.filter((e) => !seen.has(e.id))]
   }, [events, adjacentMonthEvents])
 
+  const filteredEvents = useMemo(
+    () => mergedEvents.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)),
+    [mergedEvents, activeIds]
+  )
+
   const reloadEvents = useCallback(async () => {
     if (!familyId) return
     await loadMonthEvents({
@@ -787,7 +792,7 @@ export function CalendarTab({
       {selectedDate && !selectedEvent && !editingEvent && !calendarForm && (
         <DayEventsSheet
           date={selectedDate}
-          events={mergedEvents}
+          events={filteredEvents}
           calendars={calendars}
           onClose={() => setSelectedDate(null)}
           onSelectEvent={setSelectedEvent}
