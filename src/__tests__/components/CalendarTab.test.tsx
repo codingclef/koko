@@ -289,6 +289,19 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     expect(wrapper.style.touchAction).toBe('none')
   })
 
+  it('일정 추가 FAB를 캘린더 콘텐츠 영역 하단에 배치한다', async () => {
+    const { container } = render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const wrapper = container.firstChild as HTMLElement
+    const addButton = screen.getByRole('button', { name: '일정 추가' })
+
+    expect(wrapper).toHaveClass('relative')
+    expect(addButton).toHaveClass('absolute', 'right-4', 'bottom-4')
+    expect(addButton).not.toHaveClass('fixed', 'calendar-fab')
+    expect(addButton).not.toHaveAttribute('style')
+  })
+
   it('초기 이벤트 로드 실패 시 전체 스피너 대신 오류 배너와 캘린더 그리드를 유지한다', async () => {
     mockGetEventsByMonth.mockRejectedValue(new Error('load failed'))
 

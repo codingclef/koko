@@ -733,7 +733,7 @@ export function CalendarTab({
   return (
     <div
       ref={containerRef}
-      className="w-full flex-1 min-h-0 flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
+      className="relative w-full flex-1 min-h-0 flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
       style={{ touchAction: isModalOpen ? 'auto' : 'none' }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
@@ -829,7 +829,7 @@ export function CalendarTab({
       <button
         aria-label="일정 추가"
         onClick={() => setEditingEvent({ date: selectedDate ?? today })}
-        className="calendar-fab fixed right-4 w-11 h-11 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
+        className="absolute right-4 bottom-4 w-11 h-11 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
       >
         <Plus size={18} />
       </button>
