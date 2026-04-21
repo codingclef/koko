@@ -827,8 +827,9 @@ export function CalendarTab({
       </div>
 
       <button
+        aria-label="일정 추가"
         onClick={() => setEditingEvent({ date: selectedDate ?? today })}
-        className="fixed right-4 w-10 h-10 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
+        className="fixed right-4 w-11 h-11 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
         style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
       >
         <Plus size={18} />
