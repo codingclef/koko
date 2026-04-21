@@ -787,7 +787,7 @@ export function CalendarTab({
       {selectedDate && !selectedEvent && !editingEvent && !calendarForm && (
         <DayEventsSheet
           date={selectedDate}
-          events={mergedEvents}
+          events={mergedEvents.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id))}
           calendars={calendars}
           onClose={() => setSelectedDate(null)}
           onSelectEvent={setSelectedEvent}
