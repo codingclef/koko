@@ -48,6 +48,28 @@ function getMonthEventsKey(familyId: string, year: number, month: number) {
   return `${familyId}:${year}:${month}`
 }
 
+function calendarFilterKey(familyId: string) {
+  return `koko_calendar_filter_${familyId}`
+}
+
+function readStoredFilter(familyId: string): Set<string> | null {
+  try {
+    const raw = localStorage.getItem(calendarFilterKey(familyId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+    return new Set(parsed as string[])
+  } catch {
+    return null
+  }
+}
+
+function saveStoredFilter(familyId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(calendarFilterKey(familyId), JSON.stringify([...ids]))
+  } catch {}
+}
+
 function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
   if (delta === -1) {
     return month === 0
@@ -89,6 +111,7 @@ export function CalendarTab({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const yearMonthButtonRef = useRef<HTMLButtonElement>(null)
+  const filterInitializedForRef = useRef<string | null>(null)
 
   const [slideKey, setSlideKey] = useState(0)
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
@@ -256,6 +279,28 @@ export function CalendarTab({
       return []
     }
   }, [fetchMonthEvents, prefetchAdjacentMonths, syncAdjacentFromCache])
+
+  useEffect(() => {
+    if (!familyId || calendars.length === 0) return
+    if (filterInitializedForRef.current === familyId) return
+
+    const stored = readStoredFilter(familyId)
+    const calendarIdSet = new Set(calendars.map((c) => c.id))
+    const validIds = stored
+      ? new Set([...stored].filter((id) => calendarIdSet.has(id)))
+      : new Set<string>()
+    const targetFamilyId = familyId
+
+    queueMicrotask(() => {
+      filterInitializedForRef.current = targetFamilyId
+      setActiveIds(validIds)
+    })
+  }, [familyId, calendars])
+
+  useEffect(() => {
+    if (!familyId || filterInitializedForRef.current !== familyId) return
+    saveStoredFilter(familyId, activeIds)
+  }, [familyId, activeIds])
 
   useEffect(() => {
     visibleMonthKeyRef.current = familyId ? getMonthEventsKey(familyId, year, month) : null

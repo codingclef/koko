@@ -435,6 +435,75 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 })
 
+describe('CalendarTab — 캘린더 필터 localStorage 복원', () => {
+  let consoleErrorSpy: jest.SpyInstance
+
+  beforeAll(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore()
+  })
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    localStorage.clear()
+    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetFamilyMembers.mockResolvedValue([])
+    mockGetCalendarMembers.mockResolvedValue([])
+  })
+
+  it('저장된 값이 없으면 전체 선택 상태(빈 배열)를 저장한다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const saved = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-1') ?? 'null') as string[] | null
+    expect(saved).toEqual([])
+  })
+
+  it('저장된 필터 ID를 복원하고 localStorage에 저장한다', async () => {
+    localStorage.setItem('koko_calendar_filter_fam-1', JSON.stringify(['cal-1']))
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const saved = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-1') ?? '[]') as string[]
+    expect(saved).toEqual(['cal-1'])
+  })
+
+  it('더 이상 존재하지 않는 캘린더 ID는 필터링되고 유효 ID는 보존된다', async () => {
+    localStorage.setItem('koko_calendar_filter_fam-1', JSON.stringify(['cal-1', 'cal-deleted']))
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    const saved = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-1') ?? '[]') as string[]
+    expect(saved).toEqual(['cal-1'])
+  })
+
+  it('가족 전환 시 이전 가족의 필터가 새 가족 키에 저장되지 않는다', async () => {
+    const familyACalendars = [{ id: 'cal-a', family_id: 'fam-a', created_by: 'user-1', name: 'A캘린더', color: '#f97316', created_at: '', updated_at: '' }]
+    const familyBCalendars = [{ id: 'cal-b', family_id: 'fam-b', created_by: 'user-1', name: 'B캘린더', color: '#3b82f6', created_at: '', updated_at: '' }]
+
+    localStorage.setItem('koko_calendar_filter_fam-a', JSON.stringify(['cal-a']))
+
+    const { rerender } = render(
+      <CalendarTab {...defaultProps} familyId="fam-a" calendars={familyACalendars} />
+    )
+    await act(async () => {})
+
+    rerender(
+      <CalendarTab {...defaultProps} familyId="fam-b" calendars={familyBCalendars} />
+    )
+    await act(async () => {})
+
+    const savedB = JSON.parse(localStorage.getItem('koko_calendar_filter_fam-b') ?? 'null') as string[] | null
+    expect(savedB).not.toContain('cal-a')
+    expect(savedB).toEqual([])
+  })
+})
+
 describe('CalendarTab — handleCalendarUpdate', () => {
   let consoleErrorSpy: jest.SpyInstance
 
