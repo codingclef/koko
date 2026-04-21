@@ -699,7 +699,7 @@ export function CalendarTab({
   if (fetchError) {
     return (
       <div className="w-full min-h-screen flex flex-col bg-white dark:bg-stone-950">
-        <div className="px-4 pt-8 pb-2 shrink-0">
+        <div className="px-4 pt-2 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-2">
             <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
               <span className="sr-only">이전 달</span>
@@ -739,8 +739,8 @@ export function CalendarTab({
       onTouchEnd={onTouchEnd}
     >
       {/* 헤더 */}
-      <div className="px-4 pt-8 pb-2 shrink-0">
-        <div className="flex items-center justify-between mb-2">
+      <div data-testid="calendar-tab-header" className="px-4 pt-2 pb-2 shrink-0">
+        <div className="flex items-center justify-between mb-1">
           <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">
             <span className="sr-only">이전 달</span>
             <ChevronLeft size={20} />

@@ -76,6 +76,13 @@ describe('SettingsTab 메인 화면', () => {
     expect(container.className).not.toContain('max-w-lg')
   })
 
+  it('메인 뷰는 다른 탭과 같은 압축된 상단 여백을 사용한다', async () => {
+    await act(async () => { render(<SettingsTab {...defaultProps} />) })
+    const container = screen.getByTestId('settings-main-container')
+    expect(container.className).toContain('pt-2')
+    expect(container.className).not.toContain('py-8')
+  })
+
 })
 
 describe('SettingsTab 앱 서브뷰 — 알림', () => {
@@ -91,7 +98,10 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     })
     await navigateToApp()
     expect(screen.getByText('알림 허용하기')).toBeInTheDocument()
-    expect(screen.getByTestId('settings-subview-container')).toBeInTheDocument()
+    const container = screen.getByTestId('settings-subview-container')
+    expect(container).toBeInTheDocument()
+    expect(container.className).toContain('pt-2')
+    expect(container.className).not.toContain('py-8')
   })
 
   it('권한이 granted일 때 허용 상태 메시지가 표시된다', async () => {

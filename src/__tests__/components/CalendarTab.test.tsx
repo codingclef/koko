@@ -224,6 +224,14 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     expect(mockSupabase.channel).not.toHaveBeenCalledWith(expect.stringMatching(/_\d{4}_\d{1,2}$/))
   })
 
+  it('상단 헤더를 압축된 탭 공통 시작점에 맞춘다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+    const header = screen.getByTestId('calendar-tab-header')
+    expect(header.className).toContain('pt-2')
+    expect(header.className).not.toContain('pt-8')
+  })
+
   it('broadcast 수신 시 인접하지 않은 달의 캐시도 무효화하여 재탐색 시 새로 불러온다', async () => {
     const today = new Date()
     const y = today.getFullYear()
