@@ -1,5 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { CalendarGrid, buildGrid, isMultiDayAllDay, isEventOnDate, computeSegments } from '@/components/calendar/CalendarGrid'
+import {
+  CalendarGrid,
+  buildGrid,
+  isMultiDayAllDay,
+  isEventOnDate,
+  computeSegments,
+  getVisibleSingleEventLimit,
+} from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
@@ -272,6 +279,60 @@ describe('computeSegments', () => {
   })
 })
 
+// ── 동적 단일 일정 표시 개수 ─────────────────────────────────
+
+describe('getVisibleSingleEventLimit', () => {
+  const base = {
+    dateHeaderHeight: 28,
+    laneAreaHeight: 0,
+    holidayCount: 0,
+    hasHolidaysAndEvents: false,
+  }
+
+  it('측정 전에는 기존 3개 기준으로 안전하게 fallback 한다', () => {
+    expect(getVisibleSingleEventLimit({
+      ...base,
+      rowHeight: null,
+      singleEventCount: 5,
+    })).toBe(3)
+  })
+
+  it('셀 높이가 충분하면 고정 상한 없이 들어가는 만큼 표시한다', () => {
+    expect(getVisibleSingleEventLimit({
+      ...base,
+      rowHeight: 150,
+      singleEventCount: 6,
+    })).toBe(6)
+  })
+
+  it('넘치는 일정이 있으면 +N 표시 줄을 남겨둔다', () => {
+    expect(getVisibleSingleEventLimit({
+      ...base,
+      rowHeight: 118,
+      singleEventCount: 6,
+    })).toBe(4)
+  })
+
+  it('6주 월처럼 낮은 셀에서는 표시 개수를 줄여 overflow 줄까지 포함해 맞춘다', () => {
+    expect(getVisibleSingleEventLimit({
+      ...base,
+      rowHeight: 96,
+      singleEventCount: 5,
+    })).toBe(2)
+  })
+
+  it('음력, 멀티데이 lane, 공휴일이 있으면 남은 공간 기준으로 더 적게 표시한다', () => {
+    expect(getVisibleSingleEventLimit({
+      rowHeight: 118,
+      dateHeaderHeight: 40,
+      laneAreaHeight: 18,
+      holidayCount: 1,
+      hasHolidaysAndEvents: true,
+      singleEventCount: 4,
+    })).toBe(1)
+  })
+})
+
 // ── CalendarGrid 렌더링 ──────────────────────────────────────
 
 describe('CalendarGrid', () => {
@@ -478,8 +539,6 @@ describe('라벨 색상 우선순위', () => {
 // ── 칩 variant: allDay vs timed ──────────────────────────────
 
 describe('칩 variant', () => {
-  const color = '#f97316' // calendars[0].color
-
   it('is_all_day=true 단일 일정은 solid fill + white text로 렌더된다', () => {
     const event = makeEvent({ is_all_day: true, title: '종일일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
