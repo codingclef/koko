@@ -96,6 +96,16 @@ describe('ShoppingTab', () => {
     expect(options?.refreshOnSubscribed).not.toBe(false)
   })
 
+  it('상단 여백을 다른 탭과 같은 압축 기준으로 사용한다', async () => {
+    render(
+      <ShoppingTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
+    )
+    await act(async () => {})
+    const container = screen.getByTestId('shopping-tab-container')
+    expect(container.className).toContain('pt-2')
+    expect(container.className).not.toContain('py-8')
+  })
+
   it('목록 생성 실패 시 optimistic 항목을 롤백하고 에러를 표시한다', async () => {
     const user = userEvent.setup()
     mockCreateShoppingList.mockRejectedValueOnce(new Error('insert failed'))

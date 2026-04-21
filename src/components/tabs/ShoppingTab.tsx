@@ -222,7 +222,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   }
 
   return (
-    <div className="px-4 py-8 pb-24 min-h-screen">
+    <div data-testid="shopping-tab-container" className="px-4 pt-2 pb-24 min-h-screen">
       <ShoppingListView
         lists={lists}
         fetchError={fetchError}
