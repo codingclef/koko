@@ -1,6 +1,6 @@
 'use client'
 
-import { type CSSProperties, useMemo } from 'react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
@@ -10,6 +10,11 @@ const DOW = ['일', '월', '화', '수', '목', '금', '토']
 const DATE_HEADER_HEIGHT = 28  // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28
 const LUNAR_DATE_HEIGHT = 12   // px – text-[9px] leading-tight (9 × 1.25 ≈ 12)
 const LANE_HEIGHT = 18         // px – bar (16) + gap (2)
+const WEEKDAY_HEADER_HEIGHT = 28
+const CELL_VERTICAL_CHROME = 5 // p-0.5 top/bottom + border-t
+const CHIP_HEIGHT = 17        // text-[10px] leading-tight + py-0.5
+const CHIP_GAP = 2            // space-y-0.5
+const HOLIDAY_EVENT_GAP = 2
 
 interface DayCell {
   date: Date
@@ -68,6 +73,48 @@ export function isEventOnDate(event: CalendarEvent, date: Date): boolean {
 function getChipStyle(isAllDay: boolean, color: string): CSSProperties {
   if (isAllDay) return { backgroundColor: color }
   return { backgroundColor: color + '26', color }
+}
+
+export function getSingleEventDisplayBudget({
+  rowHeight,
+  dateHeaderHeight,
+  laneAreaHeight,
+  holidayCount,
+  hasHolidaysAndEvents,
+  singleEventCount,
+}: {
+  rowHeight: number | null
+  dateHeaderHeight: number
+  laneAreaHeight: number
+  holidayCount: number
+  hasHolidaysAndEvents: boolean
+  singleEventCount: number
+}): { visibleCount: number; showOverflow: boolean } {
+  if (singleEventCount <= 0) return { visibleCount: 0, showOverflow: false }
+  if (rowHeight === null || rowHeight <= 0) {
+    const visibleCount = Math.min(3, singleEventCount)
+    return { visibleCount, showOverflow: singleEventCount > visibleCount }
+  }
+
+  const reservedHeight =
+    CELL_VERTICAL_CHROME +
+    dateHeaderHeight +
+    laneAreaHeight +
+    holidayCount * CHIP_HEIGHT +
+    Math.max(0, holidayCount - 1) * CHIP_GAP +
+    (hasHolidaysAndEvents ? HOLIDAY_EVENT_GAP : 0)
+  const availableHeight = Math.max(0, rowHeight - reservedHeight)
+  const availableLines = availableHeight >= CHIP_HEIGHT
+    ? Math.floor((availableHeight + CHIP_GAP) / (CHIP_HEIGHT + CHIP_GAP))
+    : 0
+
+  if (availableLines <= 0) return { visibleCount: 0, showOverflow: false }
+  if (singleEventCount <= availableLines) {
+    return { visibleCount: singleEventCount, showOverflow: false }
+  }
+
+  // Leave one visible line for the "+N" overflow indicator.
+  return { visibleCount: Math.max(0, availableLines - 1), showOverflow: true }
 }
 
 interface EventSegment {
@@ -155,6 +202,12 @@ export function CalendarGrid({
   year, month, events, calendars, activeIds,
   holidays = [], selectedDate, onSelectDate, showLunar = false, className,
 }: Props) {
+  const gridRef = useRef<HTMLDivElement>(null)
+  const weekdayHeaderRef = useRef<HTMLDivElement>(null)
+  const [gridMetrics, setGridMetrics] = useState({
+    height: 0,
+    weekdayHeaderHeight: WEEKDAY_HEADER_HEIGHT,
+  })
   const cells = useMemo(() => buildGrid(year, month), [year, month])
   const today = useMemo(() => new Date(), [])
   const calendarMap = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
@@ -221,14 +274,49 @@ export function CalendarGrid({
   }, [cells])
 
   const effectiveDateHeaderHeight = DATE_HEADER_HEIGHT + (showLunar ? LUNAR_DATE_HEIGHT : 0)
+  const rowHeight = gridMetrics.height > 0
+    ? Math.max(0, (gridMetrics.height - gridMetrics.weekdayHeaderHeight) / rows.length)
+    : null
+
+  useEffect(() => {
+    const measure = () => {
+      const height = gridRef.current?.getBoundingClientRect().height ?? 0
+      const weekdayHeaderHeight =
+        weekdayHeaderRef.current?.getBoundingClientRect().height || WEEKDAY_HEADER_HEIGHT
+
+      setGridMetrics((prev) => (
+        prev.height === height && prev.weekdayHeaderHeight === weekdayHeaderHeight
+          ? prev
+          : { height, weekdayHeaderHeight }
+      ))
+    }
+
+    measure()
+    window.addEventListener('resize', measure)
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => window.removeEventListener('resize', measure)
+    }
+
+    const observer = new ResizeObserver(measure)
+    if (gridRef.current) observer.observe(gridRef.current)
+    if (weekdayHeaderRef.current) observer.observe(weekdayHeaderRef.current)
+
+    return () => {
+      window.removeEventListener('resize', measure)
+      observer.disconnect()
+    }
+  }, [rows.length])
 
   return (
     <div
+      ref={gridRef}
+      data-testid="calendar-grid"
       className={`w-full grid ${className ?? ''}`}
       style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))`, height: '100%' }}
     >
       {/* 요일 헤더 — auto 트랙 */}
-      <div className="grid grid-cols-7">
+      <div ref={weekdayHeaderRef} className="grid grid-cols-7">
         {DOW.map((d, i) => (
           <div
             key={d}
@@ -262,6 +350,16 @@ export function CalendarGrid({
                   const isSun = dow === 0
                   const isSat = dow === 6
                   const hasHolidaysAndEvents = dayHolidays.length > 0 && daySingleEvents.length > 0
+                  const singleEventDisplay = getSingleEventDisplayBudget({
+                    rowHeight,
+                    dateHeaderHeight: effectiveDateHeaderHeight,
+                    laneAreaHeight,
+                    holidayCount: dayHolidays.length,
+                    hasHolidaysAndEvents,
+                    singleEventCount: daySingleEvents.length,
+                  })
+                  const visibleSingleEvents = daySingleEvents.slice(0, singleEventDisplay.visibleCount)
+                  const hiddenSingleEventCount = daySingleEvents.length - visibleSingleEvents.length
 
                   return (
                     <button
@@ -329,7 +427,7 @@ export function CalendarGrid({
 
                       {/* 단일 일정 pills */}
                       <div className={`w-full space-y-0.5${hasHolidaysAndEvents ? ' mt-0.5' : ''}`}>
-                        {daySingleEvents.slice(0, 3).map((evt) => {
+                        {visibleSingleEvents.map((evt) => {
                           const color = getEventColor(evt)
                           return (
                             <div
@@ -341,9 +439,9 @@ export function CalendarGrid({
                             </div>
                           )
                         })}
-                        {daySingleEvents.length > 3 && (
+                        {singleEventDisplay.showOverflow && hiddenSingleEventCount > 0 && (
                           <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium px-1">
-                            +{daySingleEvents.length - 3}
+                            +{hiddenSingleEventCount}
                           </div>
                         )}
                       </div>

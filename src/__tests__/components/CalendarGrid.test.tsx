@@ -1,5 +1,12 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { CalendarGrid, buildGrid, isMultiDayAllDay, isEventOnDate, computeSegments } from '@/components/calendar/CalendarGrid'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import {
+  CalendarGrid,
+  buildGrid,
+  isMultiDayAllDay,
+  isEventOnDate,
+  computeSegments,
+  getSingleEventDisplayBudget,
+} from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
@@ -272,11 +279,106 @@ describe('computeSegments', () => {
   })
 })
 
+// ── 동적 단일 일정 표시 개수 ─────────────────────────────────
+
+describe('getSingleEventDisplayBudget', () => {
+  const base = {
+    dateHeaderHeight: 28,
+    laneAreaHeight: 0,
+    holidayCount: 0,
+    hasHolidaysAndEvents: false,
+  }
+
+  it('측정 전에는 기존 3개 기준으로 안전하게 fallback 한다', () => {
+    expect(getSingleEventDisplayBudget({
+      ...base,
+      rowHeight: null,
+      singleEventCount: 5,
+    })).toEqual({ visibleCount: 3, showOverflow: true })
+  })
+
+  it('셀 높이가 충분하면 고정 상한 없이 들어가는 만큼 표시한다', () => {
+    expect(getSingleEventDisplayBudget({
+      ...base,
+      rowHeight: 150,
+      singleEventCount: 6,
+    })).toEqual({ visibleCount: 6, showOverflow: false })
+  })
+
+  it('실제 chip gap과 cell chrome을 고려해 exact-fit 케이스를 보수적으로 줄인다', () => {
+    expect(getSingleEventDisplayBudget({
+      ...base,
+      rowHeight: 118,
+      singleEventCount: 5,
+    })).toEqual({ visibleCount: 3, showOverflow: true })
+  })
+
+  it('6주 월처럼 낮은 셀에서는 표시 개수를 줄여 overflow 줄까지 포함해 맞춘다', () => {
+    expect(getSingleEventDisplayBudget({
+      ...base,
+      rowHeight: 96,
+      singleEventCount: 5,
+    })).toEqual({ visibleCount: 2, showOverflow: true })
+  })
+
+  it('단일 일정 영역이 0줄이면 +N도 표시하지 않는다', () => {
+    expect(getSingleEventDisplayBudget({
+      rowHeight: 60,
+      dateHeaderHeight: 40,
+      laneAreaHeight: 18,
+      holidayCount: 1,
+      hasHolidaysAndEvents: true,
+      singleEventCount: 3,
+    })).toEqual({ visibleCount: 0, showOverflow: false })
+  })
+
+  it('음력, 멀티데이 lane, 공휴일이 있으면 남은 공간 기준으로 더 적게 표시한다', () => {
+    expect(getSingleEventDisplayBudget({
+      rowHeight: 118,
+      dateHeaderHeight: 40,
+      laneAreaHeight: 18,
+      holidayCount: 1,
+      hasHolidaysAndEvents: true,
+      singleEventCount: 4,
+    })).toEqual({ visibleCount: 1, showOverflow: true })
+  })
+})
+
 // ── CalendarGrid 렌더링 ──────────────────────────────────────
 
 describe('CalendarGrid', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+  })
+
+  it('측정된 셀 높이가 충분하면 렌더링에서도 3개 제한을 넘겨 표시한다', async () => {
+    const getBoundingClientRectSpy = jest
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute('data-testid') === 'calendar-grid') {
+          return { width: 390, height: 778, top: 0, left: 0, right: 390, bottom: 778, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+        }
+        if (this.className === 'grid grid-cols-7') {
+          return { width: 390, height: 28, top: 0, left: 0, right: 390, bottom: 28, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+        }
+        return { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+      })
+    const events = Array.from({ length: 6 }, (_, i) => makeEvent({
+      id: `evt-dynamic-${i}`,
+      title: `동적일정${i + 1}`,
+      start_at: '2025-06-15T10:00:00Z',
+    }))
+
+    try {
+      render(<CalendarGrid {...defaultProps} events={events} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('동적일정6')).toBeInTheDocument()
+      })
+      expect(screen.queryByText('+3')).not.toBeInTheDocument()
+    } finally {
+      getBoundingClientRectSpy.mockRestore()
+    }
   })
 
   it('날짜 클릭 시 onSelectDate가 호출된다', () => {
@@ -478,8 +580,6 @@ describe('라벨 색상 우선순위', () => {
 // ── 칩 variant: allDay vs timed ──────────────────────────────
 
 describe('칩 variant', () => {
-  const color = '#f97316' // calendars[0].color
-
   it('is_all_day=true 단일 일정은 solid fill + white text로 렌더된다', () => {
     const event = makeEvent({ is_all_day: true, title: '종일일정' })
     render(<CalendarGrid {...defaultProps} events={[event]} />)
