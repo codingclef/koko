@@ -82,8 +82,7 @@ describe('EventFormModal', () => {
 
   it('종일 해제 시 시간 버튼이 나타난다', () => {
     render(<EventFormModal {...defaultProps} />)
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     // 시간 버튼(HH:MM 형태)이 나타나야 함
     expect(screen.getByText('09:00')).toBeInTheDocument()
@@ -102,6 +101,26 @@ describe('EventFormModal', () => {
     fireEvent.change(titleInput, { target: { value: '테스트 일정' } })
     const saveBtn = screen.getByText('저장')
     expect(saveBtn).not.toBeDisabled()
+  })
+
+  it('레퍼런스 레이아웃 순서로 주요 항목을 표시한다', () => {
+    render(<EventFormModal {...defaultProps} />)
+
+    const orderedNodes = [
+      screen.getByPlaceholderText('제목'),
+      screen.getByText('가족'),
+      screen.getByText('종일'),
+      screen.getByText('시작'),
+      screen.getByText('종료'),
+      screen.getByText('라벨'),
+      screen.getByText('알람'),
+    ]
+
+    orderedNodes.slice(1).forEach((node, index) => {
+      expect(
+        orderedNodes[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    })
   })
 
   it('저장 시 onSave가 startAt, endAt, isAllDay를 포함해 호출된다', async () => {
@@ -129,8 +148,7 @@ describe('EventFormModal', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
     // 종일 해제
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     // 시작: 2026-03-31 09:00 (기본)
     // 종료 날짜를 이전 날짜로 변경
@@ -155,8 +173,7 @@ describe('EventFormModal', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
     // 종일 해제
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     // 종료 시간 picker 열기
     fireEvent.click(screen.getByText('10:00'))
@@ -171,8 +188,7 @@ describe('EventFormModal', () => {
 
   it('X 버튼 클릭 시 애니메이션 후 onClose가 호출된다', () => {
     render(<EventFormModal {...defaultProps} />)
-    const closeButton = document.querySelector('button.p-1.text-stone-400') as HTMLElement
-    fireEvent.click(closeButton)
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
     act(() => {
       jest.advanceTimersByTime(300)
     })
@@ -198,13 +214,13 @@ describe('EventFormModal', () => {
       updated_at: '',
     }
     render(<EventFormModal {...defaultProps} initial={initial} />)
-    expect(screen.getByText('일정 편집')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('기존 일정')).toBeInTheDocument()
   })
 
   it('날짜 버튼에 요일이 표시된다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     // 2026-03-31은 화요일
-    expect(screen.getAllByText(/2026\/03\/31\(화\)/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/2026년 3월 31일 \(화\)/).length).toBeGreaterThan(0)
   })
 
   it('날짜 버튼 클릭 시 showPicker()를 호출한다', () => {
@@ -237,8 +253,7 @@ describe('EventFormModal', () => {
   it('시간 버튼 클릭 시 wheel picker가 나타난다', () => {
     render(<EventFormModal {...defaultProps} />)
     // 종일 해제
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
 
@@ -364,7 +379,7 @@ describe('라벨 색상', () => {
 
   it('라벨 색상 버튼 클릭 시 팔레트가 열린다', () => {
     render(<EventFormModal {...defaultProps} />)
-    fireEvent.click(screen.getByText('라벨 색상'))
+    fireEvent.click(screen.getByText('라벨'))
     expect(screen.getByTitle('주황색')).toBeInTheDocument()
   })
 
@@ -382,7 +397,7 @@ describe('라벨 색상', () => {
   it('null 선택 시 onSave에 labelColor: null이 포함된다', async () => {
     render(<EventFormModal {...defaultProps} defaultLabelColor="#f97316" />)
     // 팔레트 열기
-    fireEvent.click(screen.getByText('라벨 색상'))
+    fireEvent.click(screen.getByText('라벨'))
     // null 선택 (캘린더 색상 사용)
     fireEvent.click(screen.getByTitle('캘린더 색상 사용'))
     fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '테스트' } })
