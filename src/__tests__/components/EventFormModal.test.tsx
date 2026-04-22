@@ -244,6 +244,16 @@ describe('EventFormModal', () => {
     expect(screen.getByTestId('end-date-button')).toHaveClass('relative')
   })
 
+  it('날짜 input은 보이지 않는 클릭 영역을 만들지 않는다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+
+    expect(dateInputs[0]).toHaveClass('pointer-events-none')
+    expect(dateInputs[1]).toHaveClass('pointer-events-none')
+    expect(dateInputs[0]).toHaveAttribute('tabindex', '-1')
+    expect(dateInputs[1]).toHaveAttribute('tabindex', '-1')
+  })
+
   it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')

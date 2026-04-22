@@ -370,8 +370,9 @@ export function EventFormModal({
                       type="date"
                       value={startDate}
                       disabled={!canEditOccurrenceDate}
+                      tabIndex={-1}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className={`absolute inset-0 opacity-0 w-full h-full ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
+                      className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
                     />
                   </div>
                   {!isAllDay && (
@@ -407,8 +408,9 @@ export function EventFormModal({
                       type="date"
                       value={endDate}
                       disabled={!canEditOccurrenceDate}
+                      tabIndex={-1}
                       onChange={(e) => handleEndDateChange(e.target.value)}
-                      className={`absolute inset-0 opacity-0 w-full h-full ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
+                      className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
                     />
                   </div>
                   {!isAllDay && (
