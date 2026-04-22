@@ -254,6 +254,13 @@ describe('EventFormModal', () => {
     expect(dateInputs[1]).toHaveAttribute('tabindex', '-1')
   })
 
+  it('모바일 기본 제목 크기를 컴팩트하게 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    expect(screen.getByPlaceholderText('제목')).toHaveClass('text-[1.875rem]')
+    expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
+  })
+
   it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
