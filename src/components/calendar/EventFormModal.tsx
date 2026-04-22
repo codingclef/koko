@@ -258,7 +258,7 @@ export function EventFormModal({
       <div className="mx-auto mt-2 h-1 w-12 shrink-0 rounded-full bg-stone-300/60 dark:bg-stone-700/70" />
 
       {/* 헤더 */}
-      <div className="flex items-center justify-between px-5 pb-8 pt-6 shrink-0">
+      <div className="flex items-center justify-between px-5 pb-8 pt-6 shrink-0 sm:pb-4 sm:pt-5">
         <button
           onClick={handleClose}
           className="flex h-11 w-11 items-center justify-center rounded-full text-accent-500 transition-colors hover:bg-stone-100 dark:text-accent-300 dark:hover:bg-stone-900"
@@ -277,14 +277,14 @@ export function EventFormModal({
 
       <div className="flex-1 overflow-y-auto pb-10">
         {/* 제목 */}
-        <div className="px-8 pb-9">
+        <div className="px-8 pb-9 sm:pb-5">
           <input
             ref={titleInputRef}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목"
-            className="w-full bg-transparent text-[2.35rem] font-extrabold leading-tight tracking-normal text-stone-900 placeholder:text-stone-400 focus:outline-none dark:text-stone-100 dark:placeholder:text-stone-600"
+            className="w-full bg-transparent text-[2.35rem] font-extrabold leading-tight tracking-normal text-stone-900 placeholder:text-stone-400 focus:outline-none dark:text-stone-100 dark:placeholder:text-stone-600 sm:text-[2rem]"
           />
         </div>
 
