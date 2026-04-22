@@ -360,7 +360,8 @@ export function EventFormModal({
                 <span className="text-lg font-medium text-stone-800 dark:text-stone-100">시작</span>
                 <div className={`flex justify-end gap-2 ${isAllDay ? '' : 'min-w-0'}`}>
                   <div
-                    className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1 '}${dateBtnCls}`}
+                    data-testid="start-date-button"
+                    className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1'} ${dateBtnCls}`}
                     onClick={() => { if (canEditOccurrenceDate) startDateInputRef.current?.showPicker?.() }}
                   >
                     <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(startDate)}</span>
@@ -396,7 +397,8 @@ export function EventFormModal({
                 <span className="text-lg font-medium text-stone-800 dark:text-stone-100">종료</span>
                 <div className={`flex justify-end gap-2 ${endShake ? 'shake' : ''}`}>
                   <div
-                    className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1 '}${dateBtnCls}`}
+                    data-testid="end-date-button"
+                    className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1'} ${dateBtnCls}`}
                     onClick={() => { if (canEditOccurrenceDate) endDateInputRef.current?.showPicker?.() }}
                   >
                     <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(endDate)}</span>

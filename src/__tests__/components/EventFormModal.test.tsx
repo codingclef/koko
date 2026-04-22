@@ -237,6 +237,13 @@ describe('EventFormModal', () => {
     expect(showPickerMock).toHaveBeenCalledTimes(2)
   })
 
+  it('종일 모드 날짜 버튼은 absolute input의 기준점이 되도록 relative class를 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    expect(screen.getByTestId('start-date-button')).toHaveClass('relative')
+    expect(screen.getByTestId('end-date-button')).toHaveClass('relative')
+  })
+
   it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
