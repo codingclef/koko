@@ -17,6 +17,12 @@ function formatDateWithDOW(dateStr: string): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DOW_KR[d.getDay()]})`
 }
 
+function formatShortDateWithDOW(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T00:00:00')
+  return `${d.getMonth() + 1}/${d.getDate()} (${DOW_KR[d.getDay()]})`
+}
+
 function buildTime(h: number, m: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
@@ -160,6 +166,16 @@ export function EventFormModal({
     setActiveTimePicker((prev) => (prev === which ? null : which))
   }
 
+  const openDatePicker = (input: HTMLInputElement | null) => {
+    if (!canEditOccurrenceDate || !input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+      return
+    }
+    input.focus()
+    input.click()
+  }
+
   const handleEndDateChange = (value: string) => {
     const start = isAllDay
       ? new Date(startDate + 'T00:00:00')
@@ -254,7 +270,10 @@ export function EventFormModal({
 
   return (
     <div className={`fixed inset-0 z-[70] bg-stone-950/40 dark:bg-black flex items-end sm:items-center justify-center sm:p-6 ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
-      <div className="flex h-dvh w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-stone-50 shadow-2xl dark:bg-[#090909] sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(920px,calc(100vw-48px))] sm:max-w-none sm:rounded-[2rem]">
+      <div
+        className="flex h-dvh w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-stone-50 shadow-2xl dark:bg-[#090909] sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(920px,calc(100vw-48px))] sm:max-w-none sm:rounded-[2rem]"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
       <div className="mx-auto mt-2 h-1 w-12 shrink-0 rounded-full bg-stone-300/60 dark:bg-stone-700/70" />
 
       {/* 헤더 */}
@@ -359,12 +378,24 @@ export function EventFormModal({
               <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-y-2.5 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-y-5">
                 <span className="text-base font-medium text-stone-800 dark:text-stone-100 sm:text-lg">시작</span>
                 <div className={`flex justify-end gap-2 ${isAllDay ? '' : 'min-w-0'}`}>
-                  <div
-                    data-testid="start-date-button"
-                    className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1'} ${dateBtnCls}`}
-                    onClick={() => { if (canEditOccurrenceDate) startDateInputRef.current?.showPicker?.() }}
-                  >
-                    <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(startDate)}</span>
+                  <div className={isAllDay ? 'relative w-full max-w-[18rem]' : 'relative flex-1'}>
+                    <button
+                      type="button"
+                      data-testid="start-date-button"
+                      aria-label={`시작 날짜 ${formatDateWithDOW(startDate)}`}
+                      disabled={!canEditOccurrenceDate}
+                      className={`w-full ${dateBtnCls}`}
+                      onClick={() => openDatePicker(startDateInputRef.current)}
+                    >
+                      {isAllDay ? (
+                        <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(startDate)}</span>
+                      ) : (
+                        <>
+                          <span className="relative z-10 pointer-events-none whitespace-nowrap sm:hidden">{formatShortDateWithDOW(startDate)}</span>
+                          <span className="relative z-10 pointer-events-none hidden whitespace-nowrap sm:inline">{formatDateWithDOW(startDate)}</span>
+                        </>
+                      )}
+                    </button>
                     <input
                       ref={startDateInputRef}
                       type="date"
@@ -397,12 +428,24 @@ export function EventFormModal({
 
                 <span className="text-base font-medium text-stone-800 dark:text-stone-100 sm:text-lg">종료</span>
                 <div className={`flex justify-end gap-2 ${endShake ? 'shake' : ''}`}>
-                  <div
-                    data-testid="end-date-button"
-                    className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1'} ${dateBtnCls}`}
-                    onClick={() => { if (canEditOccurrenceDate) endDateInputRef.current?.showPicker?.() }}
-                  >
-                    <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(endDate)}</span>
+                  <div className={isAllDay ? 'relative w-full max-w-[18rem]' : 'relative flex-1'}>
+                    <button
+                      type="button"
+                      data-testid="end-date-button"
+                      aria-label={`종료 날짜 ${formatDateWithDOW(endDate)}`}
+                      disabled={!canEditOccurrenceDate}
+                      className={`w-full ${dateBtnCls}`}
+                      onClick={() => openDatePicker(endDateInputRef.current)}
+                    >
+                      {isAllDay ? (
+                        <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(endDate)}</span>
+                      ) : (
+                        <>
+                          <span className="relative z-10 pointer-events-none whitespace-nowrap sm:hidden">{formatShortDateWithDOW(endDate)}</span>
+                          <span className="relative z-10 pointer-events-none hidden whitespace-nowrap sm:inline">{formatDateWithDOW(endDate)}</span>
+                        </>
+                      )}
+                    </button>
                     <input
                       ref={endDateInputRef}
                       type="date"

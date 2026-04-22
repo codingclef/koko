@@ -72,6 +72,12 @@ describe('EventFormModal', () => {
     expect(root.className).toMatch(/inset-0/)
   })
 
+  it('시트 컨테이너에 safe-area 상단 패딩을 적용한다', () => {
+    const { container } = render(<EventFormModal {...defaultProps} />)
+    const sheet = container.querySelector('.h-dvh') as HTMLElement
+    expect(sheet).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
+  })
+
   it('종일 모드에서 날짜 input만 렌더링된다', () => {
     render(<EventFormModal {...defaultProps} />)
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)
@@ -232,9 +238,8 @@ describe('EventFormModal', () => {
     ;(dateInputs[0] as HTMLInputElement).showPicker = showPickerMock
     ;(dateInputs[1] as HTMLInputElement).showPicker = showPickerMock
 
-    const dateBtns = document.querySelectorAll('input[type="date"]')
-    fireEvent.click(dateBtns[0].parentElement!)
-    fireEvent.click(dateBtns[1].parentElement!)
+    fireEvent.click(screen.getByTestId('start-date-button'))
+    fireEvent.click(screen.getByTestId('end-date-button'))
 
     expect(showPickerMock).toHaveBeenCalledTimes(2)
   })
@@ -263,17 +268,34 @@ describe('EventFormModal', () => {
     expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
   })
 
+  it('시간 지정 모드에서는 모바일 날짜 표기를 짧게 표시한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-11-30')} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
+
+    expect(screen.getAllByText('11/30 (월)').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('2026년 11월 30일 (월)').length).toBeGreaterThan(0)
+  })
+
   it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
+    const focusMock = jest.fn()
+    const clickMock = jest.fn()
     // showPicker 메서드가 없는 환경 시뮬레이션
     Object.defineProperty(dateInputs[0], 'showPicker', { value: undefined, configurable: true })
     Object.defineProperty(dateInputs[1], 'showPicker', { value: undefined, configurable: true })
+    Object.defineProperty(dateInputs[0], 'focus', { value: focusMock, configurable: true })
+    Object.defineProperty(dateInputs[1], 'focus', { value: focusMock, configurable: true })
+    Object.defineProperty(dateInputs[0], 'click', { value: clickMock, configurable: true })
+    Object.defineProperty(dateInputs[1], 'click', { value: clickMock, configurable: true })
 
     expect(() => {
-      fireEvent.click(dateInputs[0].parentElement!)
-      fireEvent.click(dateInputs[1].parentElement!)
+      fireEvent.click(screen.getByTestId('start-date-button'))
+      fireEvent.click(screen.getByTestId('end-date-button'))
     }).not.toThrow()
+    expect(focusMock).toHaveBeenCalledTimes(2)
+    expect(clickMock).toHaveBeenCalledTimes(2)
   })
 
   it('시간 버튼 클릭 시 wheel picker가 나타난다', () => {
