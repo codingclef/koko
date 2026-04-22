@@ -238,13 +238,13 @@ export function EventFormModal({
   }
 
   const timeBtnCls = (active: boolean) =>
-    `min-w-[4.5rem] px-3 py-2 rounded-2xl text-sm font-semibold text-center transition-colors shrink-0 sm:min-w-20 sm:px-4 sm:py-2.5 ${
+    `min-w-[4.25rem] rounded-xl px-3 py-1.5 text-sm font-semibold text-center transition-colors shrink-0 sm:min-w-20 sm:rounded-2xl sm:px-4 sm:py-2.5 ${
       active
         ? 'bg-accent-400 text-white'
         : 'bg-stone-100 dark:bg-stone-800/95 text-stone-700 dark:text-stone-100'
     }`
 
-  const dateBtnCls = 'relative overflow-hidden min-w-0 px-3 py-2 rounded-2xl bg-stone-100 dark:bg-stone-800/95 text-sm font-semibold text-stone-700 dark:text-stone-100 text-center sm:px-4 sm:py-2.5'
+  const dateBtnCls = 'relative overflow-hidden min-w-0 rounded-xl bg-stone-100 px-3 py-1.5 text-center text-sm font-semibold text-stone-700 dark:bg-stone-800/95 dark:text-stone-100 sm:rounded-2xl sm:px-4 sm:py-2.5'
   const reminderLabel = reminderMinutes.size > 0
     ? REMINDER_OPTIONS
       .filter((opt) => reminderMinutes.has(opt.minutes))
@@ -254,37 +254,37 @@ export function EventFormModal({
 
   return (
     <div className={`fixed inset-0 z-[70] bg-stone-950/40 dark:bg-black flex items-end sm:items-center justify-center sm:p-6 ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
-      <div className="flex h-dvh w-full flex-col overflow-hidden rounded-t-[2rem] bg-stone-50 shadow-2xl dark:bg-[#090909] sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(920px,calc(100vw-48px))] sm:max-w-none sm:rounded-[2rem]">
+      <div className="flex h-dvh w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-stone-50 shadow-2xl dark:bg-[#090909] sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(920px,calc(100vw-48px))] sm:max-w-none sm:rounded-[2rem]">
       <div className="mx-auto mt-2 h-1 w-12 shrink-0 rounded-full bg-stone-300/60 dark:bg-stone-700/70" />
 
       {/* 헤더 */}
-      <div className="flex items-center justify-between px-5 pb-5 pt-4 shrink-0 sm:pb-4 sm:pt-5">
+      <div className="flex items-center justify-between px-4 pb-4 pt-3 shrink-0 sm:px-5 sm:pb-4 sm:pt-5">
         <button
           onClick={handleClose}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-accent-500 transition-colors hover:bg-stone-100 dark:text-accent-300 dark:hover:bg-stone-900"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-accent-500 transition-colors hover:bg-stone-100 dark:text-accent-300 dark:hover:bg-stone-900 sm:h-11 sm:w-11"
           aria-label="닫기"
         >
-          <X size={28} strokeWidth={1.8} />
+          <X size={26} strokeWidth={1.8} />
         </button>
         <button
           onClick={handleSave}
           disabled={!title.trim() || !startDate || saving}
-          className="rounded-full border border-stone-200 bg-stone-50 px-8 py-2.5 text-sm font-bold text-stone-800 transition-colors hover:bg-stone-100 disabled:opacity-40 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900"
+          className="rounded-full border border-stone-200 bg-stone-50 px-7 py-2 text-sm font-bold text-stone-800 transition-colors hover:bg-stone-100 disabled:opacity-40 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900 sm:px-8 sm:py-2.5"
         >
           저장
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-10">
+      <div className="flex-1 overflow-y-auto pb-8 sm:pb-10">
         {/* 제목 */}
-        <div className="px-6 pb-6 sm:px-8 sm:pb-5">
+        <div className="px-5 pb-4 sm:px-8 sm:pb-5">
           <input
             ref={titleInputRef}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목"
-            className="w-full bg-transparent text-[1.875rem] font-extrabold leading-tight tracking-normal text-stone-900 placeholder:text-stone-400 focus:outline-none dark:text-stone-100 dark:placeholder:text-stone-600 sm:text-[2rem]"
+            className="w-full bg-transparent text-[1.625rem] font-extrabold leading-tight tracking-normal text-stone-900 placeholder:text-stone-400 focus:outline-none dark:text-stone-100 dark:placeholder:text-stone-600 sm:text-[2rem]"
           />
         </div>
 
@@ -294,20 +294,20 @@ export function EventFormModal({
 
         <div className="border-y border-stone-200/70 dark:border-stone-900">
           {/* 캘린더 선택 */}
-          <div className="grid min-h-16 grid-cols-[3.75rem_1fr] items-center border-b border-stone-200/70 dark:border-stone-900 sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr]">
+          <div className="grid min-h-14 grid-cols-[3.25rem_1fr] items-center border-b border-stone-200/70 dark:border-stone-900 sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr]">
             <div className="flex justify-center text-accent-500 dark:text-accent-300">
-              <CalendarDays size={26} strokeWidth={1.8} />
+              <CalendarDays size={22} strokeWidth={1.8} />
             </div>
-            <div className="min-w-0 pr-5">
+            <div className="min-w-0 pr-4 sm:pr-5">
               {calendars.length > 0 ? (
-                <div className="flex flex-wrap gap-2 py-3">
+                <div className="flex flex-wrap gap-2 py-2 sm:py-3">
                   {calendars.map((cal) => {
                     const active = calendarId === cal.id
                     return (
                       <button
                         key={cal.id}
                         onClick={() => setCalendarId(cal.id)}
-                        className="flex items-center gap-2 rounded-2xl px-3 py-1.5 text-sm font-semibold transition-all sm:px-3.5 sm:py-2 sm:text-base"
+                        className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-semibold transition-all sm:rounded-2xl sm:px-3.5 sm:py-2 sm:text-base"
                         style={
                           active
                             ? { backgroundColor: cal.color, color: '#fff' }
@@ -330,33 +330,33 @@ export function EventFormModal({
           </div>
 
           {/* 종일 토글 */}
-          <div className="grid min-h-16 grid-cols-[3.75rem_1fr_auto] items-center border-b border-stone-200/70 dark:border-stone-900 sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr_auto]">
+          <div className="grid min-h-14 grid-cols-[3.25rem_1fr_auto] items-center border-b border-stone-200/70 dark:border-stone-900 sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr_auto]">
             <div className="flex justify-center text-accent-500 dark:text-accent-300">
-              <Clock3 size={25} strokeWidth={1.8} />
+              <Clock3 size={22} strokeWidth={1.8} />
             </div>
-            <span className="text-lg font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">종일</span>
+            <span className="text-base font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">종일</span>
             <button
               onClick={() => toggleAllDay(!isAllDay)}
-              className={`relative mr-5 h-8 w-[4.25rem] rounded-full transition-colors ${isAllDay ? 'bg-accent-400' : 'bg-stone-300 dark:bg-stone-700'}`}
+              className={`relative mr-4 h-7 w-14 rounded-full transition-colors sm:mr-5 sm:h-8 sm:w-[4.25rem] ${isAllDay ? 'bg-accent-400' : 'bg-stone-300 dark:bg-stone-700'}`}
               aria-label="종일"
             >
               <span
-                className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${isAllDay ? 'translate-x-9' : 'translate-x-0'}`}
+                className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform sm:h-6 sm:w-6 ${isAllDay ? 'translate-x-7 sm:translate-x-9' : 'translate-x-0'}`}
               />
             </button>
           </div>
 
           {/* 날짜/시간 */}
-          <div className="grid grid-cols-[3.75rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
+          <div className="grid grid-cols-[3.25rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
             <div />
-            <div className="py-4 pr-5 sm:py-5">
+            <div className="py-3 pr-4 sm:py-5 sm:pr-5">
               {isScopedRecurringEdit && (
                 <p className="mb-3 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-500 dark:bg-stone-900 dark:text-stone-400">
                   이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.
                 </p>
               )}
 
-              <div className="grid grid-cols-[3.75rem_minmax(0,1fr)] items-center gap-y-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-y-5">
+              <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-y-2.5 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-y-5">
                 <span className="text-base font-medium text-stone-800 dark:text-stone-100 sm:text-lg">시작</span>
                 <div className={`flex justify-end gap-2 ${isAllDay ? '' : 'min-w-0'}`}>
                   <div
@@ -440,17 +440,17 @@ export function EventFormModal({
           <button
             type="button"
             onClick={() => setLabelPickerOpen((v) => !v)}
-            className="grid min-h-16 w-full grid-cols-[3.75rem_1fr_auto] items-center border-b border-stone-200/70 text-left dark:border-stone-900 sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr_auto]"
+            className="grid min-h-14 w-full grid-cols-[3.25rem_1fr_auto] items-center border-b border-stone-200/70 text-left dark:border-stone-900 sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr_auto]"
           >
             <div className="flex justify-center text-accent-500 dark:text-accent-300">
-              <Tag size={25} strokeWidth={1.8} />
+              <Tag size={22} strokeWidth={1.8} />
             </div>
-            <span className="text-lg font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">라벨</span>
-            <div className="mr-5 flex items-center gap-2 text-right">
+            <span className="text-base font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">라벨</span>
+            <div className="mr-4 flex items-center gap-2 text-right sm:mr-5">
               {labelColor ? (
                 <>
                   <span
-                    className="h-6 w-6 rounded-full shrink-0"
+                    className="h-5 w-5 rounded-full shrink-0 sm:h-6 sm:w-6"
                     style={{ backgroundColor: toDisplayColor(labelColor) }}
                   />
                   <span className="text-sm font-semibold text-stone-500 dark:text-stone-400">
@@ -502,23 +502,23 @@ export function EventFormModal({
           )}
 
           {/* 알림 */}
-          <div className="grid grid-cols-[3.75rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
-            <div className="flex justify-center pt-5 text-accent-500 dark:text-accent-300 sm:pt-6">
-              <Bell size={25} strokeWidth={1.8} />
+          <div className="grid grid-cols-[3.25rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
+            <div className="flex justify-center pt-4 text-accent-500 dark:text-accent-300 sm:pt-6">
+              <Bell size={22} strokeWidth={1.8} />
             </div>
-            <div className="py-4 pr-5 sm:py-5">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="text-lg font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">알람</span>
+            <div className="py-3 pr-4 sm:py-5 sm:pr-5">
+              <div className="mb-2 flex items-center justify-between gap-3 sm:mb-3">
+                <span className="text-base font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">알람</span>
                 <span className="max-w-[55%] truncate text-sm font-semibold text-stone-400">{reminderLabel}</span>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 {REMINDER_OPTIONS.map((opt) => {
                   const active = reminderMinutes.has(opt.minutes)
                   return (
                     <button
                       key={opt.minutes}
                       onClick={() => toggleReminder(opt.minutes)}
-                      className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors sm:px-4 sm:py-2 ${
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors sm:rounded-full sm:px-4 sm:py-2 sm:text-sm ${
                         active
                           ? 'bg-accent-400 text-white'
                           : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
@@ -533,27 +533,27 @@ export function EventFormModal({
           </div>
 
           {/* 보조 기능 */}
-          <div className="grid grid-cols-[3.75rem_1fr] sm:grid-cols-[4.5rem_1fr]">
-            <div className="flex justify-center pt-5 text-accent-500 dark:text-accent-300 sm:pt-6">
-              <AlignLeft size={25} strokeWidth={1.8} />
+          <div className="grid grid-cols-[3.25rem_1fr] sm:grid-cols-[4.5rem_1fr]">
+            <div className="flex justify-center pt-4 text-accent-500 dark:text-accent-300 sm:pt-6">
+              <AlignLeft size={22} strokeWidth={1.8} />
             </div>
-            <div className="space-y-3 py-4 pr-5 sm:py-5">
+            <div className="space-y-2.5 py-3 pr-4 sm:space-y-3 sm:py-5 sm:pr-5">
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="메모 (선택)"
                 rows={2}
-                className="w-full resize-none rounded-2xl bg-stone-100 px-4 py-3 text-base text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 dark:bg-stone-900 dark:text-stone-100"
+                className="w-full resize-none rounded-xl bg-stone-100 px-3 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 dark:bg-stone-900 dark:text-stone-100 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-base"
               />
 
               {isNewEvent && (
                 <button
                   onClick={() => setRecurrenceModal('picker')}
-                  className="flex min-h-12 w-full items-center justify-between rounded-2xl bg-stone-100 px-4 text-left dark:bg-stone-900"
+                  className="flex min-h-11 w-full items-center justify-between rounded-xl bg-stone-100 px-3 text-left dark:bg-stone-900 sm:min-h-12 sm:rounded-2xl sm:px-4"
                 >
                   <div className="flex items-center gap-3">
                     <RefreshCw size={18} className="text-accent-500 dark:text-accent-300" />
-                    <span className="text-base font-semibold text-stone-800 dark:text-stone-100">반복</span>
+                    <span className="text-sm font-semibold text-stone-800 dark:text-stone-100 sm:text-base">반복</span>
                   </div>
                   <div className="flex items-center gap-1 text-sm font-semibold text-stone-400">
                     <span>{recurrence ? buildRecurrenceLabel(recurrence) : '안 함'}</span>

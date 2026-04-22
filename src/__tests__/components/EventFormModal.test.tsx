@@ -257,7 +257,7 @@ describe('EventFormModal', () => {
   it('모바일 기본 제목 크기를 컴팩트하게 유지한다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
-    expect(screen.getByPlaceholderText('제목')).toHaveClass('text-[1.875rem]')
+    expect(screen.getByPlaceholderText('제목')).toHaveClass('text-[1.625rem]')
     expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
   })
 
