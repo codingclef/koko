@@ -62,7 +62,13 @@ describe('POST /api/cron/send-reminders', () => {
 
   it('리마인더가 있고 구독이 있으면 web-push를 호출한다', async () => {
     mockRpcResult = {
-      data: [{ reminder_id: 'r1', event_title: '회의', event_start: '2026-04-05T10:00:00Z', family_id: 'f1' }],
+      data: [{
+        reminder_id: 'r1',
+        event_title: '회의',
+        event_start: '2026-04-05T10:00:00Z',
+        is_all_day: false,
+        family_id: 'f1',
+      }],
       error: null,
     }
 
@@ -93,9 +99,83 @@ describe('POST /api/cron/send-reminders', () => {
     expect(mockSendNotification).toHaveBeenCalledTimes(1)
   })
 
+  it('리마인더 본문은 Asia/Tokyo 기준으로 일정 시간을 표시한다', async () => {
+    mockRpcResult = {
+      data: [{
+        reminder_id: 'r1',
+        event_title: '椅子届け',
+        event_start: '2026-04-22T23:00:00Z',
+        is_all_day: false,
+        family_id: 'f1',
+      }],
+      error: null,
+    }
+
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ data: [{ user_id: 'u1', family_id: 'f1' }] }),
+    }))
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({
+        data: [{ id: 'sub1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'u1' }],
+      }),
+    }))
+    mockFrom.mockImplementationOnce(() => ({
+      update: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ error: null }),
+    }))
+    mockSendNotification.mockResolvedValue({ statusCode: 201 })
+
+    await POST(makeRequest())
+
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1] as string)
+    expect(payload.body).toBe('4월 23일 08:00 일정이 있습니다')
+  })
+
+  it('종일 일정 리마인더 본문에는 시간을 표시하지 않는다', async () => {
+    mockRpcResult = {
+      data: [{
+        reminder_id: 'r1',
+        event_title: '楽天トラベルキャンセル〆',
+        event_start: '2026-04-23T15:00:00Z',
+        is_all_day: true,
+        family_id: 'f1',
+      }],
+      error: null,
+    }
+
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ data: [{ user_id: 'u1', family_id: 'f1' }] }),
+    }))
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({
+        data: [{ id: 'sub1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'u1' }],
+      }),
+    }))
+    mockFrom.mockImplementationOnce(() => ({
+      update: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ error: null }),
+    }))
+    mockSendNotification.mockResolvedValue({ statusCode: 201 })
+
+    await POST(makeRequest())
+
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1] as string)
+    expect(payload.body).toBe('4월 24일 종일 일정이 있습니다')
+  })
+
   it('만료된 구독(410)은 삭제된다', async () => {
     mockRpcResult = {
-      data: [{ reminder_id: 'r1', event_title: '회의', event_start: '2026-04-05T10:00:00Z', family_id: 'f1' }],
+      data: [{
+        reminder_id: 'r1',
+        event_title: '회의',
+        event_start: '2026-04-05T10:00:00Z',
+        is_all_day: false,
+        family_id: 'f1',
+      }],
       error: null,
     }
 

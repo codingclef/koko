@@ -670,6 +670,7 @@ export type Database = {
           reminder_id: string
           event_title: string
           event_start: string
+          is_all_day: boolean
           family_id: string
         }[]
       }
