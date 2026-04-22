@@ -532,12 +532,12 @@ export function EventFormModal({
             </div>
           </div>
 
-          {/* 보조 기능 */}
-          <div className="grid grid-cols-[3.25rem_1fr] sm:grid-cols-[4.5rem_1fr]">
+          {/* 메모 */}
+          <div className="grid grid-cols-[3.25rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
             <div className="flex justify-center pt-4 text-accent-500 dark:text-accent-300 sm:pt-6">
               <AlignLeft size={22} strokeWidth={1.8} />
             </div>
-            <div className="space-y-2.5 py-3 pr-4 sm:space-y-3 sm:py-5 sm:pr-5">
+            <div className="py-3 pr-4 sm:py-5 sm:pr-5">
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -545,24 +545,26 @@ export function EventFormModal({
                 rows={2}
                 className="w-full resize-none rounded-xl bg-stone-100 px-3 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 dark:bg-stone-900 dark:text-stone-100 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-base"
               />
-
-              {isNewEvent && (
-                <button
-                  onClick={() => setRecurrenceModal('picker')}
-                  className="flex min-h-11 w-full items-center justify-between rounded-xl bg-stone-100 px-3 text-left dark:bg-stone-900 sm:min-h-12 sm:rounded-2xl sm:px-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <RefreshCw size={18} className="text-accent-500 dark:text-accent-300" />
-                    <span className="text-sm font-semibold text-stone-800 dark:text-stone-100 sm:text-base">반복</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm font-semibold text-stone-400">
-                    <span>{recurrence ? buildRecurrenceLabel(recurrence) : '안 함'}</span>
-                    <ChevronRight size={18} />
-                  </div>
-                </button>
-              )}
             </div>
           </div>
+
+          {/* 반복 */}
+          {isNewEvent && (
+            <button
+              type="button"
+              onClick={() => setRecurrenceModal('picker')}
+              className="grid min-h-14 w-full grid-cols-[3.25rem_1fr_auto] items-center text-left sm:min-h-[4.75rem] sm:grid-cols-[4.5rem_1fr_auto]"
+            >
+              <div className="flex justify-center text-accent-500 dark:text-accent-300">
+                <RefreshCw size={22} strokeWidth={1.8} />
+              </div>
+              <span className="text-base font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">반복</span>
+              <div className="mr-4 flex items-center gap-1 text-sm font-semibold text-stone-400 sm:mr-5">
+                <span>{recurrence ? buildRecurrenceLabel(recurrence) : '안 함'}</span>
+                <ChevronRight size={18} />
+              </div>
+            </button>
+          )}
         </div>
       </div>
 

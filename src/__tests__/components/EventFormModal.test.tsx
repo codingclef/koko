@@ -114,6 +114,8 @@ describe('EventFormModal', () => {
       screen.getByText('종료'),
       screen.getByText('라벨'),
       screen.getByText('알람'),
+      screen.getByPlaceholderText('메모 (선택)'),
+      screen.getByText('반복'),
     ]
 
     orderedNodes.slice(1).forEach((node, index) => {
