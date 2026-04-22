@@ -1,6 +1,8 @@
 -- Include all-day metadata in due reminder payloads so notification text can
 -- format all-day events without misleading UTC times.
-create or replace function get_and_mark_due_reminders()
+drop function if exists get_and_mark_due_reminders();
+
+create function get_and_mark_due_reminders()
 returns table (
   reminder_id  uuid,
   event_title  text,
