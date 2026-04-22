@@ -1,11 +1,14 @@
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import { ShoppingDetailView } from '@/components/shopping/ShoppingDetailView'
 import { getShoppingItems, getShoppingList } from '@/lib/shopping'
 
 const mockBroadcast = jest.fn()
-const mockUseRealtimeSync = jest.fn((_c: unknown, _r: unknown, _o: unknown) => mockBroadcast)
+const mockUseRealtimeSync = jest.fn((...args: unknown[]) => {
+  void args
+  return mockBroadcast
+})
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
 
 jest.mock('@/hooks/useRealtimeSync', () => ({
@@ -185,5 +188,39 @@ describe('ShoppingDetailView', () => {
         expect.arrayContaining([expect.objectContaining({ id: 'item-1', name: '우유' })])
       )
     })
+  })
+
+  it('아이템이 많아도 목록만 스크롤되고 추가 입력란은 화면 안에 유지된다', async () => {
+    mockGetShoppingItems.mockResolvedValueOnce(
+      Array.from({ length: 40 }, (_, index) => ({
+        id: `item-${index + 1}`,
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: `아이템 ${index + 1}`,
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: index,
+        created_at: '2026-01-01T00:00:00Z',
+      })) as never
+    )
+
+    render(
+      <ShoppingDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    expect(await screen.findByText('아이템 40')).toBeInTheDocument()
+    expect(screen.getByTestId('shopping-detail-overlay')).toHaveClass('overflow-hidden')
+    expect(screen.getByTestId('shopping-detail-shell')).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col')
+    expect(screen.getByTestId('shopping-detail-scroll')).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto')
+
+    const footer = screen.getByTestId('shopping-detail-footer')
+    expect(footer).toHaveClass('shrink-0')
+    expect(within(footer).getByPlaceholderText('아이템 추가...')).toBeInTheDocument()
   })
 })

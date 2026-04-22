@@ -293,9 +293,12 @@ export function ShoppingDetailView({
   )
 
   return (
-    <div className="fixed inset-0 z-[55] bg-white dark:bg-stone-950">
+    <div
+      data-testid="shopping-detail-overlay"
+      className="fixed inset-0 z-[55] overflow-hidden bg-white dark:bg-stone-950"
+    >
       {status === 'loading' ? (
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex h-full items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
         </div>
       ) : status === 'not-found' ? (
@@ -315,7 +318,10 @@ export function ShoppingDetailView({
           onSecondaryAction={onClose}
         />
       ) : (
-        <div className="max-w-lg mx-auto min-h-screen flex flex-col bg-white dark:bg-stone-950">
+        <div
+          data-testid="shopping-detail-shell"
+          className="max-w-lg mx-auto h-full min-h-0 flex flex-col bg-white dark:bg-stone-950"
+        >
           <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
             <button
               onClick={onClose}
@@ -338,7 +344,7 @@ export function ShoppingDetailView({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-2">
+          <div data-testid="shopping-detail-scroll" className="flex-1 min-h-0 overflow-y-auto py-2">
             {mutationError && (
               <div className="px-4 pt-2">
                 <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
@@ -395,7 +401,10 @@ export function ShoppingDetailView({
             )}
           </div>
 
-          <div className="border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe">
+          <div
+            data-testid="shopping-detail-footer"
+            className="shrink-0 border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe"
+          >
             <AddItemInput onAdd={handleAdd} />
           </div>
         </div>
@@ -422,7 +431,7 @@ function DetailStateShell({
   onSecondaryAction,
 }: DetailStateShellProps) {
   return (
-    <div className="max-w-lg mx-auto min-h-screen flex flex-col bg-white dark:bg-stone-950">
+    <div className="max-w-lg mx-auto h-full min-h-0 flex flex-col bg-white dark:bg-stone-950">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
         <button
           onClick={onSecondaryAction ?? onAction}
@@ -437,7 +446,7 @@ function DetailStateShell({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-6 text-center">
         <div className="text-5xl mb-4">🧺</div>
         <p className="text-stone-600 dark:text-stone-300 font-medium">{title}</p>
         <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">{description}</p>
