@@ -2,9 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { dispatchPushNotifications } from '@/lib/push-utils'
 
-function formatReminderBody(eventStart: string): string {
+const REMINDER_TIME_ZONE = 'Asia/Tokyo'
+
+export function formatReminderBody(eventStart: string, isAllDay: boolean): string {
   const d = new Date(eventStart)
-  return `${d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ${d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 일정이 있습니다`
+  const dateStr = d.toLocaleDateString('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    timeZone: REMINDER_TIME_ZONE,
+  })
+
+  if (isAllDay) return `${dateStr} 종일 일정이 있습니다`
+
+  const timeStr = d.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: REMINDER_TIME_ZONE,
+  })
+  return `${dateStr} ${timeStr} 일정이 있습니다`
 }
 
 export async function POST(req: NextRequest) {
@@ -58,7 +74,7 @@ export async function POST(req: NextRequest) {
       const familySubs = subs.filter((s) => s.user_id && memberUserIds.has(s.user_id))
       const payload = JSON.stringify({
         title: reminder.event_title,
-        body: formatReminderBody(reminder.event_start),
+        body: formatReminderBody(reminder.event_start, reminder.is_all_day),
         url: '/',
       })
 
