@@ -160,37 +160,50 @@ export function EventFormModal({
     setActiveTimePicker((prev) => (prev === which ? null : which))
   }
 
-  const handleEndDateChange = (value: string) => {
-    const start = isAllDay
-      ? new Date(startDate + 'T00:00:00')
-      : new Date(`${startDate}T${startTime}`)
-    const newEnd = isAllDay
-      ? new Date(value + 'T00:00:00')
-      : new Date(`${value}T${endTime}`)
+  const keepEndAtOrAfterStart = (
+    nextStartDate: string,
+    nextStartTime: string,
+    nextEndDate = endDate,
+    nextEndTime = endTime,
+    nextIsAllDay = isAllDay
+  ) => {
+    const start = nextIsAllDay
+      ? new Date(nextStartDate + 'T00:00:00')
+      : new Date(`${nextStartDate}T${nextStartTime}`)
+    const end = nextIsAllDay
+      ? new Date(nextEndDate + 'T00:00:00')
+      : new Date(`${nextEndDate}T${nextEndTime}`)
 
-    if (newEnd < start) {
-      setEndDate(startDate)
-      if (!isAllDay) setEndTime(startTime)
+    if (end < start) {
+      setEndDate(nextStartDate)
+      if (!nextIsAllDay) setEndTime(nextStartTime)
       triggerShake()
-    } else {
+      return false
+    }
+
+    return true
+  }
+
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value)
+    keepEndAtOrAfterStart(value, startTime)
+  }
+
+  const handleEndDateChange = (value: string) => {
+    if (keepEndAtOrAfterStart(startDate, startTime, value)) {
       setEndDate(value)
     }
   }
 
   const handleStartTimeChange = (h: number, m: number) => {
-    setStartTime(buildTime(h, m))
+    const newStartTime = buildTime(h, m)
+    setStartTime(newStartTime)
+    keepEndAtOrAfterStart(startDate, newStartTime)
   }
 
   const handleEndTimeChange = (h: number, m: number) => {
     const newEndTime = buildTime(h, m)
-    const start = new Date(`${startDate}T${startTime}`)
-    const end = new Date(`${endDate}T${newEndTime}`)
-
-    if (end < start) {
-      setEndDate(startDate)
-      setEndTime(startTime)
-      triggerShake()
-    } else {
+    if (keepEndAtOrAfterStart(startDate, startTime, endDate, newEndTime, false)) {
       setEndTime(newEndTime)
     }
   }
@@ -373,7 +386,7 @@ export function EventFormModal({
                       value={startDate}
                       disabled={!canEditOccurrenceDate}
                       aria-label={`시작 날짜 ${formatDateWithDOW(startDate)}`}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
                       className={`absolute inset-0 h-full w-full opacity-0 ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                     />
                   </div>

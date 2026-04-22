@@ -177,6 +177,19 @@ describe('EventFormModal', () => {
     expect(defaultProps.onSave).toHaveBeenCalled()
   })
 
+  it('시작 날짜가 종료 날짜보다 뒤로 바뀌면 종료 날짜를 시작 날짜로 보정한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    const startDateInput = dateInputs[0] as HTMLInputElement
+    const endDateInput = dateInputs[1] as HTMLInputElement
+
+    fireEvent.change(startDateInput, { target: { value: '2026-04-02' } })
+
+    expect(startDateInput.value).toBe('2026-04-02')
+    expect(endDateInput.value).toBe('2026-04-02')
+  })
+
   it('종료 시간이 시작보다 이르면 시작 시간으로 복귀된다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
@@ -192,6 +205,32 @@ describe('EventFormModal', () => {
 
     // 종료 시간이 시작 시간(09:00)으로 복귀 → wheel hours 값이 9가 되어야 함
     expect(hoursInput.value).toBe('9')
+  })
+
+  it('시작 시간이 종료 시간보다 뒤로 바뀌면 종료 시간을 시작 시간으로 보정한다', async () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
+    fireEvent.click(screen.getByText('09:00'))
+
+    const hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '11' } })
+
+    expect(screen.getAllByText('11:00')).toHaveLength(2)
+
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '시간 일정' } })
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startAt: expect.any(String),
+        endAt: expect.any(String),
+      })
+    )
+    const savedParams = defaultProps.onSave.mock.calls[0][0]
+    expect(savedParams.endAt).toBe(savedParams.startAt)
   })
 
   it('X 버튼 클릭 시 애니메이션 후 onClose가 호출된다', () => {
