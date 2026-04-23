@@ -1,8 +1,17 @@
-import { renderHook } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useHolidays, clearHolidayCache } from '@/hooks/useHolidays'
+import { getJsonWithAuth } from '@/lib/api-client'
+
+jest.mock('@/lib/api-client', () => ({
+  getJsonWithAuth: jest.fn(),
+}))
+
+const mockGetJsonWithAuth = getJsonWithAuth as jest.MockedFunction<typeof getJsonWithAuth>
 
 beforeEach(() => {
   clearHolidayCache()
+  jest.restoreAllMocks()
+  mockGetJsonWithAuth.mockRejectedValue(new Error('network unavailable'))
 })
 
 describe('useHolidays', () => {
@@ -78,7 +87,7 @@ describe('useHolidays', () => {
       const { result } = renderHook(() => useHolidays(2026, 0, ['KR'])) // month=0 → January 2026
       const christmas = result.current.find((h) => h.date === '2025-12-25')
       expect(christmas).toBeDefined()
-      expect(christmas?.localName).toBe('기독탄신일')
+      expect(christmas?.localName).toBe('크리스마스')
     })
 
     it('12월 뷰에서 다음 연도 1월 元日(JP)이 반환된다 — 연도 경계', () => {
@@ -98,5 +107,20 @@ describe('useHolidays', () => {
     const { result } = renderHook(() => useHolidays(2026, 2, ['KR', 'JP'])) // March
     const codes = result.current.map((h) => h.countryCode)
     expect(codes).toContain('KR')
+  })
+
+  it('API 응답이 오면 KR 휴일을 서버 응답으로 갱신한다', async () => {
+    mockGetJsonWithAuth.mockResolvedValue({
+      holidays: [
+        { date: '2026-05-01', localName: '노동절', countryCode: 'KR' },
+        { date: '2026-05-05', localName: '어린이날', countryCode: 'KR' },
+      ],
+    })
+
+    const { result } = renderHook(() => useHolidays(2026, 4, ['KR']))
+
+    await waitFor(() => {
+      expect(result.current.some((h) => h.date === '2026-05-01' && h.localName === '노동절')).toBe(true)
+    })
   })
 })

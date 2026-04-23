@@ -4,7 +4,7 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
-import type { Holiday } from '@/hooks/useHolidays'
+import type { Holiday } from '@/lib/holidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 const DATE_HEADER_HEIGHT = 28  // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28

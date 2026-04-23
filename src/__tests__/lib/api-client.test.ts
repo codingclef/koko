@@ -1,4 +1,10 @@
-import { ApiClientError, getAuthHeaders, postJson, postJsonWithAuth } from '@/lib/api-client'
+import {
+  ApiClientError,
+  getAuthHeaders,
+  getJsonWithAuth,
+  postJson,
+  postJsonWithAuth,
+} from '@/lib/api-client'
 
 const mockGetSession = jest.fn()
 
@@ -86,6 +92,25 @@ describe('postJsonWithAuth', () => {
         Authorization: 'Bearer token-123',
       },
       body: JSON.stringify({ inviteCode: 'ABC123' }),
+    })
+  })
+})
+
+describe('getJsonWithAuth', () => {
+  it('Authorization 헤더를 포함해 GET 요청한다', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ holidays: [] }),
+    } as Response)
+
+    await getJsonWithAuth('/api/holidays?year=2026&month=4&countries=KR')
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/holidays?year=2026&month=4&countries=KR', {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer token-123',
+      },
     })
   })
 })
