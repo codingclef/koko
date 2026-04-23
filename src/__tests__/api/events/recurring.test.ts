@@ -35,6 +35,30 @@ const FAMILY_ID     = 'fam-1'
 const SERIES_ID     = 'series-1'
 const EVENT_ID      = 'evt-1'
 
+function makeAllowedEmailChain() {
+  const p = Promise.resolve({ data: { app_role: 'member' }, error: null })
+  const chain = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockReturnValue(p),
+  }
+  return chain
+}
+
+function makeFirstEventChain() {
+  return {
+    select: () => ({
+      eq: () => ({
+        order: () => ({
+          limit: () => ({
+            single: () => Promise.resolve({ data: { family_id: FAMILY_ID, calendar_id: null }, error: null }),
+          }),
+        }),
+      }),
+    }),
+  }
+}
+
 function makeRequest(method: string, url: string, body?: Record<string, unknown>, token = 'valid-token') {
   return new NextRequest(url, {
     method,
@@ -56,6 +80,9 @@ beforeEach(() => {
     error: null,
   })
   mockSendEventNotification.mockResolvedValue(undefined)
+  mockFrom.mockImplementation((table: unknown) =>
+    table === 'allowed_emails' ? makeAllowedEmailChain() : makeFirstEventChain()
+  )
 })
 
 // ── POST: recurring ──────────────────────────────────────────
@@ -73,18 +100,9 @@ describe('POST /api/events (recurring)', () => {
   }
 
   beforeEach(() => {
-    // from().select().eq().order().limit().single() chain
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            limit: () => ({
-              single: () => Promise.resolve({ data: { family_id: FAMILY_ID, calendar_id: null }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    })
+    mockFrom.mockImplementation((table: unknown) =>
+      table === 'allowed_emails' ? makeAllowedEmailChain() : makeFirstEventChain()
+    )
   })
 
   it('create_recurring_series_authorized RPC를 호출한다', async () => {
@@ -301,17 +319,6 @@ describe('DELETE /api/events/[id] (series scope)', () => {
 
   it('scope=single이면 delete_series_authorized(single)을 호출한다', async () => {
     mockRpc.mockResolvedValue({ data: { ...seriesDeleteResult, scope: 'single' }, error: null })
-    // need from() for single scope pre-fetch
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({
-            data: { id: EVENT_ID, family_id: FAMILY_ID, calendar_id: null, title: '회의', start_at: '2026-04-17T09:00:00Z', series_id: SERIES_ID, created_by: ACTOR_USER_ID },
-            error: null,
-          }),
-        }),
-      }),
-    })
     const res = await DELETE(
       makeRequest('DELETE', `http://localhost/api/events/${EVENT_ID}?scope=single`),
       makeParams(EVENT_ID)

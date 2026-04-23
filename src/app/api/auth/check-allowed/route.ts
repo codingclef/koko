@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedSessionUser } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(req: NextRequest) {
-  const { email, inviteCode, appInviteCode } = await req.json() as {
-    email?: string
+  const authUser = await getAuthenticatedSessionUser(req)
+  if (!authUser) {
+    return NextResponse.json({ error: 'Unauthorized', allowed: false }, { status: 401 })
+  }
+
+  const { inviteCode, appInviteCode } = await req.json() as {
     inviteCode?: string
     appInviteCode?: string
   }
 
-  if (!email) {
-    return NextResponse.json({ error: 'email is required' }, { status: 400 })
-  }
-
-  const normalizedEmail = email.toLowerCase()
+  const normalizedEmail = authUser.email.toLowerCase()
 
   // 1. allowed_emails 테이블에 있으면 바로 허용
   const { data: existing, error: dbError } = await supabaseAdmin
@@ -49,16 +50,26 @@ export async function POST(req: NextRequest) {
 
   // 3. 가족 초대 코드로 진입한 경우 → allowed_emails에 추가 후 허용 (가족 합류는 /join 페이지에서)
   if (inviteCode) {
-    const { data: family } = await supabaseAdmin
+    const { data: family, error: familyError } = await supabaseAdmin
       .from('families')
       .select('id')
       .ilike('invite_code', inviteCode)
       .maybeSingle()
 
+    if (familyError) {
+      console.error('[check-allowed] family invite lookup error:', familyError)
+      return NextResponse.json({ error: 'DB error', allowed: false }, { status: 500 })
+    }
+
     if (family) {
-      await supabaseAdmin
+      const { error: insertError } = await supabaseAdmin
         .from('allowed_emails')
-        .insert({ email: normalizedEmail })
+        .upsert({ email: normalizedEmail }, { onConflict: 'email', ignoreDuplicates: true })
+
+      if (insertError) {
+        console.error('[check-allowed] allowed email insert error:', insertError)
+        return NextResponse.json({ error: 'DB error', allowed: false }, { status: 500 })
+      }
 
       return NextResponse.json({ allowed: true, needsOnboarding: false })
     }

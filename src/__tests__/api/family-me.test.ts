@@ -76,7 +76,7 @@ describe('POST /api/family/me', () => {
     expect(body.appRole).toBe('admin')
   })
 
-  it('allowed_emails에 없으면 appRole이 member 기본값이다', async () => {
+  it('appRole 조회 결과가 없으면 member 기본값이다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
     const res = await POST(makeRequest())
     const body = await res.json()

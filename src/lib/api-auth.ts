@@ -28,16 +28,27 @@ export async function getAuthenticatedUserId(req: NextRequest): Promise<string |
   return user?.id ?? null
 }
 
-export async function isAppAdmin(email: string): Promise<boolean> {
-  const { data } = await supabaseAdmin
+async function getAllowedEmailRecord(email: string): Promise<{ app_role: string } | null> {
+  const { data, error } = await supabaseAdmin
     .from('allowed_emails')
     .select('app_role')
     .eq('email', email.toLowerCase())
     .maybeSingle()
-  return data?.app_role === 'admin'
+
+  if (error) {
+    console.error('[api-auth] allowed email lookup failed:', error)
+    throw new Error('Allowed email lookup failed')
+  }
+
+  return data
 }
 
-export async function getAuthenticatedUser(
+export async function isAppAdmin(email: string): Promise<boolean> {
+  const record = await getAllowedEmailRecord(email)
+  return record?.app_role === 'admin'
+}
+
+export async function getAuthenticatedSessionUser(
   req: NextRequest
 ): Promise<{ id: string; email: string } | null> {
   const authorization = req.headers.get('authorization')
@@ -55,4 +66,16 @@ export async function getAuthenticatedUser(
   const { sub: id, email } = data.claims as { sub?: string; email?: string }
   if (!id || !email) return null
   return { id, email }
+}
+
+export async function getAuthenticatedUser(
+  req: NextRequest
+): Promise<{ id: string; email: string } | null> {
+  const user = await getAuthenticatedSessionUser(req)
+  if (!user) return null
+
+  const allowedEmail = await getAllowedEmailRecord(user.email)
+  if (!allowedEmail) return null
+
+  return user
 }
