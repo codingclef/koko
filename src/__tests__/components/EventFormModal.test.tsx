@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, createEvent } from '@testing-library/react'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
 import type { Calendar } from '@/lib/calendar'
 
@@ -72,6 +72,12 @@ describe('EventFormModal', () => {
     expect(root.className).toMatch(/inset-0/)
   })
 
+  it('시트 컨테이너에 safe-area 상단 패딩을 적용한다', () => {
+    const { container } = render(<EventFormModal {...defaultProps} />)
+    const sheet = container.querySelector('.h-dvh') as HTMLElement
+    expect(sheet).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
+  })
+
   it('종일 모드에서 날짜 input만 렌더링된다', () => {
     render(<EventFormModal {...defaultProps} />)
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)
@@ -82,8 +88,7 @@ describe('EventFormModal', () => {
 
   it('종일 해제 시 시간 버튼이 나타난다', () => {
     render(<EventFormModal {...defaultProps} />)
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     // 시간 버튼(HH:MM 형태)이 나타나야 함
     expect(screen.getByText('09:00')).toBeInTheDocument()
@@ -102,6 +107,28 @@ describe('EventFormModal', () => {
     fireEvent.change(titleInput, { target: { value: '테스트 일정' } })
     const saveBtn = screen.getByText('저장')
     expect(saveBtn).not.toBeDisabled()
+  })
+
+  it('레퍼런스 레이아웃 순서로 주요 항목을 표시한다', () => {
+    render(<EventFormModal {...defaultProps} />)
+
+    const orderedNodes = [
+      screen.getByPlaceholderText('제목'),
+      screen.getByText('가족'),
+      screen.getByText('종일'),
+      screen.getByText('시작'),
+      screen.getByText('종료'),
+      screen.getByText('라벨'),
+      screen.getByText('알람'),
+      screen.getByPlaceholderText('메모 (선택)'),
+      screen.getByText('반복'),
+    ]
+
+    orderedNodes.slice(1).forEach((node, index) => {
+      expect(
+        orderedNodes[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    })
   })
 
   it('저장 시 onSave가 startAt, endAt, isAllDay를 포함해 호출된다', async () => {
@@ -129,8 +156,7 @@ describe('EventFormModal', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
     // 종일 해제
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     // 시작: 2026-03-31 09:00 (기본)
     // 종료 날짜를 이전 날짜로 변경
@@ -151,12 +177,24 @@ describe('EventFormModal', () => {
     expect(defaultProps.onSave).toHaveBeenCalled()
   })
 
+  it('시작 날짜가 종료 날짜보다 뒤로 바뀌면 종료 날짜를 시작 날짜로 보정한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    const startDateInput = dateInputs[0] as HTMLInputElement
+    const endDateInput = dateInputs[1] as HTMLInputElement
+
+    fireEvent.change(startDateInput, { target: { value: '2026-04-02' } })
+
+    expect(startDateInput.value).toBe('2026-04-02')
+    expect(endDateInput.value).toBe('2026-04-02')
+  })
+
   it('종료 시간이 시작보다 이르면 시작 시간으로 복귀된다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
     // 종일 해제
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     // 종료 시간 picker 열기
     fireEvent.click(screen.getByText('10:00'))
@@ -169,10 +207,35 @@ describe('EventFormModal', () => {
     expect(hoursInput.value).toBe('9')
   })
 
+  it('시작 시간이 종료 시간보다 뒤로 바뀌면 종료 시간을 시작 시간으로 보정한다', async () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
+    fireEvent.click(screen.getByText('09:00'))
+
+    const hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '11' } })
+
+    expect(screen.getAllByText('11:00')).toHaveLength(2)
+
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '시간 일정' } })
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startAt: expect.any(String),
+        endAt: expect.any(String),
+      })
+    )
+    const savedParams = defaultProps.onSave.mock.calls[0][0]
+    expect(savedParams.endAt).toBe(savedParams.startAt)
+  })
+
   it('X 버튼 클릭 시 애니메이션 후 onClose가 호출된다', () => {
     render(<EventFormModal {...defaultProps} />)
-    const closeButton = document.querySelector('button.p-1.text-stone-400') as HTMLElement
-    fireEvent.click(closeButton)
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
     act(() => {
       jest.advanceTimersByTime(300)
     })
@@ -198,47 +261,91 @@ describe('EventFormModal', () => {
       updated_at: '',
     }
     render(<EventFormModal {...defaultProps} initial={initial} />)
-    expect(screen.getByText('일정 편집')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('기존 일정')).toBeInTheDocument()
   })
 
   it('날짜 버튼에 요일이 표시된다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     // 2026-03-31은 화요일
-    expect(screen.getAllByText(/2026\/03\/31\(화\)/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/2026년 3월 31일 \(화\)/).length).toBeGreaterThan(0)
   })
 
-  it('날짜 버튼 클릭 시 showPicker()를 호출한다', () => {
+  it('날짜 input은 보이는 날짜 버튼 영역 안에서 직접 클릭을 받는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
-    const showPickerMock = jest.fn()
-    ;(dateInputs[0] as HTMLInputElement).showPicker = showPickerMock
-    ;(dateInputs[1] as HTMLInputElement).showPicker = showPickerMock
 
-    const dateBtns = document.querySelectorAll('input[type="date"]')
-    fireEvent.click(dateBtns[0].parentElement!)
-    fireEvent.click(dateBtns[1].parentElement!)
-
-    expect(showPickerMock).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('start-date-button')).toContainElement(dateInputs[0] as HTMLElement)
+    expect(screen.getByTestId('end-date-button')).toContainElement(dateInputs[1] as HTMLElement)
+    expect(dateInputs[0]).toHaveClass('absolute')
+    expect(dateInputs[0]).toHaveClass('inset-0')
+    expect(dateInputs[0]).toHaveClass('cursor-pointer')
+    expect(dateInputs[1]).toHaveClass('cursor-pointer')
   })
 
-  it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
+  it('종일 모드 날짜 버튼은 absolute input의 기준점이 되도록 relative class를 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    expect(screen.getByTestId('start-date-button')).toHaveClass('relative')
+    expect(screen.getByTestId('end-date-button')).toHaveClass('relative')
+  })
+
+  it('날짜 input은 키보드와 보조기기 접근성을 위해 focus 가능하게 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+
+    expect(dateInputs[0]).not.toHaveClass('pointer-events-none')
+    expect(dateInputs[1]).not.toHaveClass('pointer-events-none')
+    expect(dateInputs[0]).not.toHaveAttribute('tabindex', '-1')
+    expect(dateInputs[1]).not.toHaveAttribute('tabindex', '-1')
+    expect(dateInputs[0]).toHaveAccessibleName(/시작 날짜/)
+    expect(dateInputs[1]).toHaveAccessibleName(/종료 날짜/)
+  })
+
+  it('보이는 날짜 버튼 클릭 시 데스크톱 날짜 picker를 연다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    const startShowPicker = jest.fn()
+    const endShowPicker = jest.fn()
+    Object.defineProperty(dateInputs[0], 'showPicker', { value: startShowPicker, configurable: true })
+    Object.defineProperty(dateInputs[1], 'showPicker', { value: endShowPicker, configurable: true })
+
+    fireEvent.click(screen.getByTestId('start-date-button'))
+    fireEvent.click(screen.getByTestId('end-date-button'))
+
+    expect(startShowPicker).toHaveBeenCalledTimes(1)
+    expect(endShowPicker).toHaveBeenCalledTimes(1)
+  })
+
+  it('모바일 기본 제목 크기를 컴팩트하게 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    expect(screen.getByPlaceholderText('제목')).toHaveClass('text-[1.625rem]')
+    expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
+  })
+
+  it('showPicker()가 없는 브라우저에서는 native 날짜 input 기본 동작을 막지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
     // showPicker 메서드가 없는 환경 시뮬레이션
     Object.defineProperty(dateInputs[0], 'showPicker', { value: undefined, configurable: true })
     Object.defineProperty(dateInputs[1], 'showPicker', { value: undefined, configurable: true })
 
-    expect(() => {
-      fireEvent.click(dateInputs[0].parentElement!)
-      fireEvent.click(dateInputs[1].parentElement!)
-    }).not.toThrow()
+    const startClick = createEvent.click(screen.getByTestId('start-date-button'))
+    const endClick = createEvent.click(screen.getByTestId('end-date-button'))
+    const startPreventDefault = jest.spyOn(startClick, 'preventDefault')
+    const endPreventDefault = jest.spyOn(endClick, 'preventDefault')
+
+    fireEvent(screen.getByTestId('start-date-button'), startClick)
+    fireEvent(screen.getByTestId('end-date-button'), endClick)
+
+    expect(startPreventDefault).not.toHaveBeenCalled()
+    expect(endPreventDefault).not.toHaveBeenCalled()
   })
 
   it('시간 버튼 클릭 시 wheel picker가 나타난다', () => {
     render(<EventFormModal {...defaultProps} />)
     // 종일 해제
-    const allToggle = document.querySelector('button.w-11') as HTMLElement
-    fireEvent.click(allToggle)
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
 
     expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
 
@@ -364,7 +471,7 @@ describe('라벨 색상', () => {
 
   it('라벨 색상 버튼 클릭 시 팔레트가 열린다', () => {
     render(<EventFormModal {...defaultProps} />)
-    fireEvent.click(screen.getByText('라벨 색상'))
+    fireEvent.click(screen.getByText('라벨'))
     expect(screen.getByTitle('주황색')).toBeInTheDocument()
   })
 
@@ -382,7 +489,7 @@ describe('라벨 색상', () => {
   it('null 선택 시 onSave에 labelColor: null이 포함된다', async () => {
     render(<EventFormModal {...defaultProps} defaultLabelColor="#f97316" />)
     // 팔레트 열기
-    fireEvent.click(screen.getByText('라벨 색상'))
+    fireEvent.click(screen.getByText('라벨'))
     // null 선택 (캘린더 색상 사용)
     fireEvent.click(screen.getByTitle('캘린더 색상 사용'))
     fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '테스트' } })
