@@ -160,13 +160,13 @@ export function EventFormModal({
     setActiveTimePicker((prev) => (prev === which ? null : which))
   }
 
-  const openDatePicker = (input: HTMLInputElement | null) => {
-    if (!input || input.disabled) return
+  const openDatePicker = (input: HTMLInputElement) => {
     input.focus({ preventScroll: true })
-    input.showPicker?.()
+    input.showPicker()
   }
 
   const handleDateButtonClick = (event: MouseEvent<HTMLLabelElement>, input: HTMLInputElement | null) => {
+    if (!input || input.disabled || typeof input.showPicker !== 'function') return
     event.preventDefault()
     openDatePicker(input)
   }

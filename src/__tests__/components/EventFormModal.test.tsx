@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, createEvent } from '@testing-library/react'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
 import type { Calendar } from '@/lib/calendar'
 
@@ -323,17 +323,23 @@ describe('EventFormModal', () => {
     expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
   })
 
-  it('showPicker()가 없는 브라우저에서 날짜 버튼 클릭 시 예외가 발생하지 않는다', () => {
+  it('showPicker()가 없는 브라우저에서는 native 날짜 input 기본 동작을 막지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
     // showPicker 메서드가 없는 환경 시뮬레이션
     Object.defineProperty(dateInputs[0], 'showPicker', { value: undefined, configurable: true })
     Object.defineProperty(dateInputs[1], 'showPicker', { value: undefined, configurable: true })
 
-    expect(() => {
-      fireEvent.click(screen.getByTestId('start-date-button'))
-      fireEvent.click(screen.getByTestId('end-date-button'))
-    }).not.toThrow()
+    const startClick = createEvent.click(screen.getByTestId('start-date-button'))
+    const endClick = createEvent.click(screen.getByTestId('end-date-button'))
+    const startPreventDefault = jest.spyOn(startClick, 'preventDefault')
+    const endPreventDefault = jest.spyOn(endClick, 'preventDefault')
+
+    fireEvent(screen.getByTestId('start-date-button'), startClick)
+    fireEvent(screen.getByTestId('end-date-button'), endClick)
+
+    expect(startPreventDefault).not.toHaveBeenCalled()
+    expect(endPreventDefault).not.toHaveBeenCalled()
   })
 
   it('시간 버튼 클릭 시 wheel picker가 나타난다', () => {
