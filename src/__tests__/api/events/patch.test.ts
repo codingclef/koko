@@ -20,11 +20,13 @@ jest.mock('@/lib/push-utils', () => ({
 
 const mockGetClaims = jest.fn()
 const mockRpc = jest.fn()
+const mockFrom = jest.fn()
 
 jest.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: {
     auth: { getClaims: (token: unknown) => mockGetClaims(token) },
     rpc: (fn: unknown, args: unknown) => mockRpc(fn, args),
+    from: (table: unknown) => mockFrom(table),
   },
 }))
 
@@ -39,6 +41,16 @@ const baseResult = {
   new_calendar_id: CALENDAR_ID,
   new_title: '기존 제목',
   new_start_at: '2026-04-15T09:00:00.000Z',
+}
+
+function makeAllowedEmailChain() {
+  const p = Promise.resolve({ data: { app_role: 'member' }, error: null })
+  const chain = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockReturnValue(p),
+  }
+  return chain
 }
 
 function makeRequest(body: Record<string, unknown>, token = 'valid-token') {
@@ -63,6 +75,7 @@ beforeEach(() => {
     error: null,
   })
   mockRpc.mockResolvedValue({ data: baseResult, error: null })
+  mockFrom.mockReturnValue(makeAllowedEmailChain())
 })
 
 describe('PATCH /api/events/[id]', () => {

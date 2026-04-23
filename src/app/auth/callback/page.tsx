@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { parseInviteCodeFromNext } from '@/lib/auth'
-import { postJson } from '@/lib/api-client'
+import { postJsonWithAuth } from '@/lib/api-client'
 
 function AuthCallbackInner() {
   const router = useRouter()
@@ -25,7 +25,7 @@ function AuthCallbackInner() {
       return
     }
 
-    const handleSession = async (email: string) => {
+    const handleSession = async () => {
       // 중복 실행 방지 (getSession + onAuthStateChange 둘 다 트리거될 수 있음)
       if (handledRef.current) return
       handledRef.current = true
@@ -41,10 +41,9 @@ function AuthCallbackInner() {
       let allowed = false
       let needsOnboarding = false
       try {
-        const body = await postJson<{ allowed: boolean; needsOnboarding?: boolean }>(
+        const body = await postJsonWithAuth<{ allowed: boolean; needsOnboarding?: boolean }>(
           '/api/auth/check-allowed',
           {
-            email,
             inviteCode: isAppInvite ? undefined : inviteCode,
             appInviteCode: isAppInvite ? inviteCode : undefined,
           }
@@ -68,7 +67,7 @@ function AuthCallbackInner() {
     // Supabase가 이미 세션을 처리한 경우 (effect 실행 전 자동 교환 완료)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && session.user?.email) {
-        handleSession(session.user.email)
+        handleSession()
         return
       }
 
@@ -80,7 +79,7 @@ function AuthCallbackInner() {
     // Supabase가 effect 실행 후 세션을 처리하는 경우
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session && session.user?.email) {
-        handleSession(session.user.email)
+        handleSession()
       } else if (event === 'SIGNED_OUT') {
         routeToLoginError('auth_callback_failed')
       }
