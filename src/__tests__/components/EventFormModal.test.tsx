@@ -301,6 +301,21 @@ describe('EventFormModal', () => {
     expect(dateInputs[1]).toHaveAccessibleName(/종료 날짜/)
   })
 
+  it('보이는 날짜 버튼 클릭 시 데스크톱 날짜 picker를 연다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    const startShowPicker = jest.fn()
+    const endShowPicker = jest.fn()
+    Object.defineProperty(dateInputs[0], 'showPicker', { value: startShowPicker, configurable: true })
+    Object.defineProperty(dateInputs[1], 'showPicker', { value: endShowPicker, configurable: true })
+
+    fireEvent.click(screen.getByTestId('start-date-button'))
+    fireEvent.click(screen.getByTestId('end-date-button'))
+
+    expect(startShowPicker).toHaveBeenCalledTimes(1)
+    expect(endShowPicker).toHaveBeenCalledTimes(1)
+  })
+
   it('모바일 기본 제목 크기를 컴팩트하게 유지한다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
@@ -316,8 +331,8 @@ describe('EventFormModal', () => {
     Object.defineProperty(dateInputs[1], 'showPicker', { value: undefined, configurable: true })
 
     expect(() => {
-      fireEvent.click(dateInputs[0])
-      fireEvent.click(dateInputs[1])
+      fireEvent.click(screen.getByTestId('start-date-button'))
+      fireEvent.click(screen.getByTestId('end-date-button'))
     }).not.toThrow()
   })
 

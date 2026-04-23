@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type MouseEvent } from 'react'
 import { X, Bell, RefreshCw, Check, Tag, CalendarDays, Clock3, ChevronRight, AlignLeft } from 'lucide-react'
 import { REMINDER_OPTIONS, LABEL_COLORS, LABEL_COLOR_NAMES, type Calendar, type CalendarEvent } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
@@ -158,6 +158,17 @@ export function EventFormModal({
 
   const toggleTimePicker = (which: 'start' | 'end') => {
     setActiveTimePicker((prev) => (prev === which ? null : which))
+  }
+
+  const openDatePicker = (input: HTMLInputElement | null) => {
+    if (!input || input.disabled) return
+    input.focus({ preventScroll: true })
+    input.showPicker?.()
+  }
+
+  const handleDateButtonClick = (event: MouseEvent<HTMLLabelElement>, input: HTMLInputElement | null) => {
+    event.preventDefault()
+    openDatePicker(input)
   }
 
   const keepEndAtOrAfterStart = (
@@ -375,10 +386,11 @@ export function EventFormModal({
               <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-y-2.5 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-y-5">
                 <span className="text-base font-medium text-stone-800 dark:text-stone-100 sm:text-lg">시작</span>
                 <div className={`flex justify-end gap-2 ${isAllDay ? '' : 'min-w-0'}`}>
-                  <div
-                      data-testid="start-date-button"
+                  <label
+                    data-testid="start-date-button"
+                    onClick={(event) => handleDateButtonClick(event, startDateInputRef.current)}
                     className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1'} ${dateBtnCls}`}
-                    >
+                  >
                     <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(startDate)}</span>
                     <input
                       ref={startDateInputRef}
@@ -389,7 +401,7 @@ export function EventFormModal({
                       onChange={(e) => handleStartDateChange(e.target.value)}
                       className={`absolute inset-0 h-full w-full opacity-0 ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                     />
-                  </div>
+                  </label>
                   {!isAllDay && (
                     <button
                       onClick={() => toggleTimePicker('start')}
@@ -412,10 +424,11 @@ export function EventFormModal({
 
                 <span className="text-base font-medium text-stone-800 dark:text-stone-100 sm:text-lg">종료</span>
                 <div className={`flex justify-end gap-2 ${endShake ? 'shake' : ''}`}>
-                  <div
-                      data-testid="end-date-button"
+                  <label
+                    data-testid="end-date-button"
+                    onClick={(event) => handleDateButtonClick(event, endDateInputRef.current)}
                     className={`${isAllDay ? 'w-full max-w-[18rem]' : 'flex-1'} ${dateBtnCls}`}
-                    >
+                  >
                     <span className="relative z-10 pointer-events-none whitespace-nowrap">{formatDateWithDOW(endDate)}</span>
                     <input
                       ref={endDateInputRef}
@@ -426,7 +439,7 @@ export function EventFormModal({
                       onChange={(e) => handleEndDateChange(e.target.value)}
                       className={`absolute inset-0 h-full w-full opacity-0 ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
                     />
-                  </div>
+                  </label>
                   {!isAllDay && (
                     <button
                       onClick={() => toggleTimePicker('end')}
