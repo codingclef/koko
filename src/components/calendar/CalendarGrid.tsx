@@ -184,6 +184,20 @@ export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[])
   return segments
 }
 
+export function computeLaneHeightsByColumn(segments: EventSegment[]): number[] {
+  const heights = Array.from({ length: 7 }, () => 0)
+
+  for (const seg of segments) {
+    const laneHeight = (seg.lane + 1) * LANE_HEIGHT
+    const endCol = seg.colStart + seg.colSpan
+    for (let col = seg.colStart; col < endCol; col += 1) {
+      if (laneHeight > heights[col]) heights[col] = laneHeight
+    }
+  }
+
+  return heights
+}
+
 
 interface Props {
   year: number
@@ -332,8 +346,7 @@ export function CalendarGrid({
       {/* 주 단위 행 — minmax(0,1fr) 트랙 */}
       {rows.map((row, rowIdx) => {
         const segments = computeSegments(row, multiDayEvents)
-        const laneCount = segments.reduce((max, s) => s.lane > max ? s.lane : max, -1) + 1
-        const laneAreaHeight = laneCount * LANE_HEIGHT
+        const laneHeightsByColumn = computeLaneHeightsByColumn(segments)
 
         return (
             <div key={rowIdx} className="relative min-h-0">
@@ -350,6 +363,7 @@ export function CalendarGrid({
                   const isSun = dow === 0
                   const isSat = dow === 6
                   const hasHolidaysAndEvents = dayHolidays.length > 0 && daySingleEvents.length > 0
+                  const laneAreaHeight = laneHeightsByColumn[colIdx] ?? 0
                   const singleEventDisplay = getSingleEventDisplayBudget({
                     rowHeight,
                     dateHeaderHeight: effectiveDateHeaderHeight,

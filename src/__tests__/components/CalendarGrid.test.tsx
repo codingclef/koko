@@ -5,6 +5,7 @@ import {
   isMultiDayAllDay,
   isEventOnDate,
   computeSegments,
+  computeLaneHeightsByColumn,
   getSingleEventDisplayBudget,
 } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
@@ -276,6 +277,42 @@ describe('computeSegments', () => {
     // 긴 이벤트(a-long)가 먼저
     expect(segs[0].event.id).toBe('a-long')
     expect(segs[1].event.id).toBe('z-short')
+  })
+})
+
+describe('computeLaneHeightsByColumn', () => {
+  it('이벤트가 걸친 날짜만 lane 높이를 예약하고 다른 날짜는 0으로 둔다', () => {
+    const row = makeRow(2026, 4, 24) // 2026-05-24 ~ 2026-05-30
+    const segs = computeSegments(row, [
+      makeEvent({
+        id: 'trip',
+        is_all_day: true,
+        start_at: '2026-05-28T00:00:00Z',
+        end_at: '2026-06-02T00:00:00Z',
+      }),
+    ])
+
+    expect(computeLaneHeightsByColumn(segs)).toEqual([0, 0, 0, 0, 18, 18, 18])
+  })
+
+  it('겹치는 멀티데이 이벤트는 해당 날짜 열만 더 큰 lane 높이를 예약한다', () => {
+    const row = makeRow(2025, 5, 8) // 2025-06-08 ~ 2025-06-14
+    const segs = computeSegments(row, [
+      makeEvent({
+        id: 'a',
+        is_all_day: true,
+        start_at: '2025-06-09T00:00:00Z',
+        end_at: '2025-06-12T00:00:00Z',
+      }),
+      makeEvent({
+        id: 'b',
+        is_all_day: true,
+        start_at: '2025-06-10T00:00:00Z',
+        end_at: '2025-06-11T00:00:00Z',
+      }),
+    ])
+
+    expect(computeLaneHeightsByColumn(segs)).toEqual([0, 18, 36, 36, 18, 0, 0])
   })
 })
 
