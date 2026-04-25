@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { dispatchPushNotifications } from '@/lib/push-utils'
-
-const REMINDER_TIME_ZONE = 'Asia/Tokyo'
+import { REMINDER_TIME_ZONE } from '@/lib/reminders'
 
 export function formatReminderBody(eventStart: string, isAllDay: boolean): string {
   const d = new Date(eventStart)
