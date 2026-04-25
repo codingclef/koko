@@ -425,7 +425,11 @@ export function CalendarGrid({
                       </div>
 
                       {/* 멀티데이 lane 공간 확보용 spacer */}
-                      <div aria-hidden="true" style={{ height: laneAreaHeight }} />
+                      <div
+                        aria-hidden="true"
+                        data-testid={`lane-spacer-${ymd}`}
+                        style={{ height: laneAreaHeight }}
+                      />
 
                       {/* 공휴일 chips */}
                       <div className="w-full space-y-0.5">
