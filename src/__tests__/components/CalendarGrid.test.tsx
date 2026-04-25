@@ -5,6 +5,7 @@ import {
   isMultiDayAllDay,
   isEventOnDate,
   computeSegments,
+  computeLaneHeightsByColumn,
   getSingleEventDisplayBudget,
 } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
@@ -279,6 +280,42 @@ describe('computeSegments', () => {
   })
 })
 
+describe('computeLaneHeightsByColumn', () => {
+  it('이벤트가 걸친 날짜만 lane 높이를 예약하고 다른 날짜는 0으로 둔다', () => {
+    const row = makeRow(2026, 4, 24) // 2026-05-24 ~ 2026-05-30
+    const segs = computeSegments(row, [
+      makeEvent({
+        id: 'trip',
+        is_all_day: true,
+        start_at: '2026-05-28T00:00:00Z',
+        end_at: '2026-06-02T00:00:00Z',
+      }),
+    ])
+
+    expect(computeLaneHeightsByColumn(segs)).toEqual([0, 0, 0, 0, 18, 18, 18])
+  })
+
+  it('겹치는 멀티데이 이벤트는 해당 날짜 열만 더 큰 lane 높이를 예약한다', () => {
+    const row = makeRow(2025, 5, 8) // 2025-06-08 ~ 2025-06-14
+    const segs = computeSegments(row, [
+      makeEvent({
+        id: 'a',
+        is_all_day: true,
+        start_at: '2025-06-09T00:00:00Z',
+        end_at: '2025-06-12T00:00:00Z',
+      }),
+      makeEvent({
+        id: 'b',
+        is_all_day: true,
+        start_at: '2025-06-10T00:00:00Z',
+        end_at: '2025-06-11T00:00:00Z',
+      }),
+    ])
+
+    expect(computeLaneHeightsByColumn(segs)).toEqual([0, 18, 36, 36, 18, 0, 0])
+  })
+})
+
 // ── 동적 단일 일정 표시 개수 ─────────────────────────────────
 
 describe('getSingleEventDisplayBudget', () => {
@@ -470,6 +507,40 @@ describe('CalendarGrid', () => {
     render(<CalendarGrid {...defaultProps} events={[crossWeekEvent]} />)
     const bars = screen.getAllByTitle('주경계여행')
     expect(bars).toHaveLength(2)
+  })
+
+  it('월 경계 멀티데이 종일 일정은 실제로 겹치는 날짜 셀에만 lane spacer를 만든다', () => {
+    const events = [
+      makeEvent({
+        id: 'cross-month',
+        title: '근짱 일본',
+        is_all_day: true,
+        start_at: '2026-05-28T00:00:00Z',
+        end_at: '2026-06-02T00:00:00Z',
+      }),
+      makeEvent({
+        id: 'front-day',
+        title: '부처님오신날',
+        is_all_day: true,
+        start_at: '2026-05-24T00:00:00Z',
+        end_at: '2026-05-24T00:00:00Z',
+      }),
+      makeEvent({
+        id: 'mid-day',
+        title: '대체공휴일',
+        is_all_day: true,
+        start_at: '2026-05-25T00:00:00Z',
+        end_at: '2026-05-25T00:00:00Z',
+      }),
+    ]
+
+    render(<CalendarGrid {...defaultProps} year={2026} month={4} events={events} />)
+
+    expect(screen.getByTestId('lane-spacer-2026-05-24')).toHaveStyle({ height: '0px' })
+    expect(screen.getByTestId('lane-spacer-2026-05-25')).toHaveStyle({ height: '0px' })
+    expect(screen.getByTestId('lane-spacer-2026-05-28')).toHaveStyle({ height: '18px' })
+    expect(screen.getByTestId('lane-spacer-2026-05-29')).toHaveStyle({ height: '18px' })
+    expect(screen.getByTestId('lane-spacer-2026-05-30')).toHaveStyle({ height: '18px' })
   })
 
   it('주 경계에서 잘린 이벤트 첫 segment는 ‹ 화살표가 없다', () => {
