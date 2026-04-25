@@ -570,7 +570,7 @@ export function EventFormModal({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="메모 (선택)"
                 rows={2}
-                className="w-full resize-none rounded-xl bg-stone-100 px-3 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 dark:bg-stone-900 dark:text-stone-100 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-base"
+                className="w-full resize-none rounded-xl bg-stone-100 px-3 py-2.5 text-base text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-400 dark:bg-stone-900 dark:text-stone-100 sm:rounded-2xl sm:px-4 sm:py-3"
               />
             </div>
           </div>

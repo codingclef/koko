@@ -323,6 +323,13 @@ describe('EventFormModal', () => {
     expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
   })
 
+  it('메모 입력창은 iOS 확대를 막기 위해 모바일에서도 text-base를 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    expect(screen.getByPlaceholderText('메모 (선택)')).toHaveClass('text-base')
+    expect(screen.getByPlaceholderText('메모 (선택)')).not.toHaveClass('text-sm')
+  })
+
   it('showPicker()가 없는 브라우저에서는 native 날짜 input 기본 동작을 막지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
