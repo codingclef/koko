@@ -279,7 +279,7 @@ export function EventFormModal({
   return (
     <div className={`fixed inset-0 z-[70] bg-stone-950/40 dark:bg-black flex items-end sm:items-center justify-center sm:p-6 ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
       <div
-        className="flex h-dvh w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-stone-50 shadow-2xl dark:bg-[#090909] sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(920px,calc(100vw-48px))] sm:max-w-none sm:rounded-[2rem]"
+        className="flex h-dvh w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-stone-50 shadow-2xl dark:bg-[#090909] sm:h-[min(960px,calc(100dvh-24px))] sm:w-[min(1200px,calc(100vw-32px))] sm:max-w-none sm:rounded-[2rem]"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
       <div className="mx-auto mt-2 h-1 w-12 shrink-0 rounded-full bg-stone-300/60 dark:bg-stone-700/70" />
