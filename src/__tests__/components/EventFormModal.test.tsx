@@ -78,6 +78,14 @@ describe('EventFormModal', () => {
     expect(sheet).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
   })
 
+  it('데스크톱에서는 시트가 더 넓고 높게 렌더링된다', () => {
+    const { container } = render(<EventFormModal {...defaultProps} />)
+    const sheet = container.querySelector('.h-dvh') as HTMLElement
+
+    expect(sheet).toHaveClass('sm:h-[min(960px,calc(100dvh-24px))]')
+    expect(sheet).toHaveClass('sm:w-[min(1200px,calc(100vw-32px))]')
+  })
+
   it('종일 모드에서 날짜 input만 렌더링된다', () => {
     render(<EventFormModal {...defaultProps} />)
     const dateInputs = screen.getAllByDisplayValue(/\d{4}-\d{2}-\d{2}/)
@@ -321,6 +329,13 @@ describe('EventFormModal', () => {
 
     expect(screen.getByPlaceholderText('제목')).toHaveClass('text-[1.625rem]')
     expect(screen.getByPlaceholderText('제목')).toHaveClass('sm:text-[2rem]')
+  })
+
+  it('메모 입력창은 iOS 확대를 막기 위해 모바일에서도 text-base를 유지한다', () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    expect(screen.getByPlaceholderText('메모 (선택)')).toHaveClass('text-base')
+    expect(screen.getByPlaceholderText('메모 (선택)')).not.toHaveClass('text-sm')
   })
 
   it('showPicker()가 없는 브라우저에서는 native 날짜 input 기본 동작을 막지 않는다', () => {
