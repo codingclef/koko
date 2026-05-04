@@ -3,6 +3,31 @@ import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 import { getEventsByMonth } from '@/lib/calendar'
 
+const FIXED_NOW = new Date('2026-04-18T12:00:00Z')
+const RealDate = Date
+type DateArgs =
+  | []
+  | [string | number | Date]
+  | [number, number, number?, number?, number?, number?, number?]
+
+class MockDate extends Date {
+  constructor(...args: DateArgs) {
+    if (args.length === 0) {
+      super(FIXED_NOW)
+      return
+    }
+    if (args.length === 1) {
+      super(args[0])
+      return
+    }
+    super(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
+  }
+
+  static now() {
+    return FIXED_NOW.getTime()
+  }
+}
+
 // CalendarGrid 는 events 를 data 속성으로 노출해 테스트에서 검증한다
 jest.mock('@/components/calendar/CalendarGrid', () => ({
   CalendarGrid: ({ events, onSelectDate }: {
@@ -105,12 +130,14 @@ const defaultProps = {
 }
 
 beforeEach(() => {
+  global.Date = MockDate as DateConstructor
   jest.clearAllMocks()
   capturedRefresh = null
   jest.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 afterEach(() => {
+  global.Date = RealDate
   jest.restoreAllMocks()
 })
 
