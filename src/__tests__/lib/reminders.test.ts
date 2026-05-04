@@ -1,7 +1,12 @@
 import {
   FIXED_ALL_DAY_ADVANCE_REMINDER_HOUR,
   FIXED_ALL_DAY_ADVANCE_REMINDER_MINIMUM_MINUTES,
+  REMINDER_CRON_FORWARD_BUFFER_SECONDS,
+  REMINDER_CRON_LOOKBACK_MINUTES,
+  REMINDER_CRON_PERIOD_MINUTES,
   getReminderTriggerAt,
+  getReminderSelectionWindow,
+  isReminderDueForRun,
   usesFixedMorningAllDayReminder,
 } from '@/lib/reminders'
 
@@ -40,5 +45,30 @@ describe('getReminderTriggerAt', () => {
   it('종일 일정의 1주 전도 Tokyo 기준 7일 전 오전 8시에 발송된다', () => {
     expect(getReminderTriggerAt('2026-04-25T00:00:00+09:00', true, 10080))
       .toBe('2026-04-17T23:00:00.000Z')
+  })
+})
+
+describe('reminder selection window', () => {
+  it('5분 cadence와 6분 lookback, 5초 forward buffer를 사용한다', () => {
+    expect(REMINDER_CRON_PERIOD_MINUTES).toBe(5)
+    expect(REMINDER_CRON_LOOKBACK_MINUTES).toBe(6)
+    expect(REMINDER_CRON_FORWARD_BUFFER_SECONDS).toBe(5)
+  })
+
+  it('cron 실행 시각 기준으로 due window를 계산한다', () => {
+    const { start, end } = getReminderSelectionWindow('2026-05-04T10:05:12.000Z')
+
+    expect(start.toISOString()).toBe('2026-05-04T09:59:12.000Z')
+    expect(end.toISOString()).toBe('2026-05-04T10:05:17.000Z')
+  })
+
+  it('5분 주기 실행이 11초 지연돼도 due reminder를 놓치지 않는다', () => {
+    const firstRunAt = '2026-05-04T10:00:01.000Z'
+    const secondRunAt = '2026-05-04T10:05:12.000Z'
+
+    expect(isReminderDueForRun('2026-05-04T10:00:06.000Z', firstRunAt)).toBe(true)
+    expect(isReminderDueForRun('2026-05-04T10:00:07.000Z', firstRunAt)).toBe(false)
+    expect(isReminderDueForRun('2026-05-04T10:00:07.000Z', secondRunAt)).toBe(true)
+    expect(isReminderDueForRun('2026-05-04T10:00:11.000Z', secondRunAt)).toBe(true)
   })
 })
