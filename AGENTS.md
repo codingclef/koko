@@ -6,67 +6,131 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Koko Agent Guide
+Repository rules for AI agents working in this project.
 
-This file is the primary guide for any AI agent working in this repository.
-Read this first, then follow the linked project documents before making changes.
+Read this file first. Then read:
 
-## Read Order
+1. `docs/PROJECT_MAP.md`
+2. `docs/PATTERNS.md`
+3. `docs/CHALLENGES.md`
 
-1. `AGENTS.md` — repo-wide working rules
-2. `docs/PROJECT_MAP.md` — feature map, ownership map, data model summary
-3. `docs/PATTERNS.md` — implementation conventions and forbidden patterns
-4. `docs/CHALLENGES.md` — background on past bugs and why current rules exist
-
-## Project Summary
+## Project
 
 - Product: family collaboration PWA
-- Main implemented areas: calendar, shopping lists, settings, family invite/join, push reminders
 - Stack: Next.js 16, React 19, TypeScript, Tailwind CSS v4, Supabase, Web Push
-- Deployment target: Vercel web app + installable PWA
+- Deployment: Vercel web app + installable PWA
 
-## Before Any Action
+## Operating Principles
 
-These rules apply to every task without exception.
+### Understand First
 
-1. Before starting any task, including investigation, analysis, or implementation, confirm understanding by explaining back what the user is asking.
-2. No action begins before the user's explicit approval. This includes reading files, investigating, executing commands, and writing code.
+Do not guess. Do not hide uncertainty.
 
-## Git Rules
+Before any work:
 
-1. Always work on a `feature/*` branch, then open a PR into `main`.
-2. Commit at each unit of work. Do not batch unrelated changes.
-3. Commit messages and PR titles must be written in English.
-4. Direct push to `main` is prohibited.
-5. Delete the feature branch after merge.
-6. Prefer conventional titles in `type: summary` format.
+- Restate the request clearly.
+- State assumptions that affect implementation.
+- If multiple interpretations are possible, surface them.
+- If the request is unclear enough to risk the wrong change, stop and ask.
 
-### Commit and PR Naming
+### Keep It Simple
 
-- Use lowercase conventional prefixes such as `feat:`, `fix:`, `refactor:`, `perf:`, `polish:`, `chore:`, `docs:`, `test:`.
-- Keep the summary concise and specific to the user-visible or engineering change.
-- PR titles should normally match the same `type: summary` style used in recent history.
+Implement the smallest solution that fully solves the task.
 
-### PR Body Format
+- Do not add features beyond the request.
+- Do not introduce abstractions for single-use code.
+- Do not add configurability that was not requested.
+- Do not overbuild for hypothetical cases.
 
-- Include a `## Summary` section with flat bullets describing the main changes.
-- Include a `## Testing` section describing what was run, or explicitly state that tests were not run.
-- If manual visual verification is needed, include a checkbox list in the PR body.
+### Change Only What Is Required
 
-## Working Rules
+Keep changes narrow.
 
-1. Before changing features or architecture, read `docs/PATTERNS.md`.
-2. When asking the user to run a command or tool, include a Korean explanation.
-3. Whenever code is written or modified, add or update tests with it.
-4. After writing or modifying code, run `npx tsc --noEmit` before considering the work complete.
-5. After creating a PR, monitor GitHub Actions CI until it completes. If any check fails, fix the issue and repeat until CI passes.
-6. Manual visual verification items must be listed as checkboxes in the PR.
+- Do not refactor unrelated code.
+- Do not clean up adjacent code unless required by the change.
+- Match existing project patterns and style.
+- Remove only the dead code created by your own change.
+- Report unrelated issues separately.
+
+Every changed line must be justified by the task or required verification.
+
+### Verify the Result
+
+Define success in verifiable terms.
+
+- Bug fix: reproduce, fix, verify.
+- Validation change: cover invalid cases, verify behavior.
+- Refactor: preserve behavior, verify before and after.
+
+## Approval Rule
+
+No action begins before explicit user approval.
+
+This includes:
+
+- reading files
+- investigating code
+- running commands
+- editing code
+- creating commits
+- opening pull requests
+
+Before any action, restate the request and wait for approval.
+
+## Workflow Rules
+
+### Git
+
+- Work only on a `feature/*` branch.
+- Open pull requests into `main`.
+- Never push directly to `main`.
+- Commit in small, coherent units.
+- Do not combine unrelated changes in one commit.
+- Delete the feature branch after merge.
+
+### Commit and PR Titles
+
+- Use English.
+- Use conventional lowercase prefixes: `feat:`, `fix:`, `refactor:`, `perf:`, `polish:`, `chore:`, `docs:`, `test:`.
+- Use `type: summary` format.
+- Keep summaries short and specific.
+
+### PR Body
+
+Include:
+
+- `## Summary`
+- `## Testing`
+
+Rules:
+
+- Use flat bullets under `## Summary`.
+- State exactly what was tested.
+- If tests were not run, say so explicitly.
+- If manual visual verification is required, include checkbox items.
 
 ## Engineering Rules
 
-1. Debug systematically. Fix root causes, not just local symptoms.
-2. Prefer simple, readable code over clever or layered logic.
-3. Verify behavior before marking work complete.
+- Read `docs/PATTERNS.md` before changing features or architecture.
+- Fix root causes, not local symptoms.
+- Prefer simple, readable code.
+- Add or update tests with every code change.
+- Verify behavior before marking work complete.
+
+Before completion, run:
+
+```bash
+npx tsc --noEmit
+```
+
+After creating a PR:
+
+- Monitor GitHub Actions until completion.
+- If any check fails, fix it and repeat until CI passes.
+
+## Communication Rule
+
+When asking the user to run a command or tool, include a Korean explanation.
 
 ## Architecture Rules
 
@@ -77,7 +141,7 @@ DB migration -> src/types/database.ts -> src/lib/ -> src/hooks/ (shared only) ->
 ```
 
 - Each layer depends only on the layer below it.
-- Realtime subscription ownership stays at the page/tab layer.
+- Realtime subscription ownership stays at the page or tab layer.
 
 ### Tab Structure
 
@@ -85,16 +149,17 @@ DB migration -> src/types/database.ts -> src/lib/ -> src/hooks/ (shared only) ->
 - `/shopping` and `/settings` redirect into the calendar shell.
 - `TabsShell` keeps calendar, shopping, and settings mounted and only toggles visibility.
 
-### Realtime Sync
+### Realtime
 
-- Use Supabase Realtime Broadcast, not `postgres_changes`.
-- After mutations, manually send a refresh event.
-- Only broadcast after the channel reaches `SUBSCRIBED`.
+- Use Supabase Realtime Broadcast.
+- Do not use `postgres_changes`.
+- After mutations, send a refresh event manually.
+- Broadcast only after the channel reaches `SUBSCRIBED`.
 
-### Auth Flow
+### Auth
 
-- Email allowlist lives in the `allowed_emails` table.
-- OAuth flow depends on Supabase automatic code exchange.
+- Email allowlist is stored in `allowed_emails`.
+- OAuth relies on Supabase automatic code exchange.
 - Do not call `exchangeCodeForSession` manually.
 
 ## Commands
