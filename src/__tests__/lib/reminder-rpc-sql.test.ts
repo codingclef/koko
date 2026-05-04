@@ -3,12 +3,14 @@ import path from 'node:path'
 import {
   FIXED_ALL_DAY_ADVANCE_REMINDER_HOUR,
   FIXED_ALL_DAY_ADVANCE_REMINDER_MINIMUM_MINUTES,
+  REMINDER_CRON_FORWARD_BUFFER_SECONDS,
+  REMINDER_CRON_LOOKBACK_MINUTES,
   REMINDER_TIME_ZONE,
 } from '@/lib/reminders'
 
 const migrationPath = path.resolve(
   process.cwd(),
-  'supabase/migrations/20260425030000_fix_all_day_advance_reminder_time.sql'
+  'supabase/migrations/20260504000000_reduce_reminder_cron_frequency.sql'
 )
 
 describe('get_and_mark_due_reminders migration', () => {
@@ -28,6 +30,15 @@ describe('get_and_mark_due_reminders migration', () => {
     const sql = fs.readFileSync(migrationPath, 'utf8')
 
     expect(sql).toContain("else\n            e.start_at - (er.remind_minutes_before * interval '1 minute')")
-    expect(sql).toContain("between now() - interval '65 seconds' and now() + interval '5 seconds'")
+    expect(sql).toContain(
+      `between now() - interval '${REMINDER_CRON_LOOKBACK_MINUTES} minutes' and now() + interval '${REMINDER_CRON_FORWARD_BUFFER_SECONDS} seconds'`
+    )
+  })
+
+  it('기존 reminder cron job을 5분 주기로 낮춘다', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8')
+
+    expect(sql).toContain("where jobname = 'send-push-reminders'")
+    expect(sql).toContain("cron.alter_job(reminder_job_id, schedule := '*/5 * * * *')")
   })
 })

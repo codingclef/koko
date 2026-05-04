@@ -1,6 +1,9 @@
 export const REMINDER_TIME_ZONE = 'Asia/Tokyo'
 export const FIXED_ALL_DAY_ADVANCE_REMINDER_HOUR = 8
 export const FIXED_ALL_DAY_ADVANCE_REMINDER_MINIMUM_MINUTES = 1440
+export const REMINDER_CRON_PERIOD_MINUTES = 5
+export const REMINDER_CRON_LOOKBACK_MINUTES = 6
+export const REMINDER_CRON_FORWARD_BUFFER_SECONDS = 5
 
 export function usesFixedMorningAllDayReminder(isAllDay: boolean, remindMinutesBefore: number): boolean {
   return (
@@ -49,4 +52,23 @@ export function getReminderTriggerAt(
     daysBefore * 24 * 60 * 60 * 1000 +
     FIXED_ALL_DAY_ADVANCE_REMINDER_HOUR * 60 * 60 * 1000
   ).toISOString()
+}
+
+export function getReminderSelectionWindow(runAt: string | Date): {
+  start: Date
+  end: Date
+} {
+  const runTime = new Date(runAt)
+
+  return {
+    start: new Date(runTime.getTime() - REMINDER_CRON_LOOKBACK_MINUTES * 60 * 1000),
+    end: new Date(runTime.getTime() + REMINDER_CRON_FORWARD_BUFFER_SECONDS * 1000),
+  }
+}
+
+export function isReminderDueForRun(reminderTriggerAt: string | Date, runAt: string | Date): boolean {
+  const triggerTime = new Date(reminderTriggerAt).getTime()
+  const { start, end } = getReminderSelectionWindow(runAt)
+
+  return triggerTime >= start.getTime() && triggerTime <= end.getTime()
 }

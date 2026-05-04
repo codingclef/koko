@@ -66,7 +66,7 @@ $$;
 --
 -- select cron.schedule(
 --   'send-push-reminders',
---   '* * * * *',
+--   '*/5 * * * *',
 --   $$
 --   select net.http_post(
 --     url     := 'https://<VERCEL_URL>/api/cron/send-reminders',
