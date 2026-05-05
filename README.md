@@ -3,14 +3,14 @@
 [한국어](README.ko.md) | [日本語](README.ja.md) | **[English]**
 
 Koko is a family collaboration PWA built around one shared app shell.
-The current product surface is calendar, shopping lists, family invite/join, user preferences, and web-push reminders.
+The current product surface is calendar, recurring events, shopping lists, family invite/join, user preferences, and Web Push notifications.
 
 ## Current Scope
 
 - Google OAuth login gated by an email allowlist
-- Automatic family bootstrap and invite-code based family join
-- Calendar with family-wide events and calendar-specific visibility
-- Event reminders delivered through Web Push
+- Explicit family creation and invite-code based family join
+- Calendar with family-wide events, calendar-specific visibility, recurring events, and event label colors
+- Event reminders and daily digests delivered through Web Push
 - Shopping lists with realtime sync and drag-and-drop ordering
 - User preferences for theme, holiday countries, and lunar date display
 - Installable PWA experience on mobile and desktop
@@ -29,7 +29,7 @@ The app uses a single mounted family shell:
 - `/calendar` is the only live tab entry route
 - `/shopping` and `/settings` redirect back to `/calendar`
 - `TabsShell` keeps calendar, shopping, and settings mounted, then toggles visibility with a keep-alive pattern
-- `src/app/shopping/[id]/page.tsx` is the main exception and remains a standalone detail route
+- `src/app/shopping/[id]/page.tsx` is a legacy-link bridge into `/calendar?tab=shopping&list=...`
 
 This structure avoids tab reload spinners and preserves state while switching between tabs.
 
@@ -47,7 +47,7 @@ This is used for:
 
 - Family-scoped shopping list refresh
 - Shopping-item refresh inside a specific list
-- Month-scoped calendar event refresh
+- Family-scoped calendar event refresh with month-window refetching
 
 ## Auth And Family Model
 
@@ -55,7 +55,8 @@ This is used for:
 - Supabase performs the OAuth code exchange automatically.
 - The callback page validates the signed-in email against `allowed_emails`.
 - A valid invite code can auto-allow a first-time email during callback validation.
-- `/api/family` calls a DB RPC to atomically get or create the user family.
+- `/api/family/me` calls a DB RPC to read the current family and app role.
+- `/api/family/create` calls a DB RPC to explicitly create a family during onboarding.
 - `/api/family/join` calls a DB RPC to move the user into another family by invite code.
 
 The active family is the tenant boundary for calendars, shopping lists, and family membership data.
@@ -97,14 +98,17 @@ Start with these repo docs when changing the project:
 
 ## Key Directories
 
-- [`src/components/TabsShell.tsx`](/Users/codingclef/workspace/koko/src/components/TabsShell.tsx): keep-alive app shell
-- [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/CalendarTab.tsx): calendar runtime container
-- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/ShoppingTab.tsx): shopping overview container
-- [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/SettingsTab.tsx): settings and family actions
-- [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace/koko/src/hooks/useRealtimeSync.ts): shared broadcast subscription pattern
-- [`src/app/api/family/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/route.ts): atomic family bootstrap
-- [`src/app/api/family/join/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/join/route.ts): invite-based family join
-- [`src/app/api/cron/send-reminders/route.ts`](/Users/codingclef/workspace/koko/src/app/api/cron/send-reminders/route.ts): scheduled reminder delivery
+- [`src/components/TabsShell.tsx`](/Users/codingclef/workspace_codex/koko/src/components/TabsShell.tsx): keep-alive app shell
+- [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/CalendarTab.tsx): calendar runtime container
+- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/ShoppingTab.tsx): shopping overview container
+- [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/SettingsTab.tsx): settings and family actions
+- [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace_codex/koko/src/hooks/useRealtimeSync.ts): shared broadcast subscription pattern
+- [`src/app/api/family/me/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/me/route.ts): current family and app role lookup
+- [`src/app/api/family/create/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/create/route.ts): explicit family creation
+- [`src/app/api/family/join/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/join/route.ts): invite-based family join
+- [`src/app/api/cron/send-reminders/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/send-reminders/route.ts): scheduled reminder delivery
+- [`src/app/api/cron/daily-digest/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/daily-digest/route.ts): daily schedule digest delivery
+- [`src/app/api/cron/cleanup-reminders/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/cleanup-reminders/route.ts): sent reminder cleanup
 
 ## Environment Variables
 
@@ -117,6 +121,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 CRON_SECRET=
+KASI_HOLIDAY_API_KEY=
+KASI_HOLIDAY_API_KEY_EXPIRES_AT=
 ```
 
 What they are used for:
@@ -126,7 +132,9 @@ What they are used for:
 - `SUPABASE_SERVICE_ROLE_KEY`: server-side admin client for RPCs and protected tables
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: browser push subscription registration
 - `VAPID_PRIVATE_KEY`: server-side push sending
-- `CRON_SECRET`: protects the reminder cron endpoint
+- `CRON_SECRET`: protects cron endpoints
+- `KASI_HOLIDAY_API_KEY`: Korean public holiday API key for holiday overlays
+- `KASI_HOLIDAY_API_KEY_EXPIRES_AT`: optional `YYYY-MM-DD` expiry date used to warn before the KASI key expires
 
 ## Local Development
 
@@ -165,20 +173,26 @@ Important current tables:
 - `families`
 - `family_members`
 - `allowed_emails`
+- `app_invites`
 - `user_preferences`
 - `calendars`
 - `calendar_members`
 - `events`
 - `event_reminders`
+- `recurrence_rules`
+- `recurrence_series`
 - `shopping_lists`
 - `shopping_items`
 - `push_subscriptions`
+- `daily_digest_log`
 
 Important current RPC and migration-driven behavior:
 
-- Atomic family creation
+- Explicit family creation and legacy atomic family bootstrap
 - Atomic family join by invite code
 - Reminder selection and sent-at marking
+- Sent reminder cleanup
+- Recurring event series creation, update, and deletion
 - RLS fixes for family, shopping, and calendar membership flows
 
 ## Documentation Notes

@@ -3,14 +3,14 @@
 [한국어](README.ko.md) | **[日本語]** | [English](README.md)
 
 Kokoは、1つの共有アプリシェルを中心に動く家族向けコラボレーションPWAです。
-現在のプロダクト範囲は、カレンダー、買い物リスト、家族の招待/参加、ユーザー設定、Web Pushリマインダーです。
+現在のプロダクト範囲は、カレンダー、繰り返し予定、買い物リスト、家族の招待/参加、ユーザー設定、Web Push通知です。
 
 ## 現在の実装範囲
 
 - メール許可リストで制限されたGoogle OAuthログイン
-- 自動の家族作成と招待コードによる家族参加
-- 家族全体イベントとカレンダー単位の表示制御を持つカレンダー
-- Web Pushによるイベントリマインダー
+- 明示的な家族作成と招待コードによる家族参加
+- 家族全体イベント、カレンダー単位の表示制御、繰り返し予定、予定ラベル色を持つカレンダー
+- Web Pushによるイベントリマインダーと日次予定ダイジェスト
 - リアルタイム同期とドラッグ並び替えに対応した買い物リスト
 - テーマ、祝日対象国、旧暦表示のユーザー設定
 - モバイルとデスクトップでインストール可能なPWA体験
@@ -29,7 +29,7 @@ Kokoは、1つの共有アプリシェルを中心に動く家族向けコラボ
 - `/calendar` が実際のタブアプリの単一エントリールートです
 - `/shopping` と `/settings` は `/calendar` へリダイレクトされます
 - `TabsShell` が calendar、shopping、settings の各タブを常時マウントし、表示だけを切り替えます
-- `src/app/shopping/[id]/page.tsx` だけは例外で独立した詳細ルートとして残っています
+- `src/app/shopping/[id]/page.tsx` は古いリンクを `/calendar?tab=shopping&list=...` へつなぐbridge routeです
 
 この構成により、タブ切り替え時の再読み込みスピナーを減らし、状態も維持できます。
 
@@ -47,7 +47,7 @@ Kokoは `postgres_changes` ではなく Supabase Realtime Broadcast を使いま
 
 - 家族単位の買い物リスト更新
 - 特定の買い物リスト内アイテム更新
-- 月単位のカレンダーイベント更新
+- 家族単位のカレンダーイベント更新と月範囲の再取得
 
 ## 認証と家族モデル
 
@@ -55,7 +55,8 @@ Kokoは `postgres_changes` ではなく Supabase Realtime Broadcast を使いま
 - OAuthコード交換はSupabaseが自動で処理します。
 - コールバックページで、サインイン済みメールを `allowed_emails` に対して検証します。
 - 有効な招待コードから来た初回ログインメールは、コールバック検証時に自動許可される場合があります。
-- `/api/family` はDB RPCを呼び出して、ユーザーの家族を原子的に取得または作成します。
+- `/api/family/me` はDB RPCを呼び出して、現在の家族とアプリロールを取得します。
+- `/api/family/create` はオンボーディング中にDB RPCを呼び出して、家族を明示的に作成します。
 - `/api/family/join` はDB RPCを呼び出して、招待コードで別の家族に参加させます。
 
 アクティブな家族は、カレンダー、買い物リスト、家族メンバーデータのテナント境界です。
@@ -97,14 +98,17 @@ supabase/
 
 ## 主要ファイル
 
-- [`src/components/TabsShell.tsx`](/Users/codingclef/workspace/koko/src/components/TabsShell.tsx): keep-alive アプリシェル
-- [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/CalendarTab.tsx): カレンダー実行コンテナ
-- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/ShoppingTab.tsx): 買い物一覧コンテナ
-- [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace/koko/src/components/tabs/SettingsTab.tsx): 設定と家族アクション
-- [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace/koko/src/hooks/useRealtimeSync.ts): 共通broadcast購読パターン
-- [`src/app/api/family/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/route.ts): 原子的な家族取得/作成
-- [`src/app/api/family/join/route.ts`](/Users/codingclef/workspace/koko/src/app/api/family/join/route.ts): 招待コードによる家族参加
-- [`src/app/api/cron/send-reminders/route.ts`](/Users/codingclef/workspace/koko/src/app/api/cron/send-reminders/route.ts): 定期リマインダー送信
+- [`src/components/TabsShell.tsx`](/Users/codingclef/workspace_codex/koko/src/components/TabsShell.tsx): keep-alive アプリシェル
+- [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/CalendarTab.tsx): カレンダー実行コンテナ
+- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/ShoppingTab.tsx): 買い物一覧コンテナ
+- [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/SettingsTab.tsx): 設定と家族アクション
+- [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace_codex/koko/src/hooks/useRealtimeSync.ts): 共通broadcast購読パターン
+- [`src/app/api/family/me/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/me/route.ts): 現在の家族とアプリロール取得
+- [`src/app/api/family/create/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/create/route.ts): 明示的な家族作成
+- [`src/app/api/family/join/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/join/route.ts): 招待コードによる家族参加
+- [`src/app/api/cron/send-reminders/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/send-reminders/route.ts): 定期リマインダー送信
+- [`src/app/api/cron/daily-digest/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/daily-digest/route.ts): 日次予定ダイジェスト送信
+- [`src/app/api/cron/cleanup-reminders/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/cron/cleanup-reminders/route.ts): 送信済みリマインダー削除
 
 ## 環境変数
 
@@ -117,6 +121,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 CRON_SECRET=
+KASI_HOLIDAY_API_KEY=
+KASI_HOLIDAY_API_KEY_EXPIRES_AT=
 ```
 
 各変数の用途:
@@ -126,7 +132,9 @@ CRON_SECRET=
 - `SUPABASE_SERVICE_ROLE_KEY`: RPCと保護テーブルアクセス用のサーバーadmin client
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: ブラウザのプッシュ購読登録
 - `VAPID_PRIVATE_KEY`: サーバー側プッシュ送信
-- `CRON_SECRET`: リマインダーcron endpointの保護
+- `CRON_SECRET`: cron endpointの保護
+- `KASI_HOLIDAY_API_KEY`: 祝日オーバーレイで使う韓国公共データ祝日APIキー
+- `KASI_HOLIDAY_API_KEY_EXPIRES_AT`: KASIキーの期限警告に使う任意の `YYYY-MM-DD` 有効期限
 
 ## ローカル開発
 
@@ -165,20 +173,26 @@ npx tsc --noEmit
 - `families`
 - `family_members`
 - `allowed_emails`
+- `app_invites`
 - `user_preferences`
 - `calendars`
 - `calendar_members`
 - `events`
 - `event_reminders`
+- `recurrence_rules`
+- `recurrence_series`
 - `shopping_lists`
 - `shopping_items`
 - `push_subscriptions`
+- `daily_digest_log`
 
 現在重要なRPCおよびmigrationベースの挙動:
 
-- 原子的な家族作成
+- 明示的な家族作成とlegacyの原子的な家族bootstrap
 - 招待コードによる原子的な家族参加
 - リマインダー取得と sent-at マーキング
+- 送信済みリマインダー削除
+- 繰り返し予定seriesの作成、更新、削除
 - 家族、買い物、カレンダーメンバーシップのRLS修正
 
 ## ドキュメントメモ
