@@ -103,6 +103,12 @@ describe('PATCH /api/events/[id]', () => {
     expect(mockSendEventNotification).not.toHaveBeenCalled()
   })
 
+  it('labelColor만 변경하면 RPC 결과에 따라 알림을 보내지 않는다', async () => {
+    const res = await PATCH(makeRequest({ labelColor: '#10b981' }), makeParams())
+    expect(res.status).toBe(204)
+    expect(mockSendEventNotification).not.toHaveBeenCalled()
+  })
+
   it('변경사항 있으면 204를 반환하고 알림을 보낸다', async () => {
     mockRpc.mockResolvedValue({ data: { ...baseResult, is_changed: true, new_title: '새 제목' }, error: null })
     mockSendEventNotification.mockResolvedValue(undefined)
