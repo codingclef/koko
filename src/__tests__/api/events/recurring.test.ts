@@ -317,10 +317,72 @@ describe('PATCH /api/events/[id] (series scope)', () => {
     )
   })
 
-  it('following scope에서 날짜 이동을 요청하면 400을 반환한다', async () => {
+  it('following scope에서 날짜 이동을 요청하면 split_recurring_series_following_authorized를 호출한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        is_changed: true,
+        family_id: FAMILY_ID,
+        new_calendar_id: null,
+        new_title: '회의',
+        new_start_at: '2026-04-18T09:00:00.000Z',
+        series_id: 'series-2',
+        old_series_id: SERIES_ID,
+      },
+      error: null,
+    })
     const body = {
       title: '회의',
       scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-18',
+      startAt: '2026-04-18T09:00:00.000Z',
+      endAt: '2026-04-18T10:00:00.000Z',
+      recurrence: { freq: 'weekly', interval: 1, daysOfWeek: [6] },
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'split_recurring_series_following_authorized',
+      expect.objectContaining({
+        p_anchor_occurrence_date: '2026-04-17',
+        p_local_start_date: '2026-04-18',
+        p_start_at: '2026-04-18T09:00:00.000Z',
+        p_end_at: '2026-04-18T10:00:00.000Z',
+        p_freq: 'weekly',
+        p_interval: 1,
+        p_days_of_week: [6],
+      })
+    )
+    expect(mockSendEventNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'updated', eventStartAt: '2026-04-18T09:00:00.000Z' })
+    )
+  })
+
+  it('following 날짜 이동 split이 생성할 occurrence가 없으면 400을 반환한다', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'no_future_occurrences' } })
+    const body = {
+      title: '회의',
+      scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-18',
+      startAt: '2026-04-18T09:00:00.000Z',
+      recurrence: { freq: 'weekly', interval: 1, daysOfWeek: [6], endDate: '2026-04-17' },
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(400)
+    expect(mockSendEventNotification).not.toHaveBeenCalled()
+  })
+
+  it('all scope에서 날짜 이동을 요청하면 400을 반환한다', async () => {
+    const body = {
+      title: '회의',
+      scope: 'all',
       anchorOccurrenceDate: '2026-04-17',
       localStartDate: '2026-04-18',
       startAt: '2026-04-18T09:00:00.000Z',

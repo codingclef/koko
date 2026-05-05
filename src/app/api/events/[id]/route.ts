@@ -6,6 +6,14 @@ import type { RecurrenceScope } from '@/types/recurrence'
 import { VALID_SCOPES } from '@/types/recurrence'
 import { ALLOWED_LABEL_COLORS } from '@/lib/label-colors'
 
+interface RecurrenceInput {
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  interval: number
+  daysOfWeek?: number[]
+  dayOfMonth?: number | null
+  endDate?: string | null
+}
+
 interface UpdateEventRequest {
   calendarId?: string | null
   title?: string
@@ -19,6 +27,7 @@ interface UpdateEventRequest {
   isAllDay?: boolean
   reminderMinutes?: number[]
   labelColor?: string | null
+  recurrence?: RecurrenceInput | null
   // series-only
   scope?: RecurrenceScope
   anchorOccurrenceDate?: string | null
@@ -70,15 +79,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const requestedOccurrenceDate = body.localStartDate ?? (body.startAt ? getIsoDatePart(body.startAt) : null)
-  if (
+  const isScopedDateChange = Boolean(
     scope &&
     scope !== 'single' &&
     requestedOccurrenceDate &&
     body.anchorOccurrenceDate &&
     requestedOccurrenceDate !== body.anchorOccurrenceDate
-  ) {
+  )
+
+  if (isScopedDateChange && scope !== 'following') {
     return NextResponse.json(
-      { error: 'Changing occurrence date requires single scope' },
+      { error: 'Changing occurrence date is only supported for following scope' },
       { status: 400 }
     )
   }
@@ -87,6 +98,72 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (scope) {
     const startTime = body.startTime ?? (body.startAt ? new Date(body.startAt).toISOString().slice(11, 19) : null)
     const endTime = body.endTime ?? (body.endAt ? new Date(body.endAt).toISOString().slice(11, 19) : null)
+
+    if (isScopedDateChange) {
+      const anchorOccurrenceDate = body.anchorOccurrenceDate
+      if (!body.startAt) {
+        return NextResponse.json({ error: 'startAt required for following date change' }, { status: 400 })
+      }
+      if (!anchorOccurrenceDate) {
+        return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
+      }
+      if (!body.localStartDate) {
+        return NextResponse.json({ error: 'localStartDate required for following date change' }, { status: 400 })
+      }
+
+      const { data: result, error } = await supabaseAdmin.rpc('split_recurring_series_following_authorized', {
+        p_actor_user_id:          actorUserId,
+        p_event_id:               eventId,
+        p_anchor_occurrence_date: anchorOccurrenceDate,
+        p_local_start_date:       body.localStartDate,
+        p_title:                  body.title ?? null,
+        p_description:            body.description ?? null,
+        p_has_description:        'description' in body,
+        p_start_at:               body.startAt,
+        p_end_at:                 body.endAt ?? null,
+        p_has_end_at:             'endAt' in body,
+        p_is_all_day:             body.isAllDay ?? null,
+        p_calendar_id:            body.calendarId ?? null,
+        p_has_calendar_id:        'calendarId' in body,
+        p_reminder_minutes:       body.reminderMinutes ?? null,
+        p_label_color:            body.labelColor ?? null,
+        p_has_label_color:        'labelColor' in body,
+        p_freq:                   body.recurrence?.freq ?? null,
+        p_interval:               body.recurrence?.interval ?? null,
+        p_days_of_week:           body.recurrence?.daysOfWeek ?? null,
+        p_day_of_month:           body.recurrence?.dayOfMonth ?? null,
+        p_end_date:               body.recurrence?.endDate ?? null,
+      })
+
+      if (error) {
+        if (error.message === 'not_found')        return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+        if (error.message === 'not_series_event') return NextResponse.json({ error: 'Not a series event' }, { status: 400 })
+        if (error.message === 'anchor_required')  return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
+        if (error.message === 'local_start_date_required') return NextResponse.json({ error: 'localStartDate required for following date change' }, { status: 400 })
+        if (error.message === 'start_at_required') return NextResponse.json({ error: 'startAt required for following date change' }, { status: 400 })
+        if (error.message === 'invalid_start_date') return NextResponse.json({ error: 'startAt must be on or after anchorOccurrenceDate' }, { status: 400 })
+        if (error.message === 'invalid_interval') return NextResponse.json({ error: 'Invalid recurrence interval' }, { status: 400 })
+        if (error.message === 'invalid_frequency') return NextResponse.json({ error: 'Invalid recurrence frequency' }, { status: 400 })
+        if (error.message === 'no_future_occurrences') return NextResponse.json({ error: 'No future occurrences would be created' }, { status: 400 })
+        if (error.message === 'forbidden')        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        return NextResponse.json({ error: 'Failed to split recurring event' }, { status: 500 })
+      }
+
+      const { is_changed, family_id, new_calendar_id, new_title, new_start_at } = result as UpdateResult
+      if (is_changed) {
+        after(async () => {
+          await sendEventNotification({
+            familyId: family_id,
+            calendarId: new_calendar_id,
+            actorUserId,
+            action: 'updated',
+            eventTitle: new_title,
+            eventStartAt: new_start_at,
+          })
+        })
+      }
+      return new NextResponse(null, { status: 204 })
+    }
 
     const { data: result, error } = await supabaseAdmin.rpc('update_series_authorized', {
       p_actor_user_id:          actorUserId,
