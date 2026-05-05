@@ -225,6 +225,68 @@ describe('PATCH /api/events/[id] (series scope)', () => {
     )
   })
 
+  it('반복 일정의 reminderMinutes만 변경하면 알림을 보내지 않는다', async () => {
+    mockRpc.mockResolvedValue({
+      data: { is_changed: false, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-17T09:00:00Z', series_id: SERIES_ID },
+      error: null,
+    })
+    const body = {
+      reminderMinutes: [30],
+      scope: 'all',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      localEndDate: '2026-04-17',
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockSendEventNotification).not.toHaveBeenCalled()
+  })
+
+  it('반복 일정의 labelColor만 변경하면 알림을 보내지 않는다', async () => {
+    mockRpc.mockResolvedValue({
+      data: { is_changed: false, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-17T09:00:00Z', series_id: SERIES_ID },
+      error: null,
+    })
+    const body = {
+      labelColor: '#10b981',
+      scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      localEndDate: '2026-04-17',
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockSendEventNotification).not.toHaveBeenCalled()
+  })
+
+  it('반복 일정의 제목 변경은 알림을 보낸다', async () => {
+    mockRpc.mockResolvedValue({
+      data: { is_changed: true, family_id: FAMILY_ID, new_calendar_id: null, new_title: '새 회의', new_start_at: '2026-04-17T09:00:00Z', series_id: SERIES_ID },
+      error: null,
+    })
+    const body = {
+      title: '새 회의',
+      scope: 'all',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      localEndDate: '2026-04-17',
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockSendEventNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'updated', eventTitle: '새 회의' })
+    )
+  })
+
   it('scope=following인 종일 일정은 localStartDate 기준으로 날짜 유지 여부를 판단한다', async () => {
     mockRpc.mockResolvedValue({
       data: { is_changed: true, family_id: FAMILY_ID, new_calendar_id: null, new_title: '회의', new_start_at: '2026-04-17T00:00:00Z', series_id: SERIES_ID },

@@ -758,6 +758,8 @@ export type Database = {
           p_calendar_id: string | null
           p_has_calendar_id: boolean
           p_reminder_minutes: number[] | null
+          p_label_color?: string | null
+          p_has_label_color?: boolean
         }
         Returns: Json
       }
@@ -813,6 +815,8 @@ export type Database = {
           p_calendar_id: string | null
           p_has_calendar_id: boolean
           p_reminder_minutes: number[] | null
+          p_label_color?: string | null
+          p_has_label_color?: boolean
         }
         Returns: Json
       }
