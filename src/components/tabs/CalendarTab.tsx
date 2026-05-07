@@ -82,6 +82,12 @@ function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
     : { year, month: month + 1 }
 }
 
+function getLocalTimePart(isoString: string): string {
+  const date = new Date(isoString)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 export function CalendarTab({
   preferences,
   updatePreferences,
@@ -582,21 +588,27 @@ export function CalendarTab({
         const prevLabelColor = editingEvent.event.label_color ?? null
         const scope = (editingEvent.event as CalendarEvent & { _seriesScope?: RecurrenceScope })._seriesScope ?? params.scope ?? 'single'
         const isScopedSeriesEdit = Boolean(editingEvent.event.series_id && scope !== 'single')
+        const isFollowingDateChange = Boolean(
+          isScopedSeriesEdit &&
+          scope === 'following' &&
+          editingEvent.event.series_occurrence_date &&
+          params.localStartDate !== editingEvent.event.series_occurrence_date
+        )
         await Promise.all([
           patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
             calendarId: params.calendarId,
             title: params.title,
             description: params.description,
-            startAt: isScopedSeriesEdit ? undefined : params.startAt,
-            endAt: isScopedSeriesEdit ? undefined : params.endAt,
+            startAt: isScopedSeriesEdit && !isFollowingDateChange ? undefined : params.startAt,
+            endAt: isScopedSeriesEdit && !isFollowingDateChange ? undefined : params.endAt,
             localStartDate: params.localStartDate,
             localEndDate: params.localEndDate,
             isAllDay: params.isAllDay,
             reminderMinutes: params.reminderMinutes,
             labelColor: params.labelColor,
             ...(isScopedSeriesEdit && !params.isAllDay ? {
-              startTime: new Date(params.startAt).toISOString().slice(11, 19),
-              endTime: params.endAt ? new Date(params.endAt).toISOString().slice(11, 19) : null,
+              startTime: getLocalTimePart(params.startAt),
+              endTime: params.endAt ? getLocalTimePart(params.endAt) : null,
             } : {}),
             ...(editingEvent.event.series_id ? {
               scope,

@@ -373,7 +373,7 @@ describe('EventFormModal', () => {
     expect(screen.queryByTestId('time-wheel-picker')).not.toBeInTheDocument()
   })
 
-  it('반복 일정 이후/전체 편집에서는 날짜 input이 비활성화된다', () => {
+  it('반복 일정 following 편집에서는 시작 날짜만 anchor 이후로 수정할 수 있다', async () => {
     const initial = {
       id: 'evt-1',
       family_id: 'fam-1',
@@ -395,9 +395,84 @@ describe('EventFormModal', () => {
     render(<EventFormModal {...defaultProps} initial={initial} recurrenceScope="following" />)
 
     const dateInputs = document.querySelectorAll('input[type="date"]')
+    expect((dateInputs[0] as HTMLInputElement).disabled).toBe(false)
+    expect((dateInputs[0] as HTMLInputElement).min).toBe('2026-03-31')
+    expect((dateInputs[1] as HTMLInputElement).disabled).toBe(true)
+
+    fireEvent.change(dateInputs[0] as HTMLInputElement, { target: { value: '2026-04-01' } })
+    expect((dateInputs[1] as HTMLInputElement).value).toBe('2026-04-01')
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '반복 일정 수정' } })
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localStartDate: '2026-04-01',
+        localEndDate: '2026-04-01',
+      })
+    )
+  })
+
+  it('반복 일정 following 편집에서 anchor 이전 시작 날짜 저장을 막는다', async () => {
+    const initial = {
+      id: 'evt-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '반복 일정',
+      description: null,
+      start_at: '2026-03-31T09:00:00.000Z',
+      end_at: '2026-03-31T10:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: 'series-1',
+      series_occurrence_date: '2026-03-31',
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} recurrenceScope="following" />)
+
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    fireEvent.change(dateInputs[0] as HTMLInputElement, { target: { value: '2026-03-30' } })
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '반복 일정 수정' } })
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(defaultProps.onSave).not.toHaveBeenCalled()
+    expect(screen.getByText('이후 일정은 선택한 일정 날짜 이후로만 이동할 수 있어요.')).toBeInTheDocument()
+  })
+
+  it('반복 일정 전체 편집에서는 날짜 input이 비활성화된다', () => {
+    const initial = {
+      id: 'evt-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '반복 일정',
+      description: null,
+      start_at: '2026-03-31T09:00:00.000Z',
+      end_at: '2026-03-31T10:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: 'series-1',
+      series_occurrence_date: '2026-03-31',
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} recurrenceScope="all" />)
+
+    const dateInputs = document.querySelectorAll('input[type="date"]')
     expect((dateInputs[0] as HTMLInputElement).disabled).toBe(true)
     expect((dateInputs[1] as HTMLInputElement).disabled).toBe(true)
-    expect(screen.getByText('이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.')).toBeInTheDocument()
+    expect(screen.getByText('전체 반복 일정은 날짜 이동 없이 시간과 내용만 변경할 수 있어요.')).toBeInTheDocument()
   })
 
   it('사용자화 반복 간격을 수정해 저장할 수 있다', async () => {

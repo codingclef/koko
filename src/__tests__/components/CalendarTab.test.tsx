@@ -2,7 +2,7 @@ import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 import { getCalendarMembers, getEventsByMonth, getFamilyMembers, setCalendarMembers, updateCalendar } from '@/lib/calendar'
-import { deleteWithAuth } from '@/lib/api-client'
+import { deleteWithAuth, patchJsonWithAuth } from '@/lib/api-client'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
 const mockReloadCalendars = jest.fn()
@@ -105,8 +105,11 @@ jest.mock('@/components/calendar/DayEventsSheet', () => ({
   ),
 }))
 jest.mock('@/components/calendar/EventDetailSheet', () => ({
-  EventDetailSheet: ({ onDelete, onClose }: { onDelete: () => Promise<void>; onClose: () => void }) => (
+  EventDetailSheet: ({ onEdit, onDelete, onClose }: { onEdit: () => void; onDelete: () => Promise<void>; onClose: () => void }) => (
     <div data-testid="event-detail-sheet">
+      <button data-testid="detail-edit" onClick={onEdit}>
+        edit
+      </button>
       <button
         data-testid="detail-delete"
         onClick={async () => {
@@ -120,7 +123,40 @@ jest.mock('@/components/calendar/EventDetailSheet', () => ({
   ),
 }))
 jest.mock('@/components/calendar/EventFormModal', () => ({
-  EventFormModal: () => <div />,
+  EventFormModal: ({ onSave }: {
+    onSave: (params: {
+      calendarId: string | null
+      title: string
+      description: string | null
+      startAt: string
+      endAt: string | null
+      localStartDate: string
+      localEndDate: string
+      isAllDay: boolean
+      reminderMinutes: number[]
+      recurrence: null
+      labelColor: string | null
+    }) => Promise<void>
+  }) => (
+    <button
+      data-testid="event-form-save-following-date"
+      onClick={() => onSave({
+        calendarId: 'cal-1',
+        title: '반복 일정 수정',
+        description: null,
+        startAt: '2026-04-18T09:00:00.000Z',
+        endAt: '2026-04-18T10:00:00.000Z',
+        localStartDate: '2026-04-18',
+        localEndDate: '2026-04-18',
+        isAllDay: false,
+        reminderMinutes: [],
+        recurrence: null,
+        labelColor: null,
+      })}
+    >
+      save following date
+    </button>
+  ),
 }))
 jest.mock('@/components/calendar/CalendarFormModal', () => ({
   CalendarFormModal: () => <div />,
@@ -143,6 +179,7 @@ jest.mock('@/components/calendar/CalendarListSheet', () => ({
 jest.mock('@/components/calendar/RecurrenceScopeSheet', () => ({
   RecurrenceScopeSheet: ({ onSelect }: { onSelect: (scope: 'single' | 'following' | 'all') => void }) => (
     <div data-testid="recurrence-scope-sheet">
+      <button data-testid="scope-following" onClick={() => onSelect('following')}>following</button>
       <button data-testid="scope-all" onClick={() => onSelect('all')}>all</button>
     </div>
   ),
@@ -177,6 +214,7 @@ const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof 
 const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof setCalendarMembers>
 const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
 const mockDeleteWithAuth = deleteWithAuth as jest.MockedFunction<typeof deleteWithAuth>
+const mockPatchJsonWithAuth = patchJsonWithAuth as jest.MockedFunction<typeof patchJsonWithAuth>
 let consoleErrorSpy: jest.SpyInstance
 const mockCalendars = [{
   id: 'cal-1',
@@ -214,6 +252,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
     mockDeleteWithAuth.mockResolvedValue(undefined)
+    mockPatchJsonWithAuth.mockResolvedValue(undefined)
   })
 
   it('가족 단위 채널명을 사용하고 연/월을 포함하지 않는다', async () => {
@@ -451,6 +490,31 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await waitFor(() => {
       expect(mockDeleteWithAuth).toHaveBeenCalledWith(
         '/api/events/evt-series-1?scope=all&anchorOccurrenceDate=2026-04-17'
+      )
+    })
+  })
+
+  it('반복 일정 following 날짜 변경은 startAt과 localStartDate를 함께 PATCH한다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByTestId('select-date'))
+    fireEvent.click(screen.getByTestId('select-recurring-event'))
+    fireEvent.click(screen.getByTestId('detail-edit'))
+    fireEvent.click(await screen.findByTestId('scope-following'))
+    fireEvent.click(await screen.findByTestId('event-form-save-following-date'))
+
+    await waitFor(() => {
+      expect(mockPatchJsonWithAuth).toHaveBeenCalledWith(
+        '/api/events/evt-series-1',
+        expect.objectContaining({
+          scope: 'following',
+          anchorOccurrenceDate: '2026-04-17',
+          startAt: '2026-04-18T09:00:00.000Z',
+          endAt: '2026-04-18T10:00:00.000Z',
+          localStartDate: '2026-04-18',
+          localEndDate: '2026-04-18',
+        })
       )
     })
   })
