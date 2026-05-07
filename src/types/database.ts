@@ -820,6 +820,7 @@ export type Database = {
           p_days_of_week?: number[] | null
           p_day_of_month?: number | null
           p_end_date?: string | null
+          p_should_update_end_date?: boolean
         }
         Returns: Json
       }

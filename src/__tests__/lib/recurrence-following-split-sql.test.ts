@@ -3,7 +3,7 @@ import path from 'path'
 
 const migrationPath = path.join(
   process.cwd(),
-  'supabase/migrations/20260505001000_split_recurring_series_following.sql'
+  'supabase/migrations/20260507001000_update_following_split_end_date_override.sql'
 )
 
 describe('split_recurring_series_following_authorized migration', () => {
@@ -46,5 +46,13 @@ describe('split_recurring_series_following_authorized migration', () => {
 
     expect(migration).toContain('IF v_end_date IS NOT NULL AND v_end_date < v_start_date THEN')
     expect(migration).toContain("RAISE EXCEPTION 'no_future_occurrences'")
+  })
+
+  it('반복 종료일 제거와 기존 종료일 유지를 명시 플래그로 구분한다', () => {
+    const migration = sql()
+
+    expect(migration).toContain('p_should_update_end_date boolean DEFAULT false')
+    expect(migration).toContain('WHEN p_should_update_end_date THEN p_end_date')
+    expect(migration).toContain('ELSE v_rule.end_date')
   })
 })

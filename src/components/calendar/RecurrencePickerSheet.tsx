@@ -1,7 +1,7 @@
 'use client'
 
 import { ChevronRight } from 'lucide-react'
-import type { RecurrenceFreq, RecurrenceRule } from '@/types/recurrence'
+import type { RecurrenceRule } from '@/types/recurrence'
 import { buildRecurrenceLabel } from '@/types/recurrence'
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   onCustomize: () => void
   customRule: RecurrenceRule | null
   onClose: () => void
+  allowNone?: boolean
 }
 
 const PRESETS: Array<{ label: string; rule: RecurrenceRule | null }> = [
@@ -37,8 +38,9 @@ function isCustom(rule: RecurrenceRule | null): boolean {
   return !PRESETS.some((p) => isSameRule(p.rule, rule))
 }
 
-export function RecurrencePickerSheet({ value, onSelect, onCustomize, customRule, onClose }: Props) {
+export function RecurrencePickerSheet({ value, onSelect, onCustomize, customRule, onClose, allowNone = true }: Props) {
   const showCustomCheck = isCustom(value)
+  const presets = allowNone ? PRESETS : PRESETS.filter((preset) => preset.rule !== null)
 
   return (
     <div className="fixed inset-0 z-[80] flex flex-col" onClick={onClose}>
@@ -58,7 +60,7 @@ export function RecurrencePickerSheet({ value, onSelect, onCustomize, customRule
         </div>
 
         <div className="divide-y divide-stone-100 dark:divide-stone-800 mx-4 mt-3 mb-3 rounded-xl overflow-hidden bg-stone-50 dark:bg-stone-800">
-          {PRESETS.map(({ label, rule }) => {
+          {presets.map(({ label, rule }) => {
             const checked = !isCustom(value) && isSameRule(value, rule)
             return (
               <button

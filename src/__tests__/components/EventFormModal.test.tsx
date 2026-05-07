@@ -508,6 +508,60 @@ describe('EventFormModal', () => {
       })
     )
   })
+
+  it('following 반복 일정은 기존 반복 규칙을 표시하고 변경된 규칙을 저장한다', async () => {
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '반복 일정',
+      description: null,
+      start_at: '2026-03-31T09:00:00.000Z',
+      end_at: '2026-03-31T10:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: 'series-1',
+      series_occurrence_date: '2026-03-31',
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(
+      <EventFormModal
+        {...defaultProps}
+        initial={initial}
+        recurrenceScope="following"
+        initialRecurrence={{ freq: 'weekly', interval: 1, daysOfWeek: [2] }}
+      />
+    )
+
+    expect(screen.getByText('매주 화요일')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('매주 화요일'))
+    expect(screen.queryByText('안 함')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('사용자화'))
+
+    const intervalInput = screen.getByLabelText('반복 간격') as HTMLInputElement
+    fireEvent.change(intervalInput, { target: { value: '2' } })
+    fireEvent.click(screen.getByText('완료'))
+
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '반복 일정 수정' } })
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recurrence: expect.objectContaining({
+          freq: 'weekly',
+          interval: 2,
+          daysOfWeek: [2],
+        }),
+      })
+    )
+  })
 })
 
 // ── 라벨 색상 ────────────────────────────────────────────────

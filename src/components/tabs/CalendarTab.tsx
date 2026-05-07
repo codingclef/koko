@@ -16,6 +16,7 @@ import {
   setCalendarMembers,
   getFamilyMembers,
   getReminders,
+  getRecurrenceRule,
   type CalendarEvent,
   type FamilyMember,
   type SaveResult,
@@ -29,7 +30,7 @@ import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
 import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
 import { RecurrenceScopeSheet } from '@/components/calendar/RecurrenceScopeSheet'
-import type { RecurrenceScope } from '@/types/recurrence'
+import type { RecurrenceRule, RecurrenceScope } from '@/types/recurrence'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { postJsonWithAuth, patchJsonWithAuth, deleteWithAuth } from '@/lib/api-client'
 import type { Calendar } from '@/lib/calendar'
@@ -594,18 +595,25 @@ export function CalendarTab({
           editingEvent.event.series_occurrence_date &&
           params.localStartDate !== editingEvent.event.series_occurrence_date
         )
+        const isFollowingRecurrenceChange = Boolean(
+          isScopedSeriesEdit &&
+          scope === 'following' &&
+          params.recurrence
+        )
+        const shouldSplitFollowingSeries = isFollowingDateChange || isFollowingRecurrenceChange
         await Promise.all([
           patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
             calendarId: params.calendarId,
             title: params.title,
             description: params.description,
-            startAt: isScopedSeriesEdit && !isFollowingDateChange ? undefined : params.startAt,
-            endAt: isScopedSeriesEdit && !isFollowingDateChange ? undefined : params.endAt,
+            startAt: isScopedSeriesEdit && !shouldSplitFollowingSeries ? undefined : params.startAt,
+            endAt: isScopedSeriesEdit && !shouldSplitFollowingSeries ? undefined : params.endAt,
             localStartDate: params.localStartDate,
             localEndDate: params.localEndDate,
             isAllDay: params.isAllDay,
             reminderMinutes: params.reminderMinutes,
             labelColor: params.labelColor,
+            ...(isFollowingRecurrenceChange ? { recurrence: params.recurrence } : {}),
             ...(isScopedSeriesEdit && !params.isAllDay ? {
               startTime: getLocalTimePart(params.startAt),
               endTime: params.endAt ? getLocalTimePart(params.endAt) : null,
@@ -869,7 +877,9 @@ export function CalendarTab({
 
       {editingEvent && (
         <EventFormModalWithReminders
-          key={editingEvent.event?.id ?? 'new'}
+          key={editingEvent.event
+            ? `${editingEvent.event.id}:${(editingEvent.event as CalendarEvent & { _seriesScope?: RecurrenceScope })._seriesScope ?? 'single'}`
+            : 'new'}
           event={editingEvent.event}
           date={editingEvent.date}
           defaultLabelColor={preferences?.last_label_color ?? null}
@@ -954,6 +964,10 @@ function EventFormModalWithReminders({
 }) {
   const [reminderMinutes, setReminderMinutes] = useState<number[] | null>(event ? null : [])
   const recurrenceScope = (event as (CalendarEvent & { _seriesScope?: RecurrenceScope }) | undefined)?._seriesScope
+  const shouldLoadRecurrence = Boolean(event?.series_id && recurrenceScope === 'following')
+  const [initialRecurrence, setInitialRecurrence] = useState<RecurrenceRule | null | undefined>(
+    shouldLoadRecurrence ? undefined : null
+  )
 
   useEffect(() => {
     if (!event) return
@@ -962,13 +976,22 @@ function EventFormModalWithReminders({
       .catch(() => setReminderMinutes([]))
   }, [event])
 
-  if (reminderMinutes === null) return null
+  useEffect(() => {
+    if (!event?.series_id || recurrenceScope !== 'following') return
+
+    getRecurrenceRule(event.series_id)
+      .then((rule) => setInitialRecurrence(rule))
+      .catch(() => setInitialRecurrence(null))
+  }, [event?.series_id, recurrenceScope])
+
+  if (reminderMinutes === null || initialRecurrence === undefined) return null
 
   return (
     <EventFormModal
       initial={event}
       initialDate={date}
       initialReminderMinutes={reminderMinutes}
+      initialRecurrence={initialRecurrence}
       recurrenceScope={recurrenceScope}
       defaultLabelColor={defaultLabelColor}
       calendars={calendars}
