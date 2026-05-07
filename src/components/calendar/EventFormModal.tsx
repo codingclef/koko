@@ -114,14 +114,20 @@ export function EventFormModal({
   const [labelPickerOpen, setLabelPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [dateError, setDateError] = useState<string | null>(null)
 
   // Recurrence state (only for new events — editing uses scope sheet in parent)
   const isNewEvent = !initial
   const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(null)
   const [customRule, setCustomRule] = useState<RecurrenceRule | null>(null)
   const [recurrenceModal, setRecurrenceModal] = useState<'picker' | 'custom' | null>(null)
-  const isScopedRecurringEdit = Boolean(initial?.series_id && recurrenceScope && recurrenceScope !== 'single')
-  const canEditOccurrenceDate = !isScopedRecurringEdit
+  const followingAnchorDate = initial?.series_id && recurrenceScope === 'following'
+    ? initial.series_occurrence_date
+    : null
+  const isFollowingSeriesEdit = Boolean(followingAnchorDate)
+  const isAllSeriesEdit = Boolean(initial?.series_id && recurrenceScope === 'all')
+  const canEditStartDate = !isAllSeriesEdit
+  const canEditEndDate = !isAllSeriesEdit && !isFollowingSeriesEdit
 
   const titleInputRef = useRef<HTMLInputElement>(null)
   const startDateInputRef = useRef<HTMLInputElement>(null)
@@ -196,11 +202,22 @@ export function EventFormModal({
   }
 
   const handleStartDateChange = (value: string) => {
+    if (followingAnchorDate && value < followingAnchorDate) {
+      setDateError('이후 일정은 선택한 일정 날짜 이후로만 이동할 수 있어요.')
+      return
+    }
+
+    setDateError(null)
     setStartDate(value)
+    if (isFollowingSeriesEdit) {
+      setEndDate(value)
+      return
+    }
     keepEndAtOrAfterStart(value, startTime)
   }
 
   const handleEndDateChange = (value: string) => {
+    if (!canEditEndDate) return
     if (keepEndAtOrAfterStart(startDate, startTime, value)) {
       setEndDate(value)
     }
@@ -230,6 +247,11 @@ export function EventFormModal({
 
   const handleSave = async () => {
     if (!title.trim() || !startDate) return
+    if (dateError) return
+    if (followingAnchorDate && startDate < followingAnchorDate) {
+      setDateError('이후 일정은 선택한 일정 날짜 이후로만 이동할 수 있어요.')
+      return
+    }
 
     const startAt = isAllDay ? buildAllDayISO(startDate) : buildISO(startDate, startTime)
     const endAt = isAllDay ? buildAllDayISO(endDate) : buildISO(endDate, endTime)
@@ -295,7 +317,7 @@ export function EventFormModal({
         </button>
         <button
           onClick={handleSave}
-          disabled={!title.trim() || !startDate || saving}
+          disabled={!title.trim() || !startDate || saving || Boolean(dateError)}
           className="rounded-full border border-stone-200 bg-stone-50 px-7 py-2 text-sm font-bold text-stone-800 transition-colors hover:bg-stone-100 disabled:opacity-40 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900 sm:px-8 sm:py-2.5"
         >
           저장
@@ -315,8 +337,8 @@ export function EventFormModal({
           />
         </div>
 
-        {saveError && (
-          <p className="mx-6 mb-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500 dark:bg-red-950/30 dark:text-red-300">{saveError}</p>
+        {(dateError ?? saveError) && (
+          <p className="mx-6 mb-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500 dark:bg-red-950/30 dark:text-red-300">{dateError ?? saveError}</p>
         )}
 
         <div className="border-y border-stone-200/70 dark:border-stone-900">
@@ -377,9 +399,9 @@ export function EventFormModal({
           <div className="grid grid-cols-[3.25rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
             <div />
             <div className="py-3 pr-4 sm:py-5 sm:pr-5">
-              {isScopedRecurringEdit && (
+              {isAllSeriesEdit && (
                 <p className="mb-3 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-500 dark:bg-stone-900 dark:text-stone-400">
-                  이 범위에서는 날짜 이동 없이 시간과 내용만 변경할 수 있어요.
+                  전체 반복 일정은 날짜 이동 없이 시간과 내용만 변경할 수 있어요.
                 </p>
               )}
 
@@ -396,10 +418,11 @@ export function EventFormModal({
                       ref={startDateInputRef}
                       type="date"
                       value={startDate}
-                      disabled={!canEditOccurrenceDate}
+                      min={followingAnchorDate ?? undefined}
+                      disabled={!canEditStartDate}
                       aria-label={`시작 날짜 ${formatDateWithDOW(startDate)}`}
                       onChange={(e) => handleStartDateChange(e.target.value)}
-                      className={`absolute inset-0 h-full w-full opacity-0 ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`absolute inset-0 h-full w-full opacity-0 ${canEditStartDate ? 'cursor-pointer' : 'cursor-default'}`}
                     />
                   </label>
                   {!isAllDay && (
@@ -434,10 +457,11 @@ export function EventFormModal({
                       ref={endDateInputRef}
                       type="date"
                       value={endDate}
-                      disabled={!canEditOccurrenceDate}
+                      min={startDate}
+                      disabled={!canEditEndDate}
                       aria-label={`종료 날짜 ${formatDateWithDOW(endDate)}`}
                       onChange={(e) => handleEndDateChange(e.target.value)}
-                      className={`absolute inset-0 h-full w-full opacity-0 ${canEditOccurrenceDate ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`absolute inset-0 h-full w-full opacity-0 ${canEditEndDate ? 'cursor-pointer' : 'cursor-default'}`}
                     />
                   </label>
                   {!isAllDay && (

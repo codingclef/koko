@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState, type MouseEvent } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import type { RecurrenceFreq, RecurrenceRule } from '@/types/recurrence'
 import { buildRecurrenceLabel, DOW_KR, getRecurrenceIntervalUnit } from '@/types/recurrence'
@@ -54,6 +54,7 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
     initial?.endDate ?? addMonths(startDate, 3)
   )
   const [showFreqPicker, setShowFreqPicker] = useState(false)
+  const endDateInputRef = useRef<HTMLInputElement>(null)
 
   const currentRule: RecurrenceRule = {
     freq,
@@ -88,6 +89,18 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
       return
     }
     setInterval(parsed)
+  }
+
+  const openDatePicker = (input: HTMLInputElement) => {
+    input.focus({ preventScroll: true })
+    input.showPicker()
+  }
+
+  const handleEndDateButtonClick = (event: MouseEvent<HTMLLabelElement>) => {
+    const input = endDateInputRef.current
+    if (!input || typeof input.showPicker !== 'function') return
+    event.preventDefault()
+    openDatePicker(input)
   }
 
   return (
@@ -201,18 +214,24 @@ export function RecurrenceCustomModal({ initial, startDate, onSave, onBack }: Pr
             </div>
             {hasEndDate && (
               <div className="border-t border-stone-100 dark:border-stone-700">
-                <div className="relative px-4 py-3.5 flex items-center justify-between">
+                <label
+                  data-testid="recurrence-end-date-button"
+                  onClick={handleEndDateButtonClick}
+                  className="relative flex cursor-pointer items-center justify-between px-4 py-3.5"
+                >
                   <span className="text-sm text-stone-700 dark:text-stone-300">종료일</span>
                   <span className="text-sm text-stone-500 dark:text-stone-400">{endDate}</span>
                   <input
+                    ref={endDateInputRef}
                     type="date"
                     value={endDate}
-                    min={addMonths(startDate, 1)}
+                    min={startDate}
                     max={addYears(startDate, 2)}
+                    aria-label="반복 종료일"
                     onChange={(e) => setEndDate(e.target.value)}
                     className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                   />
-                </div>
+                </label>
               </div>
             )}
           </div>
