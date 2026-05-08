@@ -472,7 +472,7 @@ describe('EventFormModal', () => {
     const dateInputs = document.querySelectorAll('input[type="date"]')
     expect((dateInputs[0] as HTMLInputElement).disabled).toBe(true)
     expect((dateInputs[1] as HTMLInputElement).disabled).toBe(true)
-    expect(screen.getByText('전체 반복 일정은 날짜 이동 없이 시간과 내용만 변경할 수 있어요.')).toBeInTheDocument()
+    expect(screen.getByText('전체 반복 일정에서는 제목, 시간, 알림 등 공통 정보만 변경할 수 있어요.')).toBeInTheDocument()
   })
 
   it('사용자화 반복 간격을 수정해 저장할 수 있다', async () => {

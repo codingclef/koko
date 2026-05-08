@@ -422,7 +422,7 @@ export function EventFormModal({
             <div className="py-3 pr-4 sm:py-5 sm:pr-5">
               {isAllSeriesEdit && (
                 <p className="mb-3 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-500 dark:bg-stone-900 dark:text-stone-400">
-                  전체 반복 일정은 날짜 이동 없이 시간과 내용만 변경할 수 있어요.
+                  전체 반복 일정에서는 제목, 시간, 알림 등 공통 정보만 변경할 수 있어요.
                 </p>
               )}
 
