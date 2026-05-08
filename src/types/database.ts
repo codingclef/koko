@@ -523,6 +523,76 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_group_members: {
+        Row: {
+          created_at: string
+          reminder_group_id: string
+          role: 'owner' | 'member'
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          reminder_group_id: string
+          role?: 'owner' | 'member'
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          reminder_group_id?: string
+          role?: 'owner' | 'member'
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_group_members_reminder_group_id_fkey"
+            columns: ["reminder_group_id"]
+            isOneToOne: false
+            referencedRelation: "reminder_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminder_groups: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          family_id: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          family_id: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          family_id?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_groups_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopping_items: {
         Row: {
           checked_at: string | null
@@ -592,6 +662,7 @@ export type Database = {
           family_id: string
           id: string
           name: string
+          reminder_group_id: string | null
           sort_order: number
           type: string
         }
@@ -601,6 +672,7 @@ export type Database = {
           family_id: string
           id?: string
           name: string
+          reminder_group_id?: string | null
           sort_order?: number
           type?: string
         }
@@ -610,6 +682,7 @@ export type Database = {
           family_id?: string
           id?: string
           name?: string
+          reminder_group_id?: string | null
           sort_order?: number
           type?: string
         }
@@ -620,6 +693,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "families"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_lists_reminder_group_family_fkey"
+            columns: ["reminder_group_id", "family_id"]
+            isOneToOne: false
+            referencedRelation: "reminder_groups"
+            referencedColumns: ["id", "family_id"]
           },
         ]
       }
@@ -659,6 +739,21 @@ export type Database = {
       get_my_list_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      get_my_reminder_group_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      get_my_owned_reminder_group_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      is_family_member_of_reminder_group: {
+        Args: {
+          p_reminder_group_id: string
+          p_user_id: string
+        }
+        Returns: boolean
       }
       get_my_calendar_ids: {
         Args: Record<PropertyKey, never>

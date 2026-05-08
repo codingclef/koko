@@ -24,6 +24,7 @@ const mockList: ShoppingList = {
   family_id: 'fam-1',
   created_by: 'user-1',
   name: '이마트',
+  reminder_group_id: null,
   type: 'strikethrough',
   sort_order: 0,
   created_at: '2026-01-01T00:00:00Z',

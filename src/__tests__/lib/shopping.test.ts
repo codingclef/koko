@@ -1,4 +1,11 @@
 import {
+  getReminderGroups,
+  createReminderGroup,
+  updateReminderGroup,
+  deleteReminderGroup,
+  getReminderGroupMembers,
+  getReminderGroupMembersForGroups,
+  setReminderGroupMembers,
   getShoppingLists,
   createShoppingList,
   deleteShoppingList,
@@ -17,7 +24,7 @@ import {
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
   const chain: Record<string, unknown> = {}
-  ;['select', 'insert', 'update', 'delete', 'eq', 'ilike', 'order'].forEach((m) => {
+  ;['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'ilike', 'order'].forEach((m) => {
     chain[m] = jest.fn().mockReturnValue(chain)
   })
   chain.single = jest.fn().mockReturnValue(p)
@@ -37,6 +44,134 @@ jest.mock('@/lib/supabase', () => ({
 beforeEach(() => {
   jest.clearAllMocks()
   mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
+})
+
+describe('getReminderGroups', () => {
+  it('정렬된 리마인더 그룹을 반환한다', async () => {
+    const mockData = [{ id: 'group-1', name: '집', sort_order: 0 }]
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getReminderGroups('fam-1')
+    expect(result).toEqual(mockData)
+    expect(mockFrom).toHaveBeenCalledWith('reminder_groups')
+  })
+
+  it('data가 null이면 빈 배열을 반환한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+    const result = await getReminderGroups('fam-1')
+    expect(result).toEqual([])
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'group fetch error' } }))
+    await expect(getReminderGroups('fam-1')).rejects.toEqual({ message: 'group fetch error' })
+  })
+})
+
+describe('createReminderGroup', () => {
+  it('그룹 생성 후 owner와 멤버를 등록한다', async () => {
+    const mockGroup = { id: 'group-1', name: '집', color: '#3b82f6' }
+    const groupChain = makeChain({ data: mockGroup, error: null })
+    const ownerChain = makeChain({ data: null, error: null })
+    const memberChain = makeChain({ data: null, error: null })
+    mockFrom
+      .mockReturnValueOnce(groupChain)
+      .mockReturnValueOnce(ownerChain)
+      .mockReturnValueOnce(memberChain)
+
+    const result = await createReminderGroup(
+      'fam-1',
+      'user-1',
+      '집',
+      '#3b82f6',
+      ['user-1', 'user-2']
+    )
+
+    expect(result).toEqual(mockGroup)
+    expect(mockFrom).toHaveBeenNthCalledWith(1, 'reminder_groups')
+    expect(groupChain.insert).toHaveBeenCalledWith({
+      family_id: 'fam-1',
+      created_by: 'user-1',
+      name: '집',
+      color: '#3b82f6',
+    })
+    expect(mockFrom).toHaveBeenNthCalledWith(2, 'reminder_group_members')
+    expect(ownerChain.insert).toHaveBeenCalledWith({
+      reminder_group_id: 'group-1',
+      user_id: 'user-1',
+      role: 'owner',
+    })
+    expect(memberChain.insert).toHaveBeenCalledWith([
+      { reminder_group_id: 'group-1', user_id: 'user-2', role: 'member' },
+    ])
+  })
+
+  it('owner 등록 실패 시 throw한다', async () => {
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: { id: 'group-1' }, error: null }))
+      .mockReturnValueOnce(makeChain({ data: null, error: { message: 'owner error' } }))
+
+    await expect(createReminderGroup('fam-1', 'user-1', '집', '#3b82f6')).rejects.toEqual({
+      message: 'owner error',
+    })
+  })
+})
+
+describe('updateReminderGroup', () => {
+  it('updated_at과 함께 그룹 정보를 수정한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+    await expect(updateReminderGroup('group-1', { name: '회사' })).resolves.toBeUndefined()
+    expect(mockFrom).toHaveBeenCalledWith('reminder_groups')
+  })
+})
+
+describe('deleteReminderGroup', () => {
+  it('에러 없이 완료된다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+    await expect(deleteReminderGroup('group-1')).resolves.toBeUndefined()
+  })
+})
+
+describe('getReminderGroupMembers', () => {
+  it('리마인더 그룹 멤버를 반환한다', async () => {
+    const mockData = [{ reminder_group_id: 'group-1', user_id: 'user-1', role: 'owner' }]
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getReminderGroupMembers('group-1')
+    expect(result).toEqual(mockData)
+    expect(mockFrom).toHaveBeenCalledWith('reminder_group_members')
+  })
+})
+
+describe('getReminderGroupMembersForGroups', () => {
+  it('그룹 id가 없으면 조회하지 않고 빈 배열을 반환한다', async () => {
+    const result = await getReminderGroupMembersForGroups([])
+    expect(result).toEqual([])
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('여러 그룹의 멤버를 조회한다', async () => {
+    const mockData = [{ reminder_group_id: 'group-1', user_id: 'user-1', role: 'owner' }]
+    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
+    const result = await getReminderGroupMembersForGroups(['group-1'])
+    expect(result).toEqual(mockData)
+    expect(mockFrom).toHaveBeenCalledWith('reminder_group_members')
+  })
+})
+
+describe('setReminderGroupMembers', () => {
+  it('owner 제외 멤버를 교체한다', async () => {
+    const deleteChain = makeChain({ data: null, error: null })
+    const insertChain = makeChain({ data: null, error: null })
+    mockFrom.mockReturnValueOnce(deleteChain).mockReturnValueOnce(insertChain)
+
+    await expect(
+      setReminderGroupMembers('group-1', 'user-1', ['user-1', 'user-2'])
+    ).resolves.toBeUndefined()
+
+    expect(deleteChain.neq).toHaveBeenCalledWith('user_id', 'user-1')
+    expect(insertChain.insert).toHaveBeenCalledWith([
+      { reminder_group_id: 'group-1', user_id: 'user-2', role: 'member' },
+    ])
+  })
 })
 
 describe('getShoppingLists', () => {
@@ -66,6 +201,34 @@ describe('createShoppingList', () => {
     mockFrom.mockReturnValue(makeChain({ data: mockList, error: null }))
     const result = await createShoppingList('fam-1', 'user-1', '이마트', 'strikethrough')
     expect(result).toEqual(mockList)
+  })
+
+  it('리마인더 그룹 id를 함께 저장할 수 있다', async () => {
+    const mockList = {
+      id: 'list-1',
+      name: '이마트',
+      type: 'strikethrough',
+      reminder_group_id: 'group-1',
+    }
+    const chain = makeChain({ data: mockList, error: null })
+    mockFrom.mockReturnValue(chain)
+
+    const result = await createShoppingList(
+      'fam-1',
+      'user-1',
+      '이마트',
+      'strikethrough',
+      'group-1'
+    )
+
+    expect(result).toEqual(mockList)
+    expect(chain.insert).toHaveBeenCalledWith({
+      family_id: 'fam-1',
+      created_by: 'user-1',
+      name: '이마트',
+      type: 'strikethrough',
+      reminder_group_id: 'group-1',
+    })
   })
 
   it('error가 있으면 throw한다', async () => {

@@ -102,6 +102,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       family_id: familyId,
       created_by: user.id,
       name,
+      reminder_group_id: null,
       type,
       sort_order: 0,
       created_at: new Date().toISOString(),
