@@ -46,7 +46,7 @@ describe('ShoppingListCard', () => {
 
     fireEvent.click(screen.getByLabelText('삭제'))
 
-    expect(screen.getByText('장바구니 삭제')).toBeInTheDocument()
+    expect(screen.getByText('리마인더 삭제')).toBeInTheDocument()
     expect(screen.getByLabelText('삭제 확인')).toBeInTheDocument()
     expect(screen.getByLabelText('취소')).toBeInTheDocument()
   })
@@ -69,7 +69,7 @@ describe('ShoppingListCard', () => {
     fireEvent.click(screen.getByLabelText('취소'))
 
     expect(onDelete).not.toHaveBeenCalled()
-    expect(screen.queryByText('장바구니 삭제')).not.toBeInTheDocument()
+    expect(screen.queryByText('리마인더 삭제')).not.toBeInTheDocument()
   })
 
   it('목록 이름이 렌더링된다', () => {
@@ -144,13 +144,13 @@ describe('ShoppingListCard', () => {
 
   it('카드 본문이 키보드로 접근 가능하다 (tabIndex=0)', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
-    const cardBody = screen.getByLabelText('이마트 장바구니 열기')
+    const cardBody = screen.getByLabelText('이마트 리마인더 열기')
     expect(cardBody).toHaveAttribute('tabindex', '0')
   })
 
   it('카드 본문에서 Enter 키 입력 시 onOpen이 호출된다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
-    const cardBody = screen.getByLabelText('이마트 장바구니 열기')
+    const cardBody = screen.getByLabelText('이마트 리마인더 열기')
     fireEvent.keyDown(cardBody, { key: 'Enter' })
     expect(mockOnOpen).toHaveBeenCalledWith('list-1')
   })

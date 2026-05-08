@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ListChecks } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -304,13 +304,13 @@ export function ShoppingDetailView({
       ) : status === 'not-found' ? (
         <DetailStateShell
           title="목록을 찾을 수 없어요"
-          description="삭제되었거나 접근할 수 없는 장바구니예요."
+          description="삭제되었거나 접근할 수 없는 리마인더예요."
           actionLabel="목록으로 돌아가기"
           onAction={onClose}
         />
       ) : status === 'fetch-error' ? (
         <DetailStateShell
-          title="장바구니를 불러오지 못했어요"
+          title="리마인더를 불러오지 못했어요"
           description="잠시 후 다시 시도해주세요."
           actionLabel="다시 시도"
           onAction={handleRetry}
@@ -332,7 +332,7 @@ export function ShoppingDetailView({
             </button>
             <div>
               <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">
-                {list?.name ?? '장바구니'}
+                {list?.name ?? '리마인더'}
               </h2>
               <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
                 {uncheckedItems.length > 0
@@ -441,13 +441,13 @@ function DetailStateShell({
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">장바구니</h2>
+          <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">리마인더</h2>
           <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{title}</p>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-5xl mb-4">🧺</div>
+        <ListChecks size={48} className="mb-4 text-stone-300 dark:text-stone-600" />
         <p className="text-stone-600 dark:text-stone-300 font-medium">{title}</p>
         <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">{description}</p>
         <div className="mt-6 flex gap-2">

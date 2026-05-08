@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, ShoppingCart, Settings } from 'lucide-react'
+import { CalendarDays, ListChecks, Settings } from 'lucide-react'
 import type { Tab } from '@/types/tabs'
 
 const navItems = [
   { href: '/calendar', icon: CalendarDays, label: '캘린더' },
-  { href: '/shopping', icon: ShoppingCart, label: '장바구니' },
+  { href: '/shopping', icon: ListChecks, label: '리마인더' },
   { href: '/settings', icon: Settings, label: '설정' },
 ]
 

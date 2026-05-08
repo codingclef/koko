@@ -9,24 +9,24 @@ import { usePathname } from 'next/navigation'
 const mockUsePathname = usePathname as jest.Mock
 
 describe('BottomNav', () => {
-  it('장바구니와 설정 탭이 렌더링된다', () => {
+  it('리마인더와 설정 탭이 렌더링된다', () => {
     mockUsePathname.mockReturnValue('/')
     render(<BottomNav />)
-    expect(screen.getByText('장바구니')).toBeInTheDocument()
+    expect(screen.getByText('리마인더')).toBeInTheDocument()
     expect(screen.getByText('설정')).toBeInTheDocument()
   })
 
-  it('/shopping 경로에서 장바구니 탭이 활성화된다', () => {
+  it('/shopping 경로에서 리마인더 탭이 활성화된다', () => {
     mockUsePathname.mockReturnValue('/shopping')
     render(<BottomNav />)
-    const shoppingLink = screen.getByText('장바구니').closest('a')
+    const shoppingLink = screen.getByText('리마인더').closest('a')
     expect(shoppingLink).toHaveClass('text-accent-500')
   })
 
-  it('/shopping/list-1 경로에서도 장바구니 탭이 활성화된다', () => {
+  it('/shopping/list-1 경로에서도 리마인더 탭이 활성화된다', () => {
     mockUsePathname.mockReturnValue('/shopping/list-1')
     render(<BottomNav />)
-    const shoppingLink = screen.getByText('장바구니').closest('a')
+    const shoppingLink = screen.getByText('리마인더').closest('a')
     expect(shoppingLink).toHaveClass('text-accent-500')
   })
 
@@ -47,7 +47,7 @@ describe('BottomNav', () => {
   it('링크의 href가 올바르다', () => {
     mockUsePathname.mockReturnValue('/')
     render(<BottomNav />)
-    expect(screen.getByText('장바구니').closest('a')).toHaveAttribute('href', '/shopping')
+    expect(screen.getByText('리마인더').closest('a')).toHaveAttribute('href', '/shopping')
     expect(screen.getByText('설정').closest('a')).toHaveAttribute('href', '/settings')
   })
 })

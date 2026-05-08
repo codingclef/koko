@@ -118,7 +118,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename, 
         {...attributes}
         {...listeners}
         tabIndex={confirming || editing ? -1 : 0}
-        aria-label={`${list.name} 장바구니 열기`}
+        aria-label={`${list.name} 리마인더 열기`}
         onClick={() => !confirming && !editing && onOpen(list.id)}
         onKeyDown={handleCardKeyDown}
         className="group flex flex-col p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-stone-100 dark:border-stone-800 shadow-sm hover:border-accent-200 dark:hover:border-accent-900 hover:shadow-md hover:-translate-y-0.5 transition-all min-h-[160px] cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-1"
@@ -205,7 +205,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename, 
             onClick={handleCancel}
           />
           <div className="relative bg-stone-50 dark:bg-stone-900 rounded-2xl w-full sm:max-w-xs p-6 shadow-xl">
-            <p id={modalTitleId} className="font-semibold text-stone-800 dark:text-stone-100 mb-1">장바구니 삭제</p>
+            <p id={modalTitleId} className="font-semibold text-stone-800 dark:text-stone-100 mb-1">리마인더 삭제</p>
             <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
               &ldquo;{list.name}&rdquo;을(를) 삭제할까요?
             </p>
