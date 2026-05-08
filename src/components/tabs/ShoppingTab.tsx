@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react'
+import { Plus, ListChecks, AlertTriangle } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -279,15 +279,15 @@ function ShoppingListView({
     <>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">장바구니</h1>
+          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">리마인더</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
-            {lists.length > 0 ? `${lists.length}개의 목록` : '장바구니를 만들어보세요'}
+            {lists.length > 0 ? `${lists.length}개의 목록` : '리마인더를 만들어보세요'}
           </p>
         </div>
         <button
           onClick={onCreateClick}
           className="w-11 h-11 flex items-center justify-center rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-sm transition-colors"
-          aria-label="새 장바구니 추가"
+          aria-label="새 리마인더 추가"
         >
           <Plus size={20} />
         </button>
@@ -307,8 +307,8 @@ function ShoppingListView({
         </div>
       ) : lists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <ShoppingCart size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
-          <p className="text-stone-500 dark:text-stone-400 font-medium">아직 장바구니가 없어요</p>
+          <ListChecks size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
+          <p className="text-stone-500 dark:text-stone-400 font-medium">아직 리마인더가 없어요</p>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 + 버튼을 눌러보세요</p>
         </div>
       ) : (

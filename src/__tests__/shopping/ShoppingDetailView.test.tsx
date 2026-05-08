@@ -120,9 +120,9 @@ describe('ShoppingDetailView', () => {
     )
 
     expect(
-      await screen.findByText('삭제되었거나 접근할 수 없는 장바구니예요.')
+      await screen.findByText('삭제되었거나 접근할 수 없는 리마인더예요.')
     ).toBeInTheDocument()
-    expect(screen.getByText('삭제되었거나 접근할 수 없는 장바구니예요.')).toBeInTheDocument()
+    expect(screen.getByText('삭제되었거나 접근할 수 없는 리마인더예요.')).toBeInTheDocument()
   })
 
   it('로드 실패 시 fetch error 상태와 재시도 버튼을 보여준다', async () => {

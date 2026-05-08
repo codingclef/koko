@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, ShoppingCart, Trash2 } from 'lucide-react'
+import { X, ListChecks, Trash2 } from 'lucide-react'
 import type { ListType } from '@/lib/shopping'
 
 interface Props {
@@ -33,7 +33,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-sm bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
-          <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100">새 장바구니</h2>
+          <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100">새 리마인더</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-full text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
@@ -71,7 +71,7 @@ export function CreateListModal({ onClose, onCreate }: Props) {
                     : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-300'
                 }`}
               >
-                <ShoppingCart size={20} />
+                <ListChecks size={20} />
                 <span className="text-xs font-medium">취소선</span>
                 <span className="text-[10px] text-stone-400 dark:text-stone-500">체크 후 남아있음</span>
               </button>

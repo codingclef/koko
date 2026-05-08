@@ -119,7 +119,7 @@ describe('ShoppingTab', () => {
       />
     )
 
-    await user.click(await screen.findByLabelText('새 장바구니 추가'))
+    await user.click(await screen.findByLabelText('새 리마인더 추가'))
     await user.type(screen.getByPlaceholderText('예: 이마트, 코스트코'), '이마트')
     await user.click(screen.getByRole('button', { name: '만들기' }))
 
