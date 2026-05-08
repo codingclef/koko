@@ -87,7 +87,7 @@ describe('deleteShoppingList', () => {
 })
 
 describe('getShoppingList', () => {
-  it('단일 장바구니를 반환한다', async () => {
+  it('단일 리마인더를 반환한다', async () => {
     const mockData = { id: 'list-1', name: '이마트', type: 'strikethrough' }
     mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
     const result = await getShoppingList('list-1')
