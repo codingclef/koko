@@ -41,10 +41,25 @@ function buildAllDayISO(date: string): string {
   return new Date(date + 'T00:00:00').toISOString()
 }
 
+function isSameRecurrenceRule(a: RecurrenceRule | null, b: RecurrenceRule | null): boolean {
+  if (a === null && b === null) return true
+  if (a === null || b === null) return false
+  const daysA = [...(a.daysOfWeek ?? [])].sort().join(',')
+  const daysB = [...(b.daysOfWeek ?? [])].sort().join(',')
+  return (
+    a.freq === b.freq &&
+    a.interval === b.interval &&
+    daysA === daysB &&
+    (a.dayOfMonth ?? null) === (b.dayOfMonth ?? null) &&
+    (a.endDate ?? null) === (b.endDate ?? null)
+  )
+}
+
 interface Props {
   initial?: CalendarEvent
   initialDate?: Date
   initialReminderMinutes?: number[]
+  initialRecurrence?: RecurrenceRule | null
   recurrenceScope?: RecurrenceScope
   defaultLabelColor?: string | null
   calendars: Calendar[]
@@ -68,6 +83,7 @@ export function EventFormModal({
   initial,
   initialDate,
   initialReminderMinutes = [],
+  initialRecurrence = null,
   recurrenceScope,
   defaultLabelColor,
   calendars,
@@ -116,15 +132,18 @@ export function EventFormModal({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
 
-  // Recurrence state (only for new events — editing uses scope sheet in parent)
   const isNewEvent = !initial
-  const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(null)
-  const [customRule, setCustomRule] = useState<RecurrenceRule | null>(null)
-  const [recurrenceModal, setRecurrenceModal] = useState<'picker' | 'custom' | null>(null)
   const followingAnchorDate = initial?.series_id && recurrenceScope === 'following'
     ? initial.series_occurrence_date
     : null
   const isFollowingSeriesEdit = Boolean(followingAnchorDate)
+  const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(
+    isFollowingSeriesEdit ? initialRecurrence : null
+  )
+  const [customRule, setCustomRule] = useState<RecurrenceRule | null>(
+    isFollowingSeriesEdit ? initialRecurrence : null
+  )
+  const [recurrenceModal, setRecurrenceModal] = useState<'picker' | 'custom' | null>(null)
   const isAllSeriesEdit = Boolean(initial?.series_id && recurrenceScope === 'all')
   const canEditStartDate = !isAllSeriesEdit
   const canEditEndDate = !isAllSeriesEdit && !isFollowingSeriesEdit
@@ -271,7 +290,9 @@ export function EventFormModal({
         localEndDate: endDate,
         isAllDay,
         reminderMinutes: Array.from(reminderMinutes),
-        recurrence: isNewEvent ? recurrence : null,
+        recurrence: isNewEvent || (isFollowingSeriesEdit && !isSameRecurrenceRule(recurrence, initialRecurrence))
+          ? recurrence
+          : null,
         labelColor,
       })
       onClose()
@@ -600,7 +621,7 @@ export function EventFormModal({
           </div>
 
           {/* 반복 */}
-          {isNewEvent && (
+          {(isNewEvent || isFollowingSeriesEdit) && (
             <button
               type="button"
               onClick={() => setRecurrenceModal('picker')}
@@ -626,6 +647,7 @@ export function EventFormModal({
           onSelect={(rule) => { setRecurrence(rule); setRecurrenceModal(null) }}
           onCustomize={() => setRecurrenceModal('custom')}
           onClose={() => setRecurrenceModal(null)}
+          allowNone={isNewEvent}
         />
       )}
 

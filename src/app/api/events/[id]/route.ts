@@ -86,6 +86,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     body.anchorOccurrenceDate &&
     requestedOccurrenceDate !== body.anchorOccurrenceDate
   )
+  const isFollowingRecurrenceChange = Boolean(
+    scope === 'following' &&
+    body.recurrence
+  )
 
   if (isScopedDateChange && scope !== 'following') {
     return NextResponse.json(
@@ -99,16 +103,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const startTime = body.startTime ?? (body.startAt ? new Date(body.startAt).toISOString().slice(11, 19) : null)
     const endTime = body.endTime ?? (body.endAt ? new Date(body.endAt).toISOString().slice(11, 19) : null)
 
-    if (isScopedDateChange) {
+    if (isScopedDateChange || isFollowingRecurrenceChange) {
       const anchorOccurrenceDate = body.anchorOccurrenceDate
       if (!body.startAt) {
-        return NextResponse.json({ error: 'startAt required for following date change' }, { status: 400 })
+        return NextResponse.json({ error: 'startAt required for following split' }, { status: 400 })
       }
       if (!anchorOccurrenceDate) {
         return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
       }
       if (!body.localStartDate) {
-        return NextResponse.json({ error: 'localStartDate required for following date change' }, { status: 400 })
+        return NextResponse.json({ error: 'localStartDate required for following split' }, { status: 400 })
       }
 
       const { data: result, error } = await supabaseAdmin.rpc('split_recurring_series_following_authorized', {
@@ -133,6 +137,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         p_days_of_week:           body.recurrence?.daysOfWeek ?? null,
         p_day_of_month:           body.recurrence?.dayOfMonth ?? null,
         p_end_date:               body.recurrence?.endDate ?? null,
+        p_should_update_end_date: Boolean(body.recurrence),
       })
 
       if (error) {

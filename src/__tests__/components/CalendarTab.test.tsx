@@ -1,7 +1,7 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { getCalendarMembers, getEventsByMonth, getFamilyMembers, setCalendarMembers, updateCalendar } from '@/lib/calendar'
+import { getCalendarMembers, getEventsByMonth, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar } from '@/lib/calendar'
 import { deleteWithAuth, patchJsonWithAuth } from '@/lib/api-client'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
@@ -21,6 +21,7 @@ jest.mock('@/lib/calendar', () => ({
   getCalendarMembersForCalendars: jest.fn().mockResolvedValue([]),
   setCalendarMembers: jest.fn(),
   getFamilyMembers: jest.fn().mockResolvedValue([]),
+  getRecurrenceRule: jest.fn().mockResolvedValue(null),
   createEvent: jest.fn(),
   updateEvent: jest.fn(),
   deleteEvent: jest.fn(),
@@ -123,7 +124,8 @@ jest.mock('@/components/calendar/EventDetailSheet', () => ({
   ),
 }))
 jest.mock('@/components/calendar/EventFormModal', () => ({
-  EventFormModal: ({ onSave }: {
+  EventFormModal: ({ initialRecurrence, onSave }: {
+    initialRecurrence?: import('@/types/recurrence').RecurrenceRule | null
     onSave: (params: {
       calendarId: string | null
       title: string
@@ -134,10 +136,11 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
       localEndDate: string
       isAllDay: boolean
       reminderMinutes: number[]
-      recurrence: null
+      recurrence: import('@/types/recurrence').RecurrenceRule | null
       labelColor: string | null
     }) => Promise<void>
   }) => (
+    <>
     <button
       data-testid="event-form-save-following-date"
       onClick={() => onSave({
@@ -156,6 +159,26 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
     >
       save following date
     </button>
+    <button
+      data-testid="event-form-save-following-recurrence"
+      data-initial-recurrence={initialRecurrence ? `${initialRecurrence.freq}:${initialRecurrence.interval}` : ''}
+      onClick={() => onSave({
+        calendarId: 'cal-1',
+        title: '반복 일정 수정',
+        description: null,
+        startAt: '2026-04-17T09:00:00.000Z',
+        endAt: '2026-04-17T10:00:00.000Z',
+        localStartDate: '2026-04-17',
+        localEndDate: '2026-04-17',
+        isAllDay: false,
+        reminderMinutes: [],
+        recurrence: { freq: 'weekly', interval: 2, daysOfWeek: [6] },
+        labelColor: null,
+      })}
+    >
+      save following recurrence
+    </button>
+    </>
   ),
 }))
 jest.mock('@/components/calendar/CalendarFormModal', () => ({
@@ -211,6 +234,7 @@ jest.mock('@/components/calendar/YearMonthPickerSheet', () => ({
 const mockGetEventsByMonth = getEventsByMonth as jest.MockedFunction<typeof getEventsByMonth>
 const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getFamilyMembers>
 const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof getCalendarMembers>
+const mockGetRecurrenceRule = getRecurrenceRule as jest.MockedFunction<typeof getRecurrenceRule>
 const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof setCalendarMembers>
 const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
 const mockDeleteWithAuth = deleteWithAuth as jest.MockedFunction<typeof deleteWithAuth>
@@ -251,6 +275,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     mockGetEventsByMonth.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
+    mockGetRecurrenceRule.mockResolvedValue({ freq: 'weekly', interval: 1, daysOfWeek: [5] })
     mockDeleteWithAuth.mockResolvedValue(undefined)
     mockPatchJsonWithAuth.mockResolvedValue(undefined)
   })
@@ -514,6 +539,36 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
           endAt: '2026-04-18T10:00:00.000Z',
           localStartDate: '2026-04-18',
           localEndDate: '2026-04-18',
+        })
+      )
+    })
+  })
+
+  it('반복 일정 following 규칙 변경은 기존 규칙을 로드하고 recurrence와 startAt을 함께 PATCH한다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByTestId('select-date'))
+    fireEvent.click(screen.getByTestId('select-recurring-event'))
+    fireEvent.click(screen.getByTestId('detail-edit'))
+    fireEvent.click(await screen.findByTestId('scope-following'))
+
+    const saveButton = await screen.findByTestId('event-form-save-following-recurrence')
+    expect(mockGetRecurrenceRule).toHaveBeenCalledWith('series-1')
+    expect(saveButton).toHaveAttribute('data-initial-recurrence', 'weekly:1')
+
+    fireEvent.click(saveButton)
+
+    await waitFor(() => {
+      expect(mockPatchJsonWithAuth).toHaveBeenCalledWith(
+        '/api/events/evt-series-1',
+        expect.objectContaining({
+          scope: 'following',
+          anchorOccurrenceDate: '2026-04-17',
+          startAt: '2026-04-17T09:00:00.000Z',
+          endAt: '2026-04-17T10:00:00.000Z',
+          localStartDate: '2026-04-17',
+          recurrence: { freq: 'weekly', interval: 2, daysOfWeek: [6] },
         })
       )
     })

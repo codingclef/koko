@@ -354,10 +354,88 @@ describe('PATCH /api/events/[id] (series scope)', () => {
         p_freq: 'weekly',
         p_interval: 1,
         p_days_of_week: [6],
+        p_should_update_end_date: true,
       })
     )
     expect(mockSendEventNotification).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'updated', eventStartAt: '2026-04-18T09:00:00.000Z' })
+    )
+  })
+
+  it('following scope에서 반복 규칙 변경을 요청하면 split_recurring_series_following_authorized를 호출한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        is_changed: true,
+        family_id: FAMILY_ID,
+        new_calendar_id: null,
+        new_title: '회의',
+        new_start_at: '2026-04-17T09:00:00.000Z',
+        series_id: 'series-2',
+        old_series_id: SERIES_ID,
+      },
+      error: null,
+    })
+    const body = {
+      title: '회의',
+      scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      startAt: '2026-04-17T09:00:00.000Z',
+      endAt: '2026-04-17T10:00:00.000Z',
+      recurrence: { freq: 'weekly', interval: 2, daysOfWeek: [5], endDate: '2026-06-12' },
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'split_recurring_series_following_authorized',
+      expect.objectContaining({
+        p_anchor_occurrence_date: '2026-04-17',
+        p_local_start_date: '2026-04-17',
+        p_start_at: '2026-04-17T09:00:00.000Z',
+        p_freq: 'weekly',
+        p_interval: 2,
+        p_days_of_week: [5],
+        p_end_date: '2026-06-12',
+        p_should_update_end_date: true,
+      })
+    )
+  })
+
+  it('following scope에서 반복 종료일 제거를 요청하면 end date update flag와 null을 전달한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        is_changed: true,
+        family_id: FAMILY_ID,
+        new_calendar_id: null,
+        new_title: '회의',
+        new_start_at: '2026-04-17T09:00:00.000Z',
+        series_id: 'series-2',
+        old_series_id: SERIES_ID,
+      },
+      error: null,
+    })
+    const body = {
+      title: '회의',
+      scope: 'following',
+      anchorOccurrenceDate: '2026-04-17',
+      localStartDate: '2026-04-17',
+      startAt: '2026-04-17T09:00:00.000Z',
+      recurrence: { freq: 'weekly', interval: 1, daysOfWeek: [5] },
+    }
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, body),
+      makeParams(EVENT_ID)
+    )
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'split_recurring_series_following_authorized',
+      expect.objectContaining({
+        p_end_date: null,
+        p_should_update_end_date: true,
+      })
     )
   })
 
