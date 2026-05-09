@@ -15,7 +15,10 @@ const mockDeleteShoppingList = jest.fn()
 const mockRenameShoppingList = jest.fn()
 const mockReorderShoppingLists = jest.fn()
 const mockBroadcast = jest.fn()
-const mockUseRealtimeSync = jest.fn((_c: unknown, _r: unknown, _o: unknown) => mockBroadcast)
+const mockUseRealtimeSync = jest.fn((...args: unknown[]) => {
+  void args
+  return mockBroadcast
+})
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 let mockListParam: string | null = null
@@ -283,6 +286,101 @@ describe('ShoppingTab', () => {
     await user.click(await screen.findByLabelText('리마인더 그룹 관리'))
 
     expect(await screen.findByText('groups:1')).toBeInTheDocument()
+  })
+
+  it('그룹 필터를 선택하면 해당 그룹 목록만 보여준다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockGetReminderGroups.mockResolvedValueOnce([
+      {
+        id: 'group-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인',
+        color: '#3b82f6',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+      {
+        id: 'list-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족 목록',
+        reminder_group_id: null,
+        type: 'strikethrough',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+      {
+        id: 'list-2',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인 목록',
+        reminder_group_id: 'group-1',
+        type: 'strikethrough',
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+    ])
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    expect(await screen.findByRole('button', { name: '가족 목록' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '개인 목록' })).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: '개인' }))
+
+    expect(screen.queryByRole('button', { name: '가족 목록' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '개인 목록' })).toBeInTheDocument()
+  })
+
+  it('그룹을 선택해 리마인더를 만들면 생성 API에 그룹 id를 전달한다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockGetReminderGroups.mockResolvedValueOnce([
+      {
+        id: 'group-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인',
+        color: '#3b82f6',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    mockCreateShoppingList.mockResolvedValueOnce({
+      id: 'list-1',
+      family_id: 'fam-1',
+      created_by: 'user-1',
+      name: '이마트',
+      reminder_group_id: 'group-1',
+      type: 'strikethrough',
+      sort_order: 0,
+      created_at: '2026-01-01T00:00:00Z',
+    })
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    await user.click(await screen.findByLabelText('새 리마인더 추가'))
+    await user.type(screen.getByPlaceholderText('예: 이마트, 코스트코'), '이마트')
+    await user.click(screen.getAllByRole('button', { name: '개인' })[1])
+    await user.click(screen.getByRole('button', { name: '만들기' }))
+
+    await waitFor(() => {
+      expect(mockCreateShoppingList).toHaveBeenCalledWith(
+        'fam-1',
+        'user-1',
+        '이마트',
+        'strikethrough',
+        'group-1'
+      )
+    })
   })
 
   it('그룹 조회가 실패해도 가족 멤버는 그룹 시트에 전달한다', async () => {
