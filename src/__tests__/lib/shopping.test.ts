@@ -15,6 +15,7 @@ import {
   checkShoppingItem,
   deleteShoppingItem,
   renameShoppingList,
+  updateShoppingListGroup,
   renameShoppingItem,
   reorderShoppingLists,
   reorderShoppingItems,
@@ -245,6 +246,51 @@ describe('createShoppingList', () => {
   it('error가 있으면 throw한다', async () => {
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'insert error' } })
     await expect(createShoppingList('fam-1', 'user-1', '이마트', 'strikethrough')).rejects.toEqual({ message: 'insert error' })
+  })
+})
+
+describe('updateShoppingListGroup', () => {
+  it('리마인더 그룹 변경 RPC를 호출하고 변경된 리스트를 반환한다', async () => {
+    const mockList = {
+      id: 'list-1',
+      name: '이마트',
+      reminder_group_id: 'group-1',
+    }
+    mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
+
+    const result = await updateShoppingListGroup('list-1', 'user-1', 'group-1')
+
+    expect(result).toEqual(mockList)
+    expect(mockRpc).toHaveBeenCalledWith('update_shopping_list_group_authorized', {
+      p_actor_user_id: 'user-1',
+      p_list_id: 'list-1',
+      p_reminder_group_id: 'group-1',
+    })
+  })
+
+  it('가족 전체로 변경할 때 null을 전달한다', async () => {
+    const mockList = {
+      id: 'list-1',
+      name: '이마트',
+      reminder_group_id: null,
+    }
+    mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
+
+    await expect(updateShoppingListGroup('list-1', 'user-1', null)).resolves.toEqual(mockList)
+
+    expect(mockRpc).toHaveBeenCalledWith('update_shopping_list_group_authorized', {
+      p_actor_user_id: 'user-1',
+      p_list_id: 'list-1',
+      p_reminder_group_id: null,
+    })
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'group update error' } })
+
+    await expect(updateShoppingListGroup('list-1', 'user-1', 'group-1')).rejects.toEqual({
+      message: 'group update error',
+    })
   })
 })
 

@@ -266,6 +266,21 @@ export async function renameShoppingList(listId: string, name: string): Promise<
   if (error) throw error
 }
 
+export async function updateShoppingListGroup(
+  listId: string,
+  userId: string,
+  reminderGroupId: string | null
+): Promise<ShoppingList> {
+  const { data, error } = await supabase.rpc('update_shopping_list_group_authorized', {
+    p_actor_user_id: userId,
+    p_list_id: listId,
+    p_reminder_group_id: reminderGroupId,
+  })
+
+  if (error) throw error
+  return data
+}
+
 export async function renameShoppingItem(itemId: string, name: string): Promise<void> {
   const { error } = await supabase
     .from('shopping_items')
