@@ -9,9 +9,14 @@ const ownerAccessMigrationPath = path.join(
   process.cwd(),
   'supabase/migrations/20260509000000_fix_reminder_group_owner_access.sql'
 )
+const createListMigrationPath = path.join(
+  process.cwd(),
+  'supabase/migrations/20260509001000_create_shopping_list_authorized.sql'
+)
 
 const sql = () => fs.readFileSync(migrationPath, 'utf8')
 const ownerAccessSql = () => fs.readFileSync(ownerAccessMigrationPath, 'utf8')
+const createListSql = () => fs.readFileSync(createListMigrationPath, 'utf8')
 
 describe('reminder groups migration', () => {
   it('does not expose grouped lists by clearing reminder_group_id on group delete', () => {
@@ -47,5 +52,17 @@ describe('reminder groups migration', () => {
     expect(migration).toContain('select id')
     expect(migration).toContain('from reminder_groups')
     expect(migration).toContain('where created_by = auth.uid()')
+  })
+
+  it('creates reminder lists through an authorized RPC', () => {
+    const migration = createListSql()
+
+    expect(migration).toContain('create or replace function create_shopping_list_authorized')
+    expect(migration).toContain('v_actor_id uuid := auth.uid()')
+    expect(migration).toContain('from family_members fm')
+    expect(migration).toContain('from reminder_groups rg')
+    expect(migration).toContain('from reminder_group_members rgm')
+    expect(migration).toContain('insert into shopping_lists')
+    expect(migration).toContain('grant execute on function create_shopping_list_authorized')
   })
 })

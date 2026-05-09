@@ -36,14 +36,19 @@ function makeChain(result: { data: unknown; error: unknown }) {
 }
 
 const mockFrom = jest.fn()
+const mockRpc = jest.fn()
 
 jest.mock('@/lib/supabase', () => ({
-  supabase: { from: (...args: unknown[]) => mockFrom(...args) },
+  supabase: {
+    from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
+  },
 }))
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
+  mockRpc.mockResolvedValue({ data: null, error: null })
 })
 
 describe('getReminderGroups', () => {
@@ -198,9 +203,16 @@ describe('getShoppingLists', () => {
 describe('createShoppingList', () => {
   it('생성된 리스트를 반환한다', async () => {
     const mockList = { id: 'list-1', name: '이마트', type: 'strikethrough' }
-    mockFrom.mockReturnValue(makeChain({ data: mockList, error: null }))
+    mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
     const result = await createShoppingList('fam-1', 'user-1', '이마트', 'strikethrough')
     expect(result).toEqual(mockList)
+    expect(mockRpc).toHaveBeenCalledWith('create_shopping_list_authorized', {
+      p_actor_user_id: 'user-1',
+      p_family_id: 'fam-1',
+      p_name: '이마트',
+      p_type: 'strikethrough',
+      p_reminder_group_id: null,
+    })
   })
 
   it('리마인더 그룹 id를 함께 저장할 수 있다', async () => {
@@ -210,8 +222,7 @@ describe('createShoppingList', () => {
       type: 'strikethrough',
       reminder_group_id: 'group-1',
     }
-    const chain = makeChain({ data: mockList, error: null })
-    mockFrom.mockReturnValue(chain)
+    mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
 
     const result = await createShoppingList(
       'fam-1',
@@ -222,17 +233,17 @@ describe('createShoppingList', () => {
     )
 
     expect(result).toEqual(mockList)
-    expect(chain.insert).toHaveBeenCalledWith({
-      family_id: 'fam-1',
-      created_by: 'user-1',
-      name: '이마트',
-      type: 'strikethrough',
-      reminder_group_id: 'group-1',
+    expect(mockRpc).toHaveBeenCalledWith('create_shopping_list_authorized', {
+      p_actor_user_id: 'user-1',
+      p_family_id: 'fam-1',
+      p_name: '이마트',
+      p_type: 'strikethrough',
+      p_reminder_group_id: 'group-1',
     })
   })
 
   it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'insert error' } }))
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'insert error' } })
     await expect(createShoppingList('fam-1', 'user-1', '이마트', 'strikethrough')).rejects.toEqual({ message: 'insert error' })
   })
 })
