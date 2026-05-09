@@ -272,6 +272,31 @@ describe('ShoppingDetailView', () => {
     expect(onListGroupChange).toHaveBeenLastCalledWith('list-1', null)
   })
 
+  it('가족 목록 refresh에서 접근할 수 없으면 not found 상태로 전환하고 preview를 비운다', async () => {
+    render(
+      <ShoppingDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    expect(await screen.findByText('이마트')).toBeInTheDocument()
+
+    const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, () => void, unknown]>
+    const familyRefresh = calls.find(([channelName]) => channelName === 'family_lists_fam-1')?.[1]
+    expect(familyRefresh).toBeDefined()
+
+    mockGetShoppingList.mockResolvedValueOnce(null)
+    await act(async () => {
+      familyRefresh?.()
+    })
+
+    expect(await screen.findByText('삭제되었거나 접근할 수 없는 리마인더예요.')).toBeInTheDocument()
+    expect(onPreviewItemsChange).toHaveBeenLastCalledWith('list-1', [])
+  })
+
   it('아이템이 많아도 목록만 스크롤되고 추가 입력란은 화면 안에 유지된다', async () => {
     mockGetShoppingItems.mockResolvedValueOnce(
       Array.from({ length: 40 }, (_, index) => ({

@@ -92,6 +92,7 @@ describe('reminder groups migration', () => {
     expect(migration).toContain('create or replace function update_shopping_list_group_authorized')
     expect(migration).toContain('v_actor_id uuid := auth.uid()')
     expect(migration).toContain('from family_members fm')
+    expect(migration).toContain('where rg.id = v_list.reminder_group_id')
     expect(migration).toContain('from reminder_groups rg')
     expect(migration).toContain('from reminder_group_members rgm')
     expect(migration).toContain("set_config('app.allow_reminder_list_scope_change', 'on', true)")

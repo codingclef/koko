@@ -61,6 +61,24 @@ begin
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
+  if v_list.reminder_group_id is not null and not exists (
+    select 1
+    from reminder_groups rg
+    where rg.id = v_list.reminder_group_id
+      and rg.family_id = v_list.family_id
+      and (
+        rg.created_by = v_actor_id
+        or exists (
+          select 1
+          from reminder_group_members rgm
+          where rgm.reminder_group_id = rg.id
+            and rgm.user_id = v_actor_id
+        )
+      )
+  ) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
   if p_reminder_group_id is not null and not exists (
     select 1
     from reminder_groups rg

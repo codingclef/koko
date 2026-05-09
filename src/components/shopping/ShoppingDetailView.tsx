@@ -80,10 +80,15 @@ export function ShoppingDetailView({
         if (nextList) {
           setList(nextList)
           onListGroupChange?.(listId, nextList.reminder_group_id)
+        } else {
+          setList(null)
+          setItems([])
+          setStatus('not-found')
+          syncPreview([])
         }
       })
       .catch((e) => console.error('[ShoppingDetailView] getShoppingList failed:', e))
-  }, [listId, onListGroupChange])
+  }, [listId, onListGroupChange, syncPreview])
 
   const broadcast = useRealtimeSync(`list_items_${listId}`, refreshItems)
   const broadcastListChange = useRealtimeSync(
