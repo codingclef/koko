@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, ListChecks, Trash2 } from 'lucide-react'
-import type { ListType, ReminderGroup } from '@/lib/shopping'
+import type { ListType, ReminderGroup } from '@/lib/reminder-lists'
 import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
   onCreate: (name: string, type: ListType, reminderGroupId: string | null) => Promise<boolean>
 }
 
-export function CreateListModal({ groups = [], onClose, onCreate }: Props) {
+export function CreateReminderListModal({ groups = [], onClose, onCreate }: Props) {
   const [name, setName] = useState('')
   const [type, setType] = useState<ListType>('strikethrough')
   const [reminderGroupId, setReminderGroupId] = useState<string | null>(null)

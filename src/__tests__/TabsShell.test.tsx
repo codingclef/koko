@@ -62,8 +62,8 @@ jest.mock('@/components/tabs/CalendarTab', () => ({
   CalendarTab: () => <div data-testid="calendar-tab" />,
 }))
 
-jest.mock('@/components/tabs/ShoppingTab', () => ({
-  ShoppingTab: () => <div data-testid="shopping-tab" />,
+jest.mock('@/components/tabs/ReminderTab', () => ({
+  ReminderTab: () => <div data-testid="reminder-tab" />,
 }))
 
 jest.mock('@/components/tabs/SettingsTab', () => ({
@@ -120,13 +120,20 @@ describe('TabsShell', () => {
   it('?tab 파라미터가 없으면 캘린더 탭이 표시된다', () => {
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
-    expect(screen.getByTestId('shopping-tab').parentElement).toHaveClass('hidden')
+    expect(screen.getByTestId('reminder-tab').parentElement).toHaveClass('hidden')
   })
 
-  it('?tab=shopping 파라미터가 있으면 쇼핑 탭이 활성화된다', () => {
+  it('?tab=reminders 파라미터가 있으면 리마인더 탭이 활성화된다', () => {
+    mockTabParam = 'reminders'
+    render(<TabsShell />)
+    expect(screen.getByTestId('reminder-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.getByTestId('calendar-tab').parentElement).toHaveClass('hidden')
+  })
+
+  it('레거시 ?tab=shopping 파라미터도 리마인더 탭으로 처리한다', () => {
     mockTabParam = 'shopping'
     render(<TabsShell />)
-    expect(screen.getByTestId('shopping-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.getByTestId('reminder-tab').parentElement).not.toHaveClass('hidden')
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveClass('hidden')
   })
 
@@ -134,7 +141,7 @@ describe('TabsShell', () => {
     mockTabParam = 'invalid'
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
-    expect(screen.getByTestId('shopping-tab').parentElement).toHaveClass('hidden')
+    expect(screen.getByTestId('reminder-tab').parentElement).toHaveClass('hidden')
   })
 
   it('초기 진입 시 자동으로 푸시 구독을 요청하지 않는다', () => {

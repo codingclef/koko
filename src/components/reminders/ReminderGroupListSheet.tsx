@@ -9,7 +9,7 @@ import {
   REMINDER_GROUP_COLOR_NAMES,
   type ReminderGroup,
   type ReminderGroupMember,
-} from '@/lib/shopping'
+} from '@/lib/reminder-lists'
 import type { FamilyMember } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
 

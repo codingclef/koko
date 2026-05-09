@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { ShoppingTab } from '@/components/tabs/ShoppingTab'
+import { ReminderTab } from '@/components/tabs/ReminderTab'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
 import { BottomNav } from '@/components/BottomNav'
 import { useAuth } from '@/hooks/useAuth'
@@ -34,7 +34,7 @@ export function TabsShell() {
   const needsFamilyOnboarding =
     !authLoading && !familyLoading && !familyError && Boolean(user) && familyId === null
 
-  const tabParam = searchParams.get('tab')
+  const tabParam = searchParams.get('tab') === 'shopping' ? 'reminders' : searchParams.get('tab')
   const activeTab: Tab = tabParam && TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'calendar'
 
   useEffect(() => {
@@ -120,8 +120,8 @@ export function TabsShell() {
             reloadCalendars={reloadCalendars}
           />
         </div>
-        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'shopping' ? ' hidden' : ''}`}>
-          <ShoppingTab
+        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'reminders' ? ' hidden' : ''}`}>
+          <ReminderTab
             key={familyId ?? 'no-family'}
             user={user}
             familyId={familyId}

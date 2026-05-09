@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { ShoppingItem as ShoppingItemType } from '@/lib/shopping'
+import type { ReminderItem as ReminderItemType } from '@/lib/reminder-lists'
 
 interface Props {
-  item: ShoppingItemType
+  item: ReminderItemType
   listType: 'strikethrough' | 'delete'
   onCheck: (itemId: string, checked: boolean) => void
   onDelete: (itemId: string) => void
@@ -15,7 +15,7 @@ interface Props {
   draggable?: boolean
 }
 
-export function ShoppingItem({ item, listType, onCheck, onDelete, onRename, draggable = false }: Props) {
+export function ReminderItem({ item, listType, onCheck, onDelete, onRename, draggable = false }: Props) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(item.name)
   const [confirming, setConfirming] = useState(false)

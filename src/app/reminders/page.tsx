@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function LegacyRemindersPage() {
+export default function RemindersPage() {
   redirect('/calendar?tab=reminders')
 }

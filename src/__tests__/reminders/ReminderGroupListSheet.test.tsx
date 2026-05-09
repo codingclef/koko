@@ -1,13 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ReminderGroupListSheet } from '@/components/shopping/ReminderGroupListSheet'
-import type { ReminderGroup, ReminderGroupMember } from '@/lib/shopping'
+import { ReminderGroupListSheet } from '@/components/reminders/ReminderGroupListSheet'
+import type { ReminderGroup, ReminderGroupMember } from '@/lib/reminder-lists'
 import type { FamilyMember } from '@/lib/calendar'
 
 const mockGetReminderGroupMembers = jest.fn()
 const mockGetReminderGroupMembersForGroups = jest.fn()
 
-jest.mock('@/lib/shopping', () => ({
+jest.mock('@/lib/reminder-lists', () => ({
   getReminderGroupMembers: (...args: unknown[]) => mockGetReminderGroupMembers(...args),
   getReminderGroupMembersForGroups: (...args: unknown[]) => mockGetReminderGroupMembersForGroups(...args),
   REMINDER_GROUP_COLORS: ['#3b82f6', '#22c55e'],

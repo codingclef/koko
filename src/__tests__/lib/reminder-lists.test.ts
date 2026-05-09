@@ -6,20 +6,20 @@ import {
   getReminderGroupMembers,
   getReminderGroupMembersForGroups,
   setReminderGroupMembers,
-  getShoppingLists,
-  createShoppingList,
-  deleteShoppingList,
-  getShoppingList,
-  getShoppingItems,
-  addShoppingItem,
-  checkShoppingItem,
-  deleteShoppingItem,
-  renameShoppingList,
-  updateShoppingListGroup,
-  renameShoppingItem,
-  reorderShoppingLists,
-  reorderShoppingItems,
-} from '@/lib/shopping'
+  getReminderLists,
+  createReminderList,
+  deleteReminderList,
+  getReminderList,
+  getReminderItems,
+  addReminderItem,
+  checkReminderItem,
+  deleteReminderItem,
+  renameReminderList,
+  updateReminderListGroup,
+  renameReminderItem,
+  reorderReminderLists,
+  reorderReminderItems,
+} from '@/lib/reminder-lists'
 
 // Supabase 체이닝 쿼리 빌더 목업 팩토리
 function makeChain(result: { data: unknown; error: unknown }) {
@@ -180,32 +180,32 @@ describe('setReminderGroupMembers', () => {
   })
 })
 
-describe('getShoppingLists', () => {
+describe('getReminderLists', () => {
   it('정렬된 리스트를 반환한다', async () => {
     const mockData = [{ id: 'list-1', name: '이마트', sort_order: 0 }]
     mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
-    const result = await getShoppingLists('fam-1')
+    const result = await getReminderLists('fam-1')
     expect(result).toEqual(mockData)
     expect(mockFrom).toHaveBeenCalledWith('shopping_lists')
   })
 
   it('data가 null이면 빈 배열을 반환한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    const result = await getShoppingLists('fam-1')
+    const result = await getReminderLists('fam-1')
     expect(result).toEqual([])
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'DB error' } }))
-    await expect(getShoppingLists('fam-1')).rejects.toEqual({ message: 'DB error' })
+    await expect(getReminderLists('fam-1')).rejects.toEqual({ message: 'DB error' })
   })
 })
 
-describe('createShoppingList', () => {
+describe('createReminderList', () => {
   it('생성된 리스트를 반환한다', async () => {
     const mockList = { id: 'list-1', name: '이마트', type: 'strikethrough' }
     mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
-    const result = await createShoppingList('fam-1', 'user-1', '이마트', 'strikethrough')
+    const result = await createReminderList('fam-1', 'user-1', '이마트', 'strikethrough')
     expect(result).toEqual(mockList)
     expect(mockRpc).toHaveBeenCalledWith('create_shopping_list_authorized', {
       p_actor_user_id: 'user-1',
@@ -225,7 +225,7 @@ describe('createShoppingList', () => {
     }
     mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
 
-    const result = await createShoppingList(
+    const result = await createReminderList(
       'fam-1',
       'user-1',
       '이마트',
@@ -245,11 +245,11 @@ describe('createShoppingList', () => {
 
   it('error가 있으면 throw한다', async () => {
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'insert error' } })
-    await expect(createShoppingList('fam-1', 'user-1', '이마트', 'strikethrough')).rejects.toEqual({ message: 'insert error' })
+    await expect(createReminderList('fam-1', 'user-1', '이마트', 'strikethrough')).rejects.toEqual({ message: 'insert error' })
   })
 })
 
-describe('updateShoppingListGroup', () => {
+describe('updateReminderListGroup', () => {
   it('리마인더 그룹 변경 RPC를 호출하고 변경된 리스트를 반환한다', async () => {
     const mockList = {
       id: 'list-1',
@@ -258,7 +258,7 @@ describe('updateShoppingListGroup', () => {
     }
     mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
 
-    const result = await updateShoppingListGroup('list-1', 'user-1', 'group-1')
+    const result = await updateReminderListGroup('list-1', 'user-1', 'group-1')
 
     expect(result).toEqual(mockList)
     expect(mockRpc).toHaveBeenCalledWith('update_shopping_list_group_authorized', {
@@ -276,7 +276,7 @@ describe('updateShoppingListGroup', () => {
     }
     mockRpc.mockResolvedValueOnce({ data: mockList, error: null })
 
-    await expect(updateShoppingListGroup('list-1', 'user-1', null)).resolves.toEqual(mockList)
+    await expect(updateReminderListGroup('list-1', 'user-1', null)).resolves.toEqual(mockList)
 
     expect(mockRpc).toHaveBeenCalledWith('update_shopping_list_group_authorized', {
       p_actor_user_id: 'user-1',
@@ -288,61 +288,61 @@ describe('updateShoppingListGroup', () => {
   it('error가 있으면 throw한다', async () => {
     mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'group update error' } })
 
-    await expect(updateShoppingListGroup('list-1', 'user-1', 'group-1')).rejects.toEqual({
+    await expect(updateReminderListGroup('list-1', 'user-1', 'group-1')).rejects.toEqual({
       message: 'group update error',
     })
   })
 })
 
-describe('deleteShoppingList', () => {
+describe('deleteReminderList', () => {
   it('에러 없이 완료된다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(deleteShoppingList('list-1')).resolves.toBeUndefined()
+    await expect(deleteReminderList('list-1')).resolves.toBeUndefined()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
-    await expect(deleteShoppingList('list-1')).rejects.toEqual({ message: 'delete error' })
+    await expect(deleteReminderList('list-1')).rejects.toEqual({ message: 'delete error' })
   })
 })
 
-describe('getShoppingList', () => {
+describe('getReminderList', () => {
   it('단일 리마인더를 반환한다', async () => {
     const mockData = { id: 'list-1', name: '이마트', type: 'strikethrough' }
     mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
-    const result = await getShoppingList('list-1')
+    const result = await getReminderList('list-1')
     expect(result).toEqual(mockData)
     expect(mockFrom).toHaveBeenCalledWith('shopping_lists')
   })
 
   it('data가 null이면 null을 반환한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    const result = await getShoppingList('list-1')
+    const result = await getReminderList('list-1')
     expect(result).toBeNull()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
-    await expect(getShoppingList('list-1')).rejects.toEqual({ message: 'fetch error' })
+    await expect(getReminderList('list-1')).rejects.toEqual({ message: 'fetch error' })
   })
 })
 
-describe('renameShoppingList', () => {
+describe('renameReminderList', () => {
   it('에러 없이 완료된다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(renameShoppingList('list-1', '코스트코')).resolves.toBeUndefined()
+    await expect(renameReminderList('list-1', '코스트코')).resolves.toBeUndefined()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'update error' } }))
-    await expect(renameShoppingList('list-1', '코스트코')).rejects.toEqual({ message: 'update error' })
+    await expect(renameReminderList('list-1', '코스트코')).rejects.toEqual({ message: 'update error' })
   })
 })
 
-describe('reorderShoppingLists', () => {
+describe('reorderReminderLists', () => {
   it('각 항목에 대해 update를 호출한다', async () => {
     mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
-    await reorderShoppingLists([
+    await reorderReminderLists([
       { id: 'list-1', sort_order: 0 },
       { id: 'list-2', sort_order: 1 },
     ])
@@ -351,7 +351,7 @@ describe('reorderShoppingLists', () => {
   })
 
   it('빈 배열이면 아무것도 호출하지 않는다', async () => {
-    await reorderShoppingLists([])
+    await reorderReminderLists([])
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
@@ -361,7 +361,7 @@ describe('reorderShoppingLists', () => {
       .mockReturnValueOnce(makeChain({ data: null, error: { message: 'reorder error' } }))
 
     await expect(
-      reorderShoppingLists([
+      reorderReminderLists([
         { id: 'list-1', sort_order: 0 },
         { id: 'list-2', sort_order: 1 },
       ])
@@ -369,81 +369,81 @@ describe('reorderShoppingLists', () => {
   })
 })
 
-describe('getShoppingItems', () => {
+describe('getReminderItems', () => {
   it('정렬된 아이템 목록을 반환한다', async () => {
     const mockData = [{ id: 'item-1', name: '우유', is_checked: false }]
     mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
-    const result = await getShoppingItems('list-1')
+    const result = await getReminderItems('list-1')
     expect(result).toEqual(mockData)
     expect(mockFrom).toHaveBeenCalledWith('shopping_items')
   })
 
   it('data가 null이면 빈 배열을 반환한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    const result = await getShoppingItems('list-1')
+    const result = await getReminderItems('list-1')
     expect(result).toEqual([])
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
-    await expect(getShoppingItems('list-1')).rejects.toEqual({ message: 'fetch error' })
+    await expect(getReminderItems('list-1')).rejects.toEqual({ message: 'fetch error' })
   })
 })
 
-describe('addShoppingItem', () => {
+describe('addReminderItem', () => {
   it('생성된 아이템을 반환한다', async () => {
     const mockItem = { id: 'item-1', name: '우유', is_checked: false }
     mockFrom.mockReturnValue(makeChain({ data: mockItem, error: null }))
-    const result = await addShoppingItem('list-1', 'user-1', '우유')
+    const result = await addReminderItem('list-1', 'user-1', '우유')
     expect(result).toEqual(mockItem)
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'insert error' } }))
-    await expect(addShoppingItem('list-1', 'user-1', '우유')).rejects.toEqual({ message: 'insert error' })
+    await expect(addReminderItem('list-1', 'user-1', '우유')).rejects.toEqual({ message: 'insert error' })
   })
 })
 
-describe('checkShoppingItem', () => {
+describe('checkReminderItem', () => {
   it('체크 상태를 업데이트한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(checkShoppingItem('item-1', 'user-1', true)).resolves.toBeUndefined()
+    await expect(checkReminderItem('item-1', 'user-1', true)).resolves.toBeUndefined()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'update error' } }))
-    await expect(checkShoppingItem('item-1', 'user-1', true)).rejects.toEqual({ message: 'update error' })
+    await expect(checkReminderItem('item-1', 'user-1', true)).rejects.toEqual({ message: 'update error' })
   })
 })
 
-describe('deleteShoppingItem', () => {
+describe('deleteReminderItem', () => {
   it('에러 없이 완료된다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(deleteShoppingItem('item-1')).resolves.toBeUndefined()
+    await expect(deleteReminderItem('item-1')).resolves.toBeUndefined()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
-    await expect(deleteShoppingItem('item-1')).rejects.toEqual({ message: 'delete error' })
+    await expect(deleteReminderItem('item-1')).rejects.toEqual({ message: 'delete error' })
   })
 })
 
-describe('renameShoppingItem', () => {
+describe('renameReminderItem', () => {
   it('에러 없이 완료된다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(renameShoppingItem('item-1', '두유')).resolves.toBeUndefined()
+    await expect(renameReminderItem('item-1', '두유')).resolves.toBeUndefined()
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'update error' } }))
-    await expect(renameShoppingItem('item-1', '두유')).rejects.toEqual({ message: 'update error' })
+    await expect(renameReminderItem('item-1', '두유')).rejects.toEqual({ message: 'update error' })
   })
 })
 
-describe('reorderShoppingItems', () => {
+describe('reorderReminderItems', () => {
   it('각 아이템에 대해 update를 호출한다', async () => {
     mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
-    await reorderShoppingItems([
+    await reorderReminderItems([
       { id: 'item-1', sort_order: 0 },
       { id: 'item-2', sort_order: 1 },
       { id: 'item-3', sort_order: 2 },
@@ -453,7 +453,7 @@ describe('reorderShoppingItems', () => {
   })
 
   it('빈 배열이면 아무것도 호출하지 않는다', async () => {
-    await reorderShoppingItems([])
+    await reorderReminderItems([])
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
@@ -463,7 +463,7 @@ describe('reorderShoppingItems', () => {
       .mockReturnValueOnce(makeChain({ data: null, error: { message: 'reorder error' } }))
 
     await expect(
-      reorderShoppingItems([
+      reorderReminderItems([
         { id: 'item-1', sort_order: 0 },
         { id: 'item-2', sort_order: 1 },
       ])

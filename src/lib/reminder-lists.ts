@@ -1,16 +1,17 @@
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 
-export type ShoppingList = Database['public']['Tables']['shopping_lists']['Row']
-export type ShoppingItem = Database['public']['Tables']['shopping_items']['Row']
+// The reminder list domain still uses legacy shopping_* table names in Supabase.
+export type ReminderList = Database['public']['Tables']['shopping_lists']['Row']
+export type ReminderItem = Database['public']['Tables']['shopping_items']['Row']
 export type ReminderGroup = Database['public']['Tables']['reminder_groups']['Row']
 export type ReminderGroupMember = Database['public']['Tables']['reminder_group_members']['Row']
 export type ListType = 'strikethrough' | 'delete'
 
-export type ItemPreview = Pick<ShoppingItem, 'id' | 'name' | 'is_checked' | 'sort_order'>
-export type ShoppingListWithPreview = ShoppingList & { previewItems: ItemPreview[] }
+export type ItemPreview = Pick<ReminderItem, 'id' | 'name' | 'is_checked' | 'sort_order'>
+export type ReminderListWithPreview = ReminderList & { previewItems: ItemPreview[] }
 
-type RawListWithItems = ShoppingList & { shopping_items: ItemPreview[] }
+type RawReminderListWithItems = ReminderList & { shopping_items: ItemPreview[] }
 
 export const REMINDER_GROUP_COLORS = [
   '#f97316',
@@ -146,7 +147,7 @@ export async function setReminderGroupMembers(
   if (error) throw error
 }
 
-export async function getShoppingLists(familyId: string): Promise<ShoppingList[]> {
+export async function getReminderLists(familyId: string): Promise<ReminderList[]> {
   const { data, error } = await supabase
     .from('shopping_lists')
     .select('*')
@@ -158,7 +159,7 @@ export async function getShoppingLists(familyId: string): Promise<ShoppingList[]
   return data ?? []
 }
 
-export async function getShoppingListsWithPreviews(familyId: string): Promise<ShoppingListWithPreview[]> {
+export async function getReminderListsWithPreviews(familyId: string): Promise<ReminderListWithPreview[]> {
   const { data, error } = await supabase
     .from('shopping_lists')
     .select('*, shopping_items(id, name, is_checked, sort_order)')
@@ -168,19 +169,19 @@ export async function getShoppingListsWithPreviews(familyId: string): Promise<Sh
 
   if (error) throw error
 
-  return ((data ?? []) as unknown as RawListWithItems[]).map(({ shopping_items, ...list }) => ({
+  return ((data ?? []) as unknown as RawReminderListWithItems[]).map(({ shopping_items, ...list }) => ({
     ...list,
     previewItems: (shopping_items ?? []).sort((a, b) => a.sort_order - b.sort_order),
   }))
 }
 
-export async function createShoppingList(
+export async function createReminderList(
   familyId: string,
   userId: string,
   name: string,
   type: ListType,
   reminderGroupId: string | null = null
-): Promise<ShoppingList> {
+): Promise<ReminderList> {
   const { data, error } = await supabase.rpc('create_shopping_list_authorized', {
     p_actor_user_id: userId,
     p_family_id: familyId,
@@ -193,12 +194,12 @@ export async function createShoppingList(
   return data
 }
 
-export async function deleteShoppingList(listId: string): Promise<void> {
+export async function deleteReminderList(listId: string): Promise<void> {
   const { error } = await supabase.from('shopping_lists').delete().eq('id', listId)
   if (error) throw error
 }
 
-export async function getShoppingList(listId: string): Promise<ShoppingList | null> {
+export async function getReminderList(listId: string): Promise<ReminderList | null> {
   const { data, error } = await supabase
     .from('shopping_lists')
     .select('*')
@@ -209,7 +210,7 @@ export async function getShoppingList(listId: string): Promise<ShoppingList | nu
   return data
 }
 
-export async function getShoppingItems(listId: string): Promise<ShoppingItem[]> {
+export async function getReminderItems(listId: string): Promise<ReminderItem[]> {
   const { data, error } = await supabase
     .from('shopping_items')
     .select('*')
@@ -221,11 +222,11 @@ export async function getShoppingItems(listId: string): Promise<ShoppingItem[]> 
   return data ?? []
 }
 
-export async function addShoppingItem(
+export async function addReminderItem(
   listId: string,
   userId: string,
   name: string
-): Promise<ShoppingItem> {
+): Promise<ReminderItem> {
   const { data, error } = await supabase
     .from('shopping_items')
     .insert({ list_id: listId, created_by: userId, name })
@@ -236,7 +237,7 @@ export async function addShoppingItem(
   return data
 }
 
-export async function checkShoppingItem(
+export async function checkReminderItem(
   itemId: string,
   userId: string,
   checked: boolean
@@ -253,12 +254,12 @@ export async function checkShoppingItem(
   if (error) throw error
 }
 
-export async function deleteShoppingItem(itemId: string): Promise<void> {
+export async function deleteReminderItem(itemId: string): Promise<void> {
   const { error } = await supabase.from('shopping_items').delete().eq('id', itemId)
   if (error) throw error
 }
 
-export async function renameShoppingList(listId: string, name: string): Promise<void> {
+export async function renameReminderList(listId: string, name: string): Promise<void> {
   const { error } = await supabase
     .from('shopping_lists')
     .update({ name })
@@ -266,11 +267,11 @@ export async function renameShoppingList(listId: string, name: string): Promise<
   if (error) throw error
 }
 
-export async function updateShoppingListGroup(
+export async function updateReminderListGroup(
   listId: string,
   userId: string,
   reminderGroupId: string | null
-): Promise<ShoppingList> {
+): Promise<ReminderList> {
   const { data, error } = await supabase.rpc('update_shopping_list_group_authorized', {
     p_actor_user_id: userId,
     p_list_id: listId,
@@ -281,7 +282,7 @@ export async function updateShoppingListGroup(
   return data
 }
 
-export async function renameShoppingItem(itemId: string, name: string): Promise<void> {
+export async function renameReminderItem(itemId: string, name: string): Promise<void> {
   const { error } = await supabase
     .from('shopping_items')
     .update({ name })
@@ -289,7 +290,7 @@ export async function renameShoppingItem(itemId: string, name: string): Promise<
   if (error) throw error
 }
 
-export async function reorderShoppingLists(
+export async function reorderReminderLists(
   updates: { id: string; sort_order: number }[]
 ): Promise<void> {
   const results = await Promise.all(
@@ -302,7 +303,7 @@ export async function reorderShoppingLists(
   if (failed?.error) throw failed.error
 }
 
-export async function reorderShoppingItems(
+export async function reorderReminderItems(
   updates: { id: string; sort_order: number }[]
 ): Promise<void> {
   const results = await Promise.all(

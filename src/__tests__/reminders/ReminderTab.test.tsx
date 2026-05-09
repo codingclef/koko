@@ -1,19 +1,19 @@
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
-import { ShoppingTab, clearShoppingTabCache } from '@/components/tabs/ShoppingTab'
+import { ReminderTab, clearReminderTabCache } from '@/components/tabs/ReminderTab'
 
-const mockCreateShoppingList = jest.fn()
+const mockCreateReminderList = jest.fn()
 const mockGetReminderGroups = jest.fn()
 const mockCreateReminderGroup = jest.fn()
 const mockUpdateReminderGroup = jest.fn()
 const mockDeleteReminderGroup = jest.fn()
 const mockSetReminderGroupMembers = jest.fn()
 const mockGetFamilyMembers = jest.fn()
-const mockGetShoppingListsWithPreviews = jest.fn()
-const mockDeleteShoppingList = jest.fn()
-const mockRenameShoppingList = jest.fn()
-const mockReorderShoppingLists = jest.fn()
+const mockGetReminderListsWithPreviews = jest.fn()
+const mockDeleteReminderList = jest.fn()
+const mockRenameReminderList = jest.fn()
+const mockReorderReminderLists = jest.fn()
 const mockBroadcast = jest.fn()
 const mockUseRealtimeSync = jest.fn((...args: unknown[]) => {
   void args
@@ -25,24 +25,24 @@ let mockListParam: string | null = null
 let mockDndOnDragEnd: ((event: { active: { id: string }; over: { id: string } | null }) => void) | null = null
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
 
-jest.mock('@/lib/shopping', () => ({
+jest.mock('@/lib/reminder-lists', () => ({
   getReminderGroups: (...args: unknown[]) => mockGetReminderGroups(...args),
   createReminderGroup: (...args: unknown[]) => mockCreateReminderGroup(...args),
   updateReminderGroup: (...args: unknown[]) => mockUpdateReminderGroup(...args),
   deleteReminderGroup: (...args: unknown[]) => mockDeleteReminderGroup(...args),
   setReminderGroupMembers: (...args: unknown[]) => mockSetReminderGroupMembers(...args),
-  getShoppingListsWithPreviews: (...args: unknown[]) => mockGetShoppingListsWithPreviews(...args),
-  createShoppingList: (...args: unknown[]) => mockCreateShoppingList(...args),
-  deleteShoppingList: (...args: unknown[]) => mockDeleteShoppingList(...args),
-  renameShoppingList: (...args: unknown[]) => mockRenameShoppingList(...args),
-  reorderShoppingLists: (...args: unknown[]) => mockReorderShoppingLists(...args),
+  getReminderListsWithPreviews: (...args: unknown[]) => mockGetReminderListsWithPreviews(...args),
+  createReminderList: (...args: unknown[]) => mockCreateReminderList(...args),
+  deleteReminderList: (...args: unknown[]) => mockDeleteReminderList(...args),
+  renameReminderList: (...args: unknown[]) => mockRenameReminderList(...args),
+  reorderReminderLists: (...args: unknown[]) => mockReorderReminderLists(...args),
 }))
 
 jest.mock('@/lib/calendar', () => ({
   getFamilyMembers: (...args: unknown[]) => mockGetFamilyMembers(...args),
 }))
 
-jest.mock('@/components/shopping/ReminderGroupListSheet', () => ({
+jest.mock('@/components/reminders/ReminderGroupListSheet', () => ({
   ReminderGroupListSheet: ({
     groups,
     familyMembers,
@@ -100,8 +100,8 @@ jest.mock('@dnd-kit/sortable', () => ({
   rectSortingStrategy: {},
 }))
 
-jest.mock('@/components/shopping/ShoppingListCard', () => ({
-  ShoppingListCard: ({
+jest.mock('@/components/reminders/ReminderListCard', () => ({
+  ReminderListCard: ({
     list,
     onOpen,
   }: {
@@ -110,8 +110,8 @@ jest.mock('@/components/shopping/ShoppingListCard', () => ({
   }) => <button onClick={() => onOpen(list.id)}>{list.name}</button>,
 }))
 
-jest.mock('@/components/shopping/ShoppingDetailView', () => ({
-  ShoppingDetailView: ({
+jest.mock('@/components/reminders/ReminderDetailView', () => ({
+  ReminderDetailView: ({
     listId,
     onClose,
   }: {
@@ -125,13 +125,13 @@ jest.mock('@/components/shopping/ShoppingDetailView', () => ({
   ),
 }))
 
-describe('ShoppingTab', () => {
+describe('ReminderTab', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    clearShoppingTabCache()
+    clearReminderTabCache()
     mockListParam = null
     mockDndOnDragEnd = null
-    mockGetShoppingListsWithPreviews.mockResolvedValue([])
+    mockGetReminderListsWithPreviews.mockResolvedValue([])
     mockGetReminderGroups.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockCreateReminderGroup.mockResolvedValue({ id: 'group-1' })
@@ -146,7 +146,7 @@ describe('ShoppingTab', () => {
 
   it('refreshOnSubscribed: false를 전달하지 않는다', async () => {
     render(
-      <ShoppingTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
+      <ReminderTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
     )
     await act(async () => {})
     const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, unknown, { refreshOnSubscribed?: boolean } | undefined]>
@@ -156,13 +156,13 @@ describe('ShoppingTab', () => {
 
   it('realtime refresh에서 목록과 그룹을 함께 다시 읽는다', async () => {
     render(
-      <ShoppingTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
+      <ReminderTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
     )
 
     await act(async () => {})
     const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, () => void, unknown]>
     const refreshCallback = calls[0]?.[1]
-    mockGetShoppingListsWithPreviews.mockClear()
+    mockGetReminderListsWithPreviews.mockClear()
     mockGetReminderGroups.mockClear()
     mockGetFamilyMembers.mockClear()
 
@@ -170,28 +170,28 @@ describe('ShoppingTab', () => {
       refreshCallback()
     })
 
-    expect(mockGetShoppingListsWithPreviews).toHaveBeenCalledWith('fam-1')
+    expect(mockGetReminderListsWithPreviews).toHaveBeenCalledWith('fam-1')
     expect(mockGetReminderGroups).toHaveBeenCalledWith('fam-1')
     expect(mockGetFamilyMembers).toHaveBeenCalledWith('fam-1')
   })
 
   it('상단 여백을 다른 탭과 같은 압축 기준으로 사용한다', async () => {
     render(
-      <ShoppingTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
+      <ReminderTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
     )
     await act(async () => {})
-    const container = screen.getByTestId('shopping-tab-container')
+    const container = screen.getByTestId('reminder-tab-container')
     expect(container.className).toContain('pt-2')
     expect(container.className).not.toContain('py-8')
   })
 
   it('목록 생성 실패 시 optimistic 항목을 롤백하고 에러를 표시한다', async () => {
     const user = userEvent.setup()
-    mockCreateShoppingList.mockRejectedValueOnce(new Error('insert failed'))
+    mockCreateReminderList.mockRejectedValueOnce(new Error('insert failed'))
     const mockUser = { id: 'user-1' } as User
 
     render(
-      <ShoppingTab
+      <ReminderTab
         user={mockUser}
         familyId="fam-1"
         isInitializing={false}
@@ -211,7 +211,7 @@ describe('ShoppingTab', () => {
 
   it('familyId가 바뀌면 이전 가족의 캐시 목록을 보여주지 않는다', async () => {
     const mockUser = { id: 'user-1' } as User
-    mockGetShoppingListsWithPreviews
+    mockGetReminderListsWithPreviews
       .mockResolvedValueOnce([
         {
           id: 'list-1',
@@ -228,12 +228,12 @@ describe('ShoppingTab', () => {
       .mockRejectedValueOnce(new Error('fetch failed'))
 
     const { rerender } = render(
-      <ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />
+      <ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />
     )
 
     expect(await screen.findByText('첫째 가족 목록')).toBeInTheDocument()
 
-    rerender(<ShoppingTab user={mockUser} familyId="fam-2" isInitializing={false} />)
+    rerender(<ReminderTab user={mockUser} familyId="fam-2" isInitializing={false} />)
 
     await waitFor(() => {
       expect(screen.getByText('목록을 불러오지 못했어요')).toBeInTheDocument()
@@ -242,11 +242,11 @@ describe('ShoppingTab', () => {
     expect(screen.queryByText('첫째 가족 목록')).not.toBeInTheDocument()
   })
 
-  it('목록 카드 열기 시 canonical shopping detail URL로 push한다', async () => {
+  it('목록 카드 열기 시 canonical reminder detail URL로 push한다', async () => {
     const user = userEvent.setup()
     const mockUser = { id: 'user-1' } as User
 
-    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+    mockGetReminderListsWithPreviews.mockResolvedValueOnce([
       {
         id: 'list-1',
         family_id: 'fam-1',
@@ -260,25 +260,25 @@ describe('ShoppingTab', () => {
       },
     ])
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     await user.click(await screen.findByRole('button', { name: '이마트' }))
 
-    expect(mockPush).toHaveBeenCalledWith('/calendar?tab=shopping&list=list-1', { scroll: false })
+    expect(mockPush).toHaveBeenCalledWith('/calendar?tab=reminders&list=list-1', { scroll: false })
   })
 
-  it('list 쿼리가 있으면 상세를 열고 닫기 시 shopping 리스트 URL로 replace한다', async () => {
+  it('list 쿼리가 있으면 상세를 열고 닫기 시 reminder 리스트 URL로 replace한다', async () => {
     const user = userEvent.setup()
     const mockUser = { id: 'user-1' } as User
     mockListParam = 'list-1'
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     expect(await screen.findByText('detail:list-1')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'close-detail' }))
 
-    expect(mockReplace).toHaveBeenCalledWith('/calendar?tab=shopping', { scroll: false })
+    expect(mockReplace).toHaveBeenCalledWith('/calendar?tab=reminders', { scroll: false })
   })
 
   it('리마인더 그룹 관리 시트를 연다', async () => {
@@ -297,7 +297,7 @@ describe('ShoppingTab', () => {
       },
     ])
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     await user.click(await screen.findByLabelText('리마인더 그룹 관리'))
 
@@ -319,7 +319,7 @@ describe('ShoppingTab', () => {
         updated_at: '2026-01-01T00:00:00Z',
       },
     ])
-    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+    mockGetReminderListsWithPreviews.mockResolvedValueOnce([
       {
         id: 'list-1',
         family_id: 'fam-1',
@@ -344,7 +344,7 @@ describe('ShoppingTab', () => {
       },
     ])
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     expect(await screen.findByRole('button', { name: '가족 목록' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '개인 목록' })).toBeInTheDocument()
@@ -358,7 +358,7 @@ describe('ShoppingTab', () => {
   it('필터 상태에서 정렬하면 보이는 목록끼리만 순서를 바꾸고 숨겨진 목록 위치는 유지한다', async () => {
     const user = userEvent.setup()
     const mockUser = { id: 'user-1' } as User
-    mockReorderShoppingLists.mockResolvedValueOnce(undefined)
+    mockReorderReminderLists.mockResolvedValueOnce(undefined)
     mockGetReminderGroups.mockResolvedValueOnce([
       {
         id: 'group-1',
@@ -371,7 +371,7 @@ describe('ShoppingTab', () => {
         updated_at: '2026-01-01T00:00:00Z',
       },
     ])
-    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+    mockGetReminderListsWithPreviews.mockResolvedValueOnce([
       {
         id: 'family-a',
         family_id: 'fam-1',
@@ -407,7 +407,7 @@ describe('ShoppingTab', () => {
       },
     ])
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     await user.click(await screen.findByRole('button', { name: '가족 전체' }))
 
@@ -418,7 +418,7 @@ describe('ShoppingTab', () => {
       })
     })
 
-    expect(mockReorderShoppingLists).toHaveBeenCalledWith([
+    expect(mockReorderReminderLists).toHaveBeenCalledWith([
       { id: 'family-b', sort_order: 0 },
       { id: 'group-a', sort_order: 1 },
       { id: 'family-a', sort_order: 2 },
@@ -428,7 +428,7 @@ describe('ShoppingTab', () => {
   it('특정 그룹 필터에서도 해당 그룹 목록끼리만 순서를 바꾼다', async () => {
     const user = userEvent.setup()
     const mockUser = { id: 'user-1' } as User
-    mockReorderShoppingLists.mockResolvedValueOnce(undefined)
+    mockReorderReminderLists.mockResolvedValueOnce(undefined)
     mockGetReminderGroups.mockResolvedValueOnce([
       {
         id: 'group-1',
@@ -451,7 +451,7 @@ describe('ShoppingTab', () => {
         updated_at: '2026-01-01T00:00:00Z',
       },
     ])
-    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+    mockGetReminderListsWithPreviews.mockResolvedValueOnce([
       {
         id: 'family-a',
         family_id: 'fam-1',
@@ -498,7 +498,7 @@ describe('ShoppingTab', () => {
       },
     ])
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     await user.click(await screen.findByRole('button', { name: '개인' }))
 
@@ -509,7 +509,7 @@ describe('ShoppingTab', () => {
       })
     })
 
-    expect(mockReorderShoppingLists).toHaveBeenCalledWith([
+    expect(mockReorderReminderLists).toHaveBeenCalledWith([
       { id: 'family-a', sort_order: 0 },
       { id: 'group-b', sort_order: 1 },
       { id: 'other-group', sort_order: 2 },
@@ -532,7 +532,7 @@ describe('ShoppingTab', () => {
         updated_at: '2026-01-01T00:00:00Z',
       },
     ])
-    mockCreateShoppingList.mockResolvedValueOnce({
+    mockCreateReminderList.mockResolvedValueOnce({
       id: 'list-1',
       family_id: 'fam-1',
       created_by: 'user-1',
@@ -543,7 +543,7 @@ describe('ShoppingTab', () => {
       created_at: '2026-01-01T00:00:00Z',
     })
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     await user.click(await screen.findByLabelText('새 리마인더 추가'))
     await user.type(screen.getByPlaceholderText('예: 이마트, 코스트코'), '이마트')
@@ -551,7 +551,7 @@ describe('ShoppingTab', () => {
     await user.click(screen.getByRole('button', { name: '만들기' }))
 
     await waitFor(() => {
-      expect(mockCreateShoppingList).toHaveBeenCalledWith(
+      expect(mockCreateReminderList).toHaveBeenCalledWith(
         'fam-1',
         'user-1',
         '이마트',
@@ -584,7 +584,7 @@ describe('ShoppingTab', () => {
       },
     ])
 
-    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+    render(<ReminderTab user={mockUser} familyId="fam-1" isInitializing={false} />)
 
     await user.click(await screen.findByLabelText('리마인더 그룹 관리'))
 

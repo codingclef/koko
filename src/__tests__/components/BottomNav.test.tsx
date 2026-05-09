@@ -16,18 +16,18 @@ describe('BottomNav', () => {
     expect(screen.getByText('설정')).toBeInTheDocument()
   })
 
-  it('/shopping 경로에서 리마인더 탭이 활성화된다', () => {
-    mockUsePathname.mockReturnValue('/shopping')
+  it('/reminders 경로에서 리마인더 탭이 활성화된다', () => {
+    mockUsePathname.mockReturnValue('/reminders')
     render(<BottomNav />)
-    const shoppingLink = screen.getByText('리마인더').closest('a')
-    expect(shoppingLink).toHaveClass('text-accent-500')
+    const reminderLink = screen.getByText('리마인더').closest('a')
+    expect(reminderLink).toHaveClass('text-accent-500')
   })
 
-  it('/shopping/list-1 경로에서도 리마인더 탭이 활성화된다', () => {
-    mockUsePathname.mockReturnValue('/shopping/list-1')
+  it('/reminders/list-1 경로에서도 리마인더 탭이 활성화된다', () => {
+    mockUsePathname.mockReturnValue('/reminders/list-1')
     render(<BottomNav />)
-    const shoppingLink = screen.getByText('리마인더').closest('a')
-    expect(shoppingLink).toHaveClass('text-accent-500')
+    const reminderLink = screen.getByText('리마인더').closest('a')
+    expect(reminderLink).toHaveClass('text-accent-500')
   })
 
   it('/settings 경로에서 설정 탭이 활성화된다', () => {
@@ -38,7 +38,7 @@ describe('BottomNav', () => {
   })
 
   it('활성화되지 않은 탭은 기본 색상이다', () => {
-    mockUsePathname.mockReturnValue('/shopping')
+    mockUsePathname.mockReturnValue('/reminders')
     render(<BottomNav />)
     const settingsLink = screen.getByText('설정').closest('a')
     expect(settingsLink).not.toHaveClass('text-accent-500')
@@ -47,7 +47,7 @@ describe('BottomNav', () => {
   it('링크의 href가 올바르다', () => {
     mockUsePathname.mockReturnValue('/')
     render(<BottomNav />)
-    expect(screen.getByText('리마인더').closest('a')).toHaveAttribute('href', '/shopping')
+    expect(screen.getByText('리마인더').closest('a')).toHaveAttribute('href', '/reminders')
     expect(screen.getByText('설정').closest('a')).toHaveAttribute('href', '/settings')
   })
 })

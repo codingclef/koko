@@ -3,7 +3,7 @@
 [한국어](README.ko.md) | [日本語](README.ja.md) | **[English]**
 
 Koko is a family collaboration PWA built around one shared app shell.
-The current product surface is calendar, recurring events, shopping lists, family invite/join, user preferences, and Web Push notifications.
+The current product surface is calendar, recurring events, reminder lists, family invite/join, user preferences, and Web Push notifications.
 
 ## Current Scope
 
@@ -11,7 +11,7 @@ The current product surface is calendar, recurring events, shopping lists, famil
 - Explicit family creation and invite-code based family join
 - Calendar with family-wide events, calendar-specific visibility, recurring events, and event label colors
 - Event reminders and daily digests delivered through Web Push
-- Shopping lists with realtime sync and drag-and-drop ordering
+- Reminder lists with realtime sync and drag-and-drop ordering
 - User preferences for theme, holiday countries, and lunar date display
 - Installable PWA experience on mobile and desktop
 
@@ -27,9 +27,10 @@ Those tables exist in the schema and generated types, but not in the active fron
 The app uses a single mounted family shell:
 
 - `/calendar` is the only live tab entry route
-- `/shopping` and `/settings` redirect back to `/calendar`
-- `TabsShell` keeps calendar, shopping, and settings mounted, then toggles visibility with a keep-alive pattern
-- `src/app/shopping/[id]/page.tsx` is a legacy-link bridge into `/calendar?tab=shopping&list=...`
+- `/reminders` and `/settings` redirect back to the `/calendar` tab shell
+- `/shopping` remains as a legacy-link compatibility route
+- `TabsShell` keeps calendar, reminders, and settings mounted, then toggles visibility with a keep-alive pattern
+- `src/app/shopping/[id]/page.tsx` is a legacy-link bridge into `/calendar?tab=reminders&list=...`
 
 This structure avoids tab reload spinners and preserves state while switching between tabs.
 
@@ -45,8 +46,8 @@ The pattern is:
 
 This is used for:
 
-- Family-scoped shopping list refresh
-- Shopping-item refresh inside a specific list
+- Family-scoped reminder list refresh
+- Reminder-item refresh inside a specific list
 - Family-scoped calendar event refresh with month-window refetching
 
 ## Auth And Family Model
@@ -59,7 +60,7 @@ This is used for:
 - `/api/family/create` calls a DB RPC to explicitly create a family during onboarding.
 - `/api/family/join` calls a DB RPC to move the user into another family by invite code.
 
-The active family is the tenant boundary for calendars, shopping lists, and family membership data.
+The active family is the tenant boundary for calendars, reminder lists, and family membership data.
 
 ## Tech Stack
 
@@ -100,7 +101,7 @@ Start with these repo docs when changing the project:
 
 - [`src/components/TabsShell.tsx`](/Users/codingclef/workspace_codex/koko/src/components/TabsShell.tsx): keep-alive app shell
 - [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/CalendarTab.tsx): calendar runtime container
-- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/ShoppingTab.tsx): shopping overview container
+- [`src/components/tabs/ReminderTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/ReminderTab.tsx): reminder overview container
 - [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/SettingsTab.tsx): settings and family actions
 - [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace_codex/koko/src/hooks/useRealtimeSync.ts): shared broadcast subscription pattern
 - [`src/app/api/family/me/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/me/route.ts): current family and app role lookup
@@ -160,7 +161,7 @@ The repo already includes regression coverage for:
 - API routes
 - Supabase-facing `lib/*` modules
 - Shared hooks
-- Calendar, shopping, settings, and shell UI behavior
+- Calendar, reminders, settings, and shell UI behavior
 
 When changing code, update the relevant tests and run `npx tsc --noEmit` before considering the work complete.
 
@@ -183,6 +184,7 @@ Important current tables:
 - `recurrence_series`
 - `shopping_lists`
 - `shopping_items`
+- These two tables are legacy physical DB names for the reminders domain
 - `push_subscriptions`
 - `daily_digest_log`
 
@@ -193,7 +195,7 @@ Important current RPC and migration-driven behavior:
 - Reminder selection and sent-at marking
 - Sent reminder cleanup
 - Recurring event series creation, update, and deletion
-- RLS fixes for family, shopping, and calendar membership flows
+- RLS fixes for family, reminders, and calendar membership flows
 
 ## Documentation Notes
 

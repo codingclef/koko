@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AddItemInput } from '@/components/shopping/AddItemInput'
+import { AddItemInput } from '@/components/reminders/AddItemInput'
 
 describe('AddItemInput', () => {
   it('입력창과 추가 버튼이 렌더링된다', () => {
