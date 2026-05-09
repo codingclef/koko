@@ -49,6 +49,15 @@ export function clearShoppingTabCache() {
 type Props = AuthState
 type ReminderGroupFilter = 'all' | 'family' | string
 
+function matchesReminderGroupFilter(
+  list: ShoppingListWithPreview,
+  activeGroupId: ReminderGroupFilter
+): boolean {
+  if (activeGroupId === 'all') return true
+  if (activeGroupId === 'family') return list.reminder_group_id === null
+  return list.reminder_group_id === activeGroupId
+}
+
 export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -76,11 +85,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       ? 'all'
       : activeGroupId
   const visibleLists = useMemo(() => {
-    if (effectiveActiveGroupId === 'all') return lists
-    if (effectiveActiveGroupId === 'family') {
-      return lists.filter((list) => list.reminder_group_id === null)
-    }
-    return lists.filter((list) => list.reminder_group_id === effectiveActiveGroupId)
+    return lists.filter((list) => matchesReminderGroupFilter(list, effectiveActiveGroupId))
   }, [effectiveActiveGroupId, lists])
 
   const sensors = useSensors(
@@ -273,9 +278,22 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     if (!over || active.id === over.id) return
 
     setMutationError(null)
-    const oldIndex = lists.findIndex((l) => l.id === active.id)
-    const newIndex = lists.findIndex((l) => l.id === over.id)
-    const reordered = arrayMove(lists, oldIndex, newIndex).map((l, i) => ({ ...l, sort_order: i }))
+    const oldIndex = visibleLists.findIndex((l) => l.id === active.id)
+    const newIndex = visibleLists.findIndex((l) => l.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+
+    const reorderedVisibleLists = arrayMove(visibleLists, oldIndex, newIndex)
+    let visibleIndex = 0
+    const reordered = lists
+      .map((list) => {
+        if (!matchesReminderGroupFilter(list, effectiveActiveGroupId)) {
+          return list
+        }
+        const nextVisibleList = reorderedVisibleLists[visibleIndex]
+        visibleIndex += 1
+        return nextVisibleList
+      })
+      .map((l, i) => ({ ...l, sort_order: i }))
     updateLists(reordered)
 
     try {

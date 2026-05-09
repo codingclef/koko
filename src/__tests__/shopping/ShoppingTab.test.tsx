@@ -22,6 +22,7 @@ const mockUseRealtimeSync = jest.fn((...args: unknown[]) => {
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 let mockListParam: string | null = null
+let mockDndOnDragEnd: ((event: { active: { id: string }; over: { id: string } | null }) => void) | null = null
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
 
 jest.mock('@/lib/shopping', () => ({
@@ -72,7 +73,16 @@ jest.mock('next/navigation', () => ({
 }))
 
 jest.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DndContext: ({
+    children,
+    onDragEnd,
+  }: {
+    children: React.ReactNode
+    onDragEnd: (event: { active: { id: string }; over: { id: string } | null }) => void
+  }) => {
+    mockDndOnDragEnd = onDragEnd
+    return <>{children}</>
+  },
   PointerSensor: class {},
   TouchSensor: class {},
   useSensor: jest.fn(),
@@ -81,7 +91,12 @@ jest.mock('@dnd-kit/core', () => ({
 
 jest.mock('@dnd-kit/sortable', () => ({
   SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  arrayMove: jest.fn((items: unknown[]) => items),
+  arrayMove: jest.fn((items: unknown[], oldIndex: number, newIndex: number) => {
+    const next = [...items]
+    const [item] = next.splice(oldIndex, 1)
+    next.splice(newIndex, 0, item)
+    return next
+  }),
   rectSortingStrategy: {},
 }))
 
@@ -115,6 +130,7 @@ describe('ShoppingTab', () => {
     jest.clearAllMocks()
     clearShoppingTabCache()
     mockListParam = null
+    mockDndOnDragEnd = null
     mockGetShoppingListsWithPreviews.mockResolvedValue([])
     mockGetReminderGroups.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
@@ -337,6 +353,168 @@ describe('ShoppingTab', () => {
 
     expect(screen.queryByRole('button', { name: '가족 목록' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '개인 목록' })).toBeInTheDocument()
+  })
+
+  it('필터 상태에서 정렬하면 보이는 목록끼리만 순서를 바꾸고 숨겨진 목록 위치는 유지한다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockReorderShoppingLists.mockResolvedValueOnce(undefined)
+    mockGetReminderGroups.mockResolvedValueOnce([
+      {
+        id: 'group-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인',
+        color: '#3b82f6',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+      {
+        id: 'family-a',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족 A',
+        reminder_group_id: null,
+        type: 'strikethrough',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+      {
+        id: 'group-a',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인 A',
+        reminder_group_id: 'group-1',
+        type: 'strikethrough',
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+      {
+        id: 'family-b',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족 B',
+        reminder_group_id: null,
+        type: 'strikethrough',
+        sort_order: 2,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+    ])
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    await user.click(await screen.findByRole('button', { name: '가족 전체' }))
+
+    await act(async () => {
+      mockDndOnDragEnd?.({
+        active: { id: 'family-b' },
+        over: { id: 'family-a' },
+      })
+    })
+
+    expect(mockReorderShoppingLists).toHaveBeenCalledWith([
+      { id: 'family-b', sort_order: 0 },
+      { id: 'group-a', sort_order: 1 },
+      { id: 'family-a', sort_order: 2 },
+    ])
+  })
+
+  it('특정 그룹 필터에서도 해당 그룹 목록끼리만 순서를 바꾼다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockReorderShoppingLists.mockResolvedValueOnce(undefined)
+    mockGetReminderGroups.mockResolvedValueOnce([
+      {
+        id: 'group-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인',
+        color: '#3b82f6',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'group-2',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '회사',
+        color: '#22c55e',
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    mockGetShoppingListsWithPreviews.mockResolvedValueOnce([
+      {
+        id: 'family-a',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '가족 A',
+        reminder_group_id: null,
+        type: 'strikethrough',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+      {
+        id: 'group-a',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인 A',
+        reminder_group_id: 'group-1',
+        type: 'strikethrough',
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+      {
+        id: 'other-group',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '회사 A',
+        reminder_group_id: 'group-2',
+        type: 'strikethrough',
+        sort_order: 2,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+      {
+        id: 'group-b',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '개인 B',
+        reminder_group_id: 'group-1',
+        type: 'strikethrough',
+        sort_order: 3,
+        created_at: '2026-01-01T00:00:00Z',
+        previewItems: [],
+      },
+    ])
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    await user.click(await screen.findByRole('button', { name: '개인' }))
+
+    await act(async () => {
+      mockDndOnDragEnd?.({
+        active: { id: 'group-b' },
+        over: { id: 'group-a' },
+      })
+    })
+
+    expect(mockReorderShoppingLists).toHaveBeenCalledWith([
+      { id: 'family-a', sort_order: 0 },
+      { id: 'group-b', sort_order: 1 },
+      { id: 'other-group', sort_order: 2 },
+      { id: 'group-a', sort_order: 3 },
+    ])
   })
 
   it('그룹을 선택해 리마인더를 만들면 생성 API에 그룹 id를 전달한다', async () => {
