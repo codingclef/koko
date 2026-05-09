@@ -213,6 +213,14 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     }
   }
 
+  const handleListGroupChange = useCallback((listId: string, reminderGroupId: string | null) => {
+    updateLists((prev) =>
+      prev.map((list) =>
+        list.id === listId ? { ...list, reminder_group_id: reminderGroupId } : list
+      )
+    )
+  }, [updateLists])
+
   const handleGroupCreate = async (
     name: string,
     color: string,
@@ -370,7 +378,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
           key={activeListId}
           listId={activeListId}
           user={user}
+          groups={groups}
           onClose={closeShoppingDetail}
+          onListGroupChange={handleListGroupChange}
           onPreviewItemsChange={handlePreviewItemsChange}
         />
       )}

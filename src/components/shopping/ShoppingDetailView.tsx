@@ -19,11 +19,13 @@ import {
   deleteShoppingItem,
   renameShoppingItem,
   reorderShoppingItems,
+  updateShoppingListGroup,
 } from '@/lib/shopping'
 import { ShoppingItem } from '@/components/shopping/ShoppingItem'
 import { AddItemInput } from '@/components/shopping/AddItemInput'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import type { ShoppingItem as ShoppingItemType, ShoppingList } from '@/lib/shopping'
+import { toDisplayColor } from '@/lib/label-colors'
+import type { ShoppingItem as ShoppingItemType, ShoppingList, ReminderGroup } from '@/lib/shopping'
 import type { User } from '@supabase/supabase-js'
 
 type DetailStatus = 'loading' | 'ready' | 'not-found' | 'fetch-error'
@@ -31,20 +33,25 @@ type DetailStatus = 'loading' | 'ready' | 'not-found' | 'fetch-error'
 interface Props {
   listId: string
   user: User
+  groups?: ReminderGroup[]
   onClose: () => void
+  onListGroupChange?: (listId: string, reminderGroupId: string | null) => void
   onPreviewItemsChange: (listId: string, items: ShoppingItemType[]) => void
 }
 
 export function ShoppingDetailView({
   listId,
   user,
+  groups = [],
   onClose,
+  onListGroupChange,
   onPreviewItemsChange,
 }: Props) {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [items, setItems] = useState<ShoppingItemType[]>([])
   const [status, setStatus] = useState<DetailStatus>('loading')
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [groupSaving, setGroupSaving] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -67,7 +74,22 @@ export function ShoppingDetailView({
       .catch((e) => console.error('[ShoppingDetailView] getShoppingItems failed:', e))
   }, [listId, syncPreview])
 
+  const refreshList = useCallback(() => {
+    getShoppingList(listId)
+      .then((nextList) => {
+        if (nextList) {
+          setList(nextList)
+          onListGroupChange?.(listId, nextList.reminder_group_id)
+        }
+      })
+      .catch((e) => console.error('[ShoppingDetailView] getShoppingList failed:', e))
+  }, [listId, onListGroupChange])
+
   const broadcast = useRealtimeSync(`list_items_${listId}`, refreshItems)
+  const broadcastListChange = useRealtimeSync(
+    list ? `family_lists_${list.family_id}` : null,
+    refreshList
+  )
 
   const fetchDetailData = useCallback(async () => {
     const shoppingList = await getShoppingList(listId)
@@ -283,6 +305,33 @@ export function ShoppingDetailView({
     }
   }
 
+  const handleGroupChange = async (nextValue: string) => {
+    if (!list || groupSaving) return
+
+    const nextGroupId = nextValue === '' ? null : nextValue
+    if (nextGroupId === list.reminder_group_id) return
+
+    setMutationError(null)
+    setGroupSaving(true)
+    const previousList = list
+    setList({ ...list, reminder_group_id: nextGroupId })
+    onListGroupChange?.(list.id, nextGroupId)
+
+    try {
+      const updatedList = await updateShoppingListGroup(list.id, user.id, nextGroupId)
+      setList(updatedList)
+      onListGroupChange?.(updatedList.id, updatedList.reminder_group_id)
+      broadcastListChange()
+    } catch (e) {
+      console.error('[ShoppingDetailView] updateShoppingListGroup failed:', e)
+      setList(previousList)
+      onListGroupChange?.(previousList.id, previousList.reminder_group_id)
+      setMutationError('그룹을 변경하지 못했어요')
+    } finally {
+      setGroupSaving(false)
+    }
+  }
+
   const uncheckedItems = useMemo(
     () => items.filter((item) => !item.is_checked),
     [items]
@@ -291,6 +340,9 @@ export function ShoppingDetailView({
     () => items.filter((item) => item.is_checked),
     [items]
   )
+  const currentGroup = list?.reminder_group_id
+    ? groups.find((group) => group.id === list.reminder_group_id) ?? null
+    : null
 
   return (
     <div
@@ -343,6 +395,35 @@ export function ShoppingDetailView({
               </p>
             </div>
           </div>
+
+          {list && groups.length > 0 && (
+            <div className="flex items-center gap-3 border-b border-stone-100 px-4 py-3 dark:border-stone-800">
+              <div
+                className="h-2.5 w-2.5 shrink-0 rounded-full bg-stone-300 dark:bg-stone-600"
+                style={currentGroup ? { backgroundColor: toDisplayColor(currentGroup.color) } : undefined}
+              />
+              <label
+                htmlFor="shopping-list-group"
+                className="shrink-0 text-xs font-semibold text-stone-400 dark:text-stone-500"
+              >
+                그룹
+              </label>
+              <select
+                id="shopping-list-group"
+                value={list.reminder_group_id ?? ''}
+                disabled={groupSaving}
+                onChange={(event) => void handleGroupChange(event.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-2 text-sm font-medium text-stone-700 outline-none transition-colors focus:ring-2 focus:ring-accent-300 disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200"
+              >
+                <option value="">가족 전체</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div data-testid="shopping-detail-scroll" className="flex-1 min-h-0 overflow-y-auto py-2">
             {mutationError && (

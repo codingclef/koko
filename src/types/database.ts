@@ -765,6 +765,14 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["shopping_lists"]["Row"]
       }
+      update_shopping_list_group_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_list_id: string
+          p_reminder_group_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["shopping_lists"]["Row"]
+      }
       get_my_calendar_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
