@@ -181,17 +181,13 @@ export async function createShoppingList(
   type: ListType,
   reminderGroupId: string | null = null
 ): Promise<ShoppingList> {
-  const { data, error } = await supabase
-    .from('shopping_lists')
-    .insert({
-      family_id: familyId,
-      created_by: userId,
-      name,
-      type,
-      reminder_group_id: reminderGroupId,
-    })
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('create_shopping_list_authorized', {
+    p_actor_user_id: userId,
+    p_family_id: familyId,
+    p_name: name,
+    p_type: type,
+    p_reminder_group_id: reminderGroupId,
+  })
 
   if (error) throw error
   return data

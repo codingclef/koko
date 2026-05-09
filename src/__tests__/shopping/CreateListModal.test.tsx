@@ -30,7 +30,39 @@ describe('CreateListModal', () => {
     fireEvent.click(screen.getByRole('button', { name: '만들기' }))
 
     await waitFor(() => {
-      expect(onCreate).toHaveBeenCalledWith('이마트', 'strikethrough')
+      expect(onCreate).toHaveBeenCalledWith('이마트', 'strikethrough', null)
+    })
+  })
+
+  it('그룹 선택 후 생성하면 선택한 그룹 id를 전달한다', async () => {
+    const onCreate = jest.fn().mockResolvedValue(true)
+    render(
+      <CreateListModal
+        groups={[
+          {
+            id: 'group-1',
+            family_id: 'fam-1',
+            created_by: 'user-1',
+            name: '집',
+            color: '#3b82f6',
+            sort_order: 0,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ]}
+        onClose={jest.fn()}
+        onCreate={onCreate}
+      />
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('예: 이마트, 코스트코'), {
+      target: { value: '이마트' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '집' }))
+    fireEvent.click(screen.getByRole('button', { name: '만들기' }))
+
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith('이마트', 'strikethrough', 'group-1')
     })
   })
 

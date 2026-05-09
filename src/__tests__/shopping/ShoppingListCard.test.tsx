@@ -78,6 +78,29 @@ describe('ShoppingListCard', () => {
     expect(screen.getByText('이마트')).toBeInTheDocument()
   })
 
+  it('그룹이 있으면 그룹 이름을 표시한다', () => {
+    render(
+      <ShoppingListCard
+        list={mockList}
+        group={{
+          id: 'group-1',
+          family_id: 'fam-1',
+          created_by: 'user-1',
+          name: '집',
+          color: '#3b82f6',
+          sort_order: 0,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }}
+        onDelete={jest.fn()}
+        onRename={jest.fn()}
+        onOpen={mockOnOpen}
+      />
+    )
+
+    expect(screen.getByText('집')).toBeInTheDocument()
+  })
+
   it('이름 클릭 시 인라인 편집 입력창이 나타난다', () => {
     render(<ShoppingListCard list={mockList} onDelete={jest.fn()} onRename={jest.fn()} onOpen={mockOnOpen} />)
     fireEvent.click(screen.getByText('이마트'))

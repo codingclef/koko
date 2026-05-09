@@ -4,17 +4,19 @@ import { useState, useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { ShoppingList, ItemPreview } from '@/lib/shopping'
+import type { ShoppingList, ItemPreview, ReminderGroup } from '@/lib/shopping'
+import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
   list: ShoppingList
+  group?: ReminderGroup | null
   previewItems?: ItemPreview[]
   onDelete: (listId: string) => void
   onRename: (listId: string, name: string) => void
   onOpen: (listId: string) => void
 }
 
-export function ShoppingListCard({ list, previewItems = [], onDelete, onRename, onOpen }: Props) {
+export function ShoppingListCard({ list, group, previewItems = [], onDelete, onRename, onOpen }: Props) {
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(list.name)
@@ -109,6 +111,7 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename, 
 
   const visibleItems = previewItems.slice(0, 3)
   const hiddenCount = previewItems.length - visibleItems.length
+  const groupColor = group ? toDisplayColor(group.color) : null
 
   return (
     <>
@@ -163,6 +166,13 @@ export function ShoppingListCard({ list, previewItems = [], onDelete, onRename, 
             </button>
           )}
         </div>
+
+        {group && groupColor && (
+          <div className="mb-2 flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-stone-400 dark:text-stone-500">
+            <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: groupColor }} />
+            <span className="truncate">{group.name}</span>
+          </div>
+        )}
 
         {/* Preview items — divider always at same position (no mt-auto) */}
         <div className="border-t border-stone-100 dark:border-stone-800 pt-2 space-y-1">

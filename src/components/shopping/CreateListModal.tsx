@@ -2,16 +2,19 @@
 
 import { useState } from 'react'
 import { X, ListChecks, Trash2 } from 'lucide-react'
-import type { ListType } from '@/lib/shopping'
+import type { ListType, ReminderGroup } from '@/lib/shopping'
+import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
+  groups?: ReminderGroup[]
   onClose: () => void
-  onCreate: (name: string, type: ListType) => Promise<boolean>
+  onCreate: (name: string, type: ListType, reminderGroupId: string | null) => Promise<boolean>
 }
 
-export function CreateListModal({ onClose, onCreate }: Props) {
+export function CreateListModal({ groups = [], onClose, onCreate }: Props) {
   const [name, setName] = useState('')
   const [type, setType] = useState<ListType>('strikethrough')
+  const [reminderGroupId, setReminderGroupId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,9 +22,10 @@ export function CreateListModal({ onClose, onCreate }: Props) {
     if (!name.trim()) return
     setLoading(true)
     try {
-      const created = await onCreate(name.trim(), type)
+      const created = await onCreate(name.trim(), type, reminderGroupId)
       if (created) {
         setName('')
+        setReminderGroupId(null)
       }
     } finally {
       setLoading(false)
@@ -56,6 +60,50 @@ export function CreateListModal({ onClose, onCreate }: Props) {
               className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-accent-300 dark:focus:ring-accent-500 transition"
             />
           </div>
+
+          {groups.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-2">
+                그룹
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReminderGroupId(null)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    reminderGroupId === null
+                      ? 'border-accent-300 bg-accent-50 text-accent-600 dark:border-accent-700 dark:bg-accent-950/30 dark:text-accent-400'
+                      : 'border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-700 dark:text-stone-400'
+                  }`}
+                >
+                  가족 전체
+                </button>
+                {groups.map((group) => {
+                  const selected = reminderGroupId === group.id
+                  const displayColor = toDisplayColor(group.color)
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => setReminderGroupId(group.id)}
+                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        selected
+                          ? 'border-transparent text-white'
+                          : 'border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-700 dark:text-stone-400'
+                      }`}
+                      style={selected ? { backgroundColor: displayColor } : undefined}
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: selected ? 'rgba(255,255,255,0.75)' : displayColor }}
+                      />
+                      {group.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-2">

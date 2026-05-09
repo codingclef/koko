@@ -5,8 +5,23 @@ const migrationPath = path.join(
   process.cwd(),
   'supabase/migrations/20260508000000_reminder_groups_groundwork.sql'
 )
+const ownerAccessMigrationPath = path.join(
+  process.cwd(),
+  'supabase/migrations/20260509000000_fix_reminder_group_owner_access.sql'
+)
+const createListMigrationPath = path.join(
+  process.cwd(),
+  'supabase/migrations/20260509001000_create_shopping_list_authorized.sql'
+)
+const lockDirectInsertMigrationPath = path.join(
+  process.cwd(),
+  'supabase/migrations/20260509002000_lock_shopping_list_direct_insert.sql'
+)
 
 const sql = () => fs.readFileSync(migrationPath, 'utf8')
+const ownerAccessSql = () => fs.readFileSync(ownerAccessMigrationPath, 'utf8')
+const createListSql = () => fs.readFileSync(createListMigrationPath, 'utf8')
+const lockDirectInsertSql = () => fs.readFileSync(lockDirectInsertMigrationPath, 'utf8')
 
 describe('reminder groups migration', () => {
   it('does not expose grouped lists by clearing reminder_group_id on group delete', () => {
@@ -31,5 +46,36 @@ describe('reminder groups migration', () => {
     expect(migration).toContain('create or replace function get_my_reminder_group_ids()')
     expect(migration).toContain('create or replace function get_my_list_ids()')
     expect(migration).toContain('sl.reminder_group_id in (select get_my_reminder_group_ids())')
+  })
+
+  it('backfills group owners and includes created groups in access helpers', () => {
+    const migration = ownerAccessSql()
+
+    expect(migration).toContain('insert into reminder_group_members')
+    expect(migration).toContain('from reminder_groups rg')
+    expect(migration).toContain('on conflict (reminder_group_id, user_id) do update')
+    expect(migration).toContain('select id')
+    expect(migration).toContain('from reminder_groups')
+    expect(migration).toContain('where created_by = auth.uid()')
+  })
+
+  it('creates reminder lists through an authorized RPC', () => {
+    const migration = createListSql()
+
+    expect(migration).toContain('create or replace function create_shopping_list_authorized')
+    expect(migration).toContain('v_actor_id uuid := auth.uid()')
+    expect(migration).toContain('from family_members fm')
+    expect(migration).toContain('from reminder_groups rg')
+    expect(migration).toContain('from reminder_group_members rgm')
+    expect(migration).toContain('insert into shopping_lists')
+    expect(migration).toContain('grant execute on function create_shopping_list_authorized')
+  })
+
+  it('blocks direct shopping list inserts outside the authorized RPC', () => {
+    const migration = lockDirectInsertSql()
+
+    expect(migration).toContain('drop policy if exists "members can insert reminder lists"')
+    expect(migration).toContain('on shopping_lists for insert')
+    expect(migration).toContain('with check (false)')
   })
 })

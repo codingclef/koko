@@ -190,4 +190,19 @@ describe('ReminderGroupListSheet', () => {
       expect(defaultProps.onDelete).toHaveBeenCalledWith('group-1')
     })
   })
+
+  it('그룹 삭제 실패 시 리마인더가 있으면 삭제할 수 없다는 안내를 표시한다', async () => {
+    defaultProps.onDelete.mockRejectedValueOnce(new Error('delete restricted'))
+    render(<ReminderGroupListSheet {...defaultProps} />)
+
+    fireEvent.click(screen.getByText('집'))
+    expect(await screen.findByText('그룹 삭제')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('그룹 삭제'))
+    fireEvent.click(screen.getByText('삭제 확인'))
+
+    expect(
+      await screen.findByText('그룹에 포함된 리마인더가 있으면 삭제할 수 없어요.')
+    ).toBeInTheDocument()
+  })
 })

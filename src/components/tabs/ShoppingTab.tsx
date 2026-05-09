@@ -32,6 +32,7 @@ import { CreateListModal } from '@/components/shopping/CreateListModal'
 import { ReminderGroupListSheet } from '@/components/shopping/ReminderGroupListSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { ShoppingListWithPreview, ListType, ShoppingItem, ReminderGroup } from '@/lib/shopping'
+import { toDisplayColor } from '@/lib/label-colors'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
 const cachedListsByFamily = new Map<string, ShoppingListWithPreview[]>()
@@ -46,6 +47,7 @@ export function clearShoppingTabCache() {
 }
 
 type Props = AuthState
+type ReminderGroupFilter = 'all' | 'family' | string
 
 export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const router = useRouter()
@@ -59,6 +61,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showGroupList, setShowGroupList] = useState(false)
+  const [activeGroupId, setActiveGroupId] = useState<ReminderGroupFilter>('all')
 
   const activeListId = useMemo(() => {
     const raw = searchParams.get('list')?.trim()
@@ -67,6 +70,18 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   // 현재 family 기준 캐시가 없으면 첫 진입으로 간주한다.
   const loading = isInitializing && getCachedLists(familyId) === null
+  const groupMap = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups])
+  const effectiveActiveGroupId =
+    activeGroupId !== 'all' && activeGroupId !== 'family' && !groupMap.has(activeGroupId)
+      ? 'all'
+      : activeGroupId
+  const visibleLists = useMemo(() => {
+    if (effectiveActiveGroupId === 'all') return lists
+    if (effectiveActiveGroupId === 'family') {
+      return lists.filter((list) => list.reminder_group_id === null)
+    }
+    return lists.filter((list) => list.reminder_group_id === effectiveActiveGroupId)
+  }, [effectiveActiveGroupId, lists])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -133,7 +148,11 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     void refreshGroups()
   }, [refreshGroups])
 
-  const handleCreate = async (name: string, type: ListType): Promise<boolean> => {
+  const handleCreate = async (
+    name: string,
+    type: ListType,
+    reminderGroupId: string | null
+  ): Promise<boolean> => {
     if (!familyId || !user) return false
 
     setMutationError(null)
@@ -142,7 +161,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       family_id: familyId,
       created_by: user.id,
       name,
-      reminder_group_id: null,
+      reminder_group_id: reminderGroupId,
       type,
       sort_order: 0,
       created_at: new Date().toISOString(),
@@ -151,7 +170,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     updateLists((prev) => [optimisticList, ...prev])
 
     try {
-      const realList = await createShoppingList(familyId, user.id, name, type)
+      const realList = await createShoppingList(familyId, user.id, name, type, reminderGroupId)
       updateLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
       setShowModal(false)
       broadcast()
@@ -313,11 +332,16 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     <div data-testid="shopping-tab-container" className="px-4 pt-2 pb-24 min-h-screen">
       <ShoppingListView
         lists={lists}
+        visibleLists={visibleLists}
         fetchError={fetchError}
         mutationError={mutationError}
+        groups={groups}
+        groupMap={groupMap}
         groupCount={groups.length}
+        activeGroupId={effectiveActiveGroupId}
         sensors={sensors}
         onGroupManageClick={() => setShowGroupList(true)}
+        onGroupFilterChange={setActiveGroupId}
         onCreateClick={() => setShowModal(true)}
         onDelete={handleDelete}
         onRename={handleRename}
@@ -326,7 +350,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       />
 
       {showModal && (
-        <CreateListModal onClose={() => setShowModal(false)} onCreate={handleCreate} />
+        <CreateListModal groups={groups} onClose={() => setShowModal(false)} onCreate={handleCreate} />
       )}
 
       {showGroupList && user && (
@@ -356,11 +380,16 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
 interface ShoppingListViewProps {
   lists: ShoppingListWithPreview[]
+  visibleLists: ShoppingListWithPreview[]
   fetchError: boolean
   mutationError: string | null
+  groups: ReminderGroup[]
+  groupMap: Map<string, ReminderGroup>
   groupCount: number
+  activeGroupId: ReminderGroupFilter
   sensors: ReturnType<typeof useSensors>
   onGroupManageClick: () => void
+  onGroupFilterChange: (groupId: ReminderGroupFilter) => void
   onCreateClick: () => void
   onDelete: (listId: string) => void
   onRename: (listId: string, name: string) => void
@@ -370,11 +399,16 @@ interface ShoppingListViewProps {
 
 function ShoppingListView({
   lists,
+  visibleLists,
   fetchError,
   mutationError,
+  groups,
+  groupMap,
   groupCount,
+  activeGroupId,
   sensors,
   onGroupManageClick,
+  onGroupFilterChange,
   onCreateClick,
   onDelete,
   onRename,
@@ -411,6 +445,58 @@ function ShoppingListView({
         </div>
       </div>
 
+      {groups.length > 0 && (
+        <div className="mb-5 -mx-1 overflow-x-auto px-1 pb-1">
+          <div className="flex min-w-max gap-2">
+            <button
+              type="button"
+              onClick={() => onGroupFilterChange('all')}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeGroupId === 'all'
+                  ? 'border-accent-300 bg-accent-50 text-accent-600 dark:border-accent-700 dark:bg-accent-950/30 dark:text-accent-400'
+                  : 'border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-700 dark:text-stone-400'
+              }`}
+            >
+              전체
+            </button>
+            <button
+              type="button"
+              onClick={() => onGroupFilterChange('family')}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeGroupId === 'family'
+                  ? 'border-accent-300 bg-accent-50 text-accent-600 dark:border-accent-700 dark:bg-accent-950/30 dark:text-accent-400'
+                  : 'border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-700 dark:text-stone-400'
+              }`}
+            >
+              가족 전체
+            </button>
+            {groups.map((group) => {
+              const selected = activeGroupId === group.id
+              const displayColor = toDisplayColor(group.color)
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => onGroupFilterChange(group.id)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    selected
+                      ? 'border-transparent text-white'
+                      : 'border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-700 dark:text-stone-400'
+                  }`}
+                  style={selected ? { backgroundColor: displayColor } : undefined}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: selected ? 'rgba(255,255,255,0.75)' : displayColor }}
+                  />
+                  {group.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {mutationError && (
         <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
           {mutationError}
@@ -429,14 +515,21 @@ function ShoppingListView({
           <p className="text-stone-500 dark:text-stone-400 font-medium">아직 리마인더가 없어요</p>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">위의 + 버튼을 눌러보세요</p>
         </div>
+      ) : visibleLists.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <ListChecks size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
+          <p className="text-stone-500 dark:text-stone-400 font-medium">이 그룹에는 리마인더가 없어요</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">새 리마인더를 추가해보세요</p>
+        </div>
       ) : (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <SortableContext items={lists.map((list) => list.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={visibleLists.map((list) => list.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {lists.map((list) => (
+              {visibleLists.map((list) => (
                 <ShoppingListCard
                   key={list.id}
                   list={list}
+                  group={list.reminder_group_id ? groupMap.get(list.reminder_group_id) : null}
                   previewItems={list.previewItems}
                   onDelete={onDelete}
                   onRename={onRename}
