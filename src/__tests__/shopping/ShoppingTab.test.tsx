@@ -4,6 +4,12 @@ import type { User } from '@supabase/supabase-js'
 import { ShoppingTab, clearShoppingTabCache } from '@/components/tabs/ShoppingTab'
 
 const mockCreateShoppingList = jest.fn()
+const mockGetReminderGroups = jest.fn()
+const mockCreateReminderGroup = jest.fn()
+const mockUpdateReminderGroup = jest.fn()
+const mockDeleteReminderGroup = jest.fn()
+const mockSetReminderGroupMembers = jest.fn()
+const mockGetFamilyMembers = jest.fn()
 const mockGetShoppingListsWithPreviews = jest.fn()
 const mockDeleteShoppingList = jest.fn()
 const mockRenameShoppingList = jest.fn()
@@ -16,11 +22,38 @@ let mockListParam: string | null = null
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
 
 jest.mock('@/lib/shopping', () => ({
+  getReminderGroups: (...args: unknown[]) => mockGetReminderGroups(...args),
+  createReminderGroup: (...args: unknown[]) => mockCreateReminderGroup(...args),
+  updateReminderGroup: (...args: unknown[]) => mockUpdateReminderGroup(...args),
+  deleteReminderGroup: (...args: unknown[]) => mockDeleteReminderGroup(...args),
+  setReminderGroupMembers: (...args: unknown[]) => mockSetReminderGroupMembers(...args),
   getShoppingListsWithPreviews: (...args: unknown[]) => mockGetShoppingListsWithPreviews(...args),
   createShoppingList: (...args: unknown[]) => mockCreateShoppingList(...args),
   deleteShoppingList: (...args: unknown[]) => mockDeleteShoppingList(...args),
   renameShoppingList: (...args: unknown[]) => mockRenameShoppingList(...args),
   reorderShoppingLists: (...args: unknown[]) => mockReorderShoppingLists(...args),
+}))
+
+jest.mock('@/lib/calendar', () => ({
+  getFamilyMembers: (...args: unknown[]) => mockGetFamilyMembers(...args),
+}))
+
+jest.mock('@/components/shopping/ReminderGroupListSheet', () => ({
+  ReminderGroupListSheet: ({
+    groups,
+    familyMembers,
+    onClose,
+  }: {
+    groups: Array<{ id: string; name: string }>
+    familyMembers: Array<{ user_id: string }>
+    onClose: () => void
+  }) => (
+    <div>
+      <p>groups:{groups.length}</p>
+      <p>members:{familyMembers.length}</p>
+      <button onClick={onClose}>close-groups</button>
+    </div>
+  ),
 }))
 
 jest.mock('@/hooks/useRealtimeSync', () => ({
@@ -80,6 +113,12 @@ describe('ShoppingTab', () => {
     clearShoppingTabCache()
     mockListParam = null
     mockGetShoppingListsWithPreviews.mockResolvedValue([])
+    mockGetReminderGroups.mockResolvedValue([])
+    mockGetFamilyMembers.mockResolvedValue([])
+    mockCreateReminderGroup.mockResolvedValue({ id: 'group-1' })
+    mockUpdateReminderGroup.mockResolvedValue(undefined)
+    mockDeleteReminderGroup.mockResolvedValue(undefined)
+    mockSetReminderGroupMembers.mockResolvedValue(undefined)
   })
 
   afterAll(() => {
@@ -94,6 +133,27 @@ describe('ShoppingTab', () => {
     const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, unknown, { refreshOnSubscribed?: boolean } | undefined]>
     const options = calls[0]?.[2]
     expect(options?.refreshOnSubscribed).not.toBe(false)
+  })
+
+  it('realtime refresh에서 목록과 그룹을 함께 다시 읽는다', async () => {
+    render(
+      <ShoppingTab user={{ id: 'user-1' } as User} familyId="fam-1" isInitializing={false} />
+    )
+
+    await act(async () => {})
+    const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, () => void, unknown]>
+    const refreshCallback = calls[0]?.[1]
+    mockGetShoppingListsWithPreviews.mockClear()
+    mockGetReminderGroups.mockClear()
+    mockGetFamilyMembers.mockClear()
+
+    await act(async () => {
+      refreshCallback()
+    })
+
+    expect(mockGetShoppingListsWithPreviews).toHaveBeenCalledWith('fam-1')
+    expect(mockGetReminderGroups).toHaveBeenCalledWith('fam-1')
+    expect(mockGetFamilyMembers).toHaveBeenCalledWith('fam-1')
   })
 
   it('상단 여백을 다른 탭과 같은 압축 기준으로 사용한다', async () => {
@@ -139,6 +199,7 @@ describe('ShoppingTab', () => {
           family_id: 'fam-1',
           created_by: 'user-1',
           name: '첫째 가족 목록',
+          reminder_group_id: null,
           type: 'strikethrough',
           sort_order: 0,
           created_at: '2026-01-01T00:00:00Z',
@@ -172,6 +233,7 @@ describe('ShoppingTab', () => {
         family_id: 'fam-1',
         created_by: 'user-1',
         name: '이마트',
+        reminder_group_id: null,
         type: 'strikethrough',
         sort_order: 0,
         created_at: '2026-01-01T00:00:00Z',
@@ -198,5 +260,58 @@ describe('ShoppingTab', () => {
     await user.click(screen.getByRole('button', { name: 'close-detail' }))
 
     expect(mockReplace).toHaveBeenCalledWith('/calendar?tab=shopping', { scroll: false })
+  })
+
+  it('리마인더 그룹 관리 시트를 연다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockGetReminderGroups.mockResolvedValueOnce([
+      {
+        id: 'group-1',
+        family_id: 'fam-1',
+        created_by: 'user-1',
+        name: '집',
+        color: '#3b82f6',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    await user.click(await screen.findByLabelText('리마인더 그룹 관리'))
+
+    expect(await screen.findByText('groups:1')).toBeInTheDocument()
+  })
+
+  it('그룹 조회가 실패해도 가족 멤버는 그룹 시트에 전달한다', async () => {
+    const user = userEvent.setup()
+    const mockUser = { id: 'user-1' } as User
+    mockGetReminderGroups.mockRejectedValueOnce(new Error('groups failed'))
+    mockGetFamilyMembers.mockResolvedValueOnce([
+      {
+        id: 'member-1',
+        family_id: 'fam-1',
+        user_id: 'user-1',
+        display_name: '나',
+        role: 'admin',
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'member-2',
+        family_id: 'fam-1',
+        user_id: 'user-2',
+        display_name: '엄마',
+        role: 'member',
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+
+    render(<ShoppingTab user={mockUser} familyId="fam-1" isInitializing={false} />)
+
+    await user.click(await screen.findByLabelText('리마인더 그룹 관리'))
+
+    expect(await screen.findByText('members:2')).toBeInTheDocument()
   })
 })

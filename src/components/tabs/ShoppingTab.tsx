@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, ListChecks, AlertTriangle } from 'lucide-react'
+import { Plus, ListChecks, AlertTriangle, ListFilter } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -14,17 +14,24 @@ import {
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
 import type { AuthState } from '@/types/tabs'
 import {
+  getReminderGroups,
+  createReminderGroup,
+  updateReminderGroup,
+  deleteReminderGroup,
+  setReminderGroupMembers,
   getShoppingListsWithPreviews,
   createShoppingList,
   deleteShoppingList,
   renameShoppingList,
   reorderShoppingLists,
 } from '@/lib/shopping'
+import { getFamilyMembers, type FamilyMember } from '@/lib/calendar'
 import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
 import { ShoppingDetailView } from '@/components/shopping/ShoppingDetailView'
 import { CreateListModal } from '@/components/shopping/CreateListModal'
+import { ReminderGroupListSheet } from '@/components/shopping/ReminderGroupListSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import type { ShoppingListWithPreview, ListType, ShoppingItem } from '@/lib/shopping'
+import type { ShoppingListWithPreview, ListType, ShoppingItem, ReminderGroup } from '@/lib/shopping'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
 const cachedListsByFamily = new Map<string, ShoppingListWithPreview[]>()
@@ -47,8 +54,11 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     () => getCachedLists(familyId) ?? []
   )
   const [fetchError, setFetchError] = useState(false)
+  const [groups, setGroups] = useState<ReminderGroup[]>([])
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [showGroupList, setShowGroupList] = useState(false)
 
   const activeListId = useMemo(() => {
     const raw = searchParams.get('list')?.trim()
@@ -87,11 +97,41 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       })
   }, [familyId, updateLists])
 
-  const broadcast = useRealtimeSync(familyId ? `family_lists_${familyId}` : null, refresh)
+  const refreshGroups = useCallback(() => {
+    if (!familyId) return Promise.resolve()
+    return Promise.allSettled([getReminderGroups(familyId), getFamilyMembers(familyId)])
+      .then(([groupsResult, membersResult]) => {
+        if (groupsResult.status === 'fulfilled') {
+          setGroups(groupsResult.value)
+        } else {
+          console.error('[ShoppingTab] getReminderGroups failed:', groupsResult.reason)
+        }
+
+        if (membersResult.status === 'fulfilled') {
+          setFamilyMembers(membersResult.value)
+        } else {
+          console.error('[ShoppingTab] getFamilyMembers failed:', membersResult.reason)
+        }
+      })
+  }, [familyId])
+
+  const refreshShoppingData = useCallback(() => {
+    refresh()
+    void refreshGroups()
+  }, [refresh, refreshGroups])
+
+  const broadcast = useRealtimeSync(
+    familyId ? `family_lists_${familyId}` : null,
+    refreshShoppingData
+  )
 
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    void refreshGroups()
+  }, [refreshGroups])
 
   const handleCreate = async (name: string, type: ListType): Promise<boolean> => {
     if (!familyId || !user) return false
@@ -152,6 +192,53 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       updateLists(previousLists)
       setMutationError('목록 이름을 저장하지 못했어요')
     }
+  }
+
+  const handleGroupCreate = async (
+    name: string,
+    color: string,
+    memberIds: string[]
+  ): Promise<void> => {
+    if (!familyId || !user) return
+    setMutationError(null)
+    await createReminderGroup(familyId, user.id, name, color, memberIds)
+    await refreshGroups()
+    broadcast()
+  }
+
+  const handleGroupSave = async (
+    reminderGroupId: string,
+    name: string,
+    color: string,
+    memberIds: string[] | null
+  ): Promise<{ status: 'success' } | { status: 'partial' }> => {
+    setMutationError(null)
+    await updateReminderGroup(reminderGroupId, { name, color })
+
+    if (memberIds === null || !user) {
+      await refreshGroups()
+      broadcast()
+      return { status: 'success' }
+    }
+
+    try {
+      await setReminderGroupMembers(reminderGroupId, user.id, memberIds)
+      await refreshGroups()
+      broadcast()
+      return { status: 'success' }
+    } catch (e) {
+      console.error('[ShoppingTab] setReminderGroupMembers failed:', e)
+      await refreshGroups()
+      broadcast()
+      return { status: 'partial' }
+    }
+  }
+
+  const handleGroupDelete = async (reminderGroupId: string): Promise<void> => {
+    setMutationError(null)
+    await deleteReminderGroup(reminderGroupId)
+    await refreshGroups()
+    broadcast()
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -228,7 +315,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         lists={lists}
         fetchError={fetchError}
         mutationError={mutationError}
+        groupCount={groups.length}
         sensors={sensors}
+        onGroupManageClick={() => setShowGroupList(true)}
         onCreateClick={() => setShowModal(true)}
         onDelete={handleDelete}
         onRename={handleRename}
@@ -238,6 +327,18 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
       {showModal && (
         <CreateListModal onClose={() => setShowModal(false)} onCreate={handleCreate} />
+      )}
+
+      {showGroupList && user && (
+        <ReminderGroupListSheet
+          groups={groups}
+          familyMembers={familyMembers}
+          currentUserId={user.id}
+          onClose={() => setShowGroupList(false)}
+          onCreate={handleGroupCreate}
+          onSave={handleGroupSave}
+          onDelete={handleGroupDelete}
+        />
       )}
 
       {user && activeListId && (
@@ -257,7 +358,9 @@ interface ShoppingListViewProps {
   lists: ShoppingListWithPreview[]
   fetchError: boolean
   mutationError: string | null
+  groupCount: number
   sensors: ReturnType<typeof useSensors>
+  onGroupManageClick: () => void
   onCreateClick: () => void
   onDelete: (listId: string) => void
   onRename: (listId: string, name: string) => void
@@ -269,7 +372,9 @@ function ShoppingListView({
   lists,
   fetchError,
   mutationError,
+  groupCount,
   sensors,
+  onGroupManageClick,
   onCreateClick,
   onDelete,
   onRename,
@@ -285,13 +390,25 @@ function ShoppingListView({
             {lists.length > 0 ? `${lists.length}개의 목록` : '리마인더를 만들어보세요'}
           </p>
         </div>
-        <button
-          onClick={onCreateClick}
-          className="w-11 h-11 flex items-center justify-center rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-sm transition-colors"
-          aria-label="새 리마인더 추가"
-        >
-          <Plus size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onGroupManageClick}
+            className="relative w-11 h-11 flex items-center justify-center rounded-full border border-stone-200 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600 dark:border-stone-700 dark:text-stone-500 dark:hover:bg-stone-900 dark:hover:text-stone-300"
+            aria-label="리마인더 그룹 관리"
+          >
+            <ListFilter size={19} />
+            {groupCount > 0 && (
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-400" />
+            )}
+          </button>
+          <button
+            onClick={onCreateClick}
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-sm transition-colors"
+            aria-label="새 리마인더 추가"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
       </div>
 
       {mutationError && (
