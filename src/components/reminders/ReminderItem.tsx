@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -11,14 +11,32 @@ interface Props {
   listType: 'strikethrough' | 'delete'
   onCheck: (itemId: string, checked: boolean) => void
   onDelete: (itemId: string) => void
-  onRename: (itemId: string, name: string) => void
+  onRename: (itemId: string, name: string) => Promise<boolean | void> | boolean | void
+  isEditing?: boolean
+  onEditStart?: (itemId: string) => void
+  onEditEnd?: (itemId: string) => void
+  onAdvanceEdit?: (itemId: string) => void
   draggable?: boolean
 }
 
-export function ReminderItem({ item, listType, onCheck, onDelete, onRename, draggable = false }: Props) {
-  const [editing, setEditing] = useState(false)
+export function ReminderItem({
+  item,
+  listType,
+  onCheck,
+  onDelete,
+  onRename,
+  isEditing,
+  onEditStart,
+  onEditEnd,
+  onAdvanceEdit,
+  draggable = false,
+}: Props) {
+  const [internalEditing, setInternalEditing] = useState(false)
   const [editValue, setEditValue] = useState(item.name)
   const [confirming, setConfirming] = useState(false)
+  const committingRef = useRef(false)
+  const wasEditingRef = useRef(false)
+  const editing = isEditing ?? internalEditing
 
   const {
     attributes,
@@ -37,24 +55,68 @@ export function ReminderItem({ item, listType, onCheck, onDelete, onRename, drag
 
   const handleNameClick = () => {
     setEditValue(item.name)
-    setEditing(true)
+    if (onEditStart) {
+      onEditStart(item.id)
+    } else {
+      setInternalEditing(true)
+    }
   }
 
-  const commitEdit = () => {
-    const trimmed = editValue.trim()
-    if (trimmed && trimmed !== item.name) {
-      onRename(item.id, trimmed)
-    } else {
+  useEffect(() => {
+    if (editing && !wasEditingRef.current) {
       setEditValue(item.name)
     }
-    setEditing(false)
+    wasEditingRef.current = editing
+  }, [editing, item.name])
+
+  const endEditing = () => {
+    if (onEditEnd) {
+      onEditEnd(item.id)
+    } else {
+      setInternalEditing(false)
+    }
+  }
+
+  const commitEdit = async (advanceAfterSave = false) => {
+    const trimmed = editValue.trim()
+    if (!trimmed) {
+      setEditValue(item.name)
+      endEditing()
+      return
+    }
+
+    if (trimmed === item.name) {
+      if (advanceAfterSave && onAdvanceEdit) {
+        onAdvanceEdit(item.id)
+      } else {
+        endEditing()
+      }
+      return
+    }
+
+    committingRef.current = true
+    try {
+      const renamed = await onRename(item.id, trimmed)
+      if (renamed === false) return
+
+      if (advanceAfterSave && onAdvanceEdit) {
+        onAdvanceEdit(item.id)
+      } else {
+        endEditing()
+      }
+    } finally {
+      committingRef.current = false
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') commitEdit()
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void commitEdit(true)
+    }
     if (e.key === 'Escape') {
       setEditValue(item.name)
-      setEditing(false)
+      endEditing()
     }
   }
 
@@ -112,7 +174,9 @@ export function ReminderItem({ item, listType, onCheck, onDelete, onRename, drag
             const len = e.target.value.length
             e.target.setSelectionRange(len, len)
           }}
-          onBlur={commitEdit}
+          onBlur={() => {
+            if (!committingRef.current) void commitEdit(false)
+          }}
           onKeyDown={handleKeyDown}
           className="flex-1 text-stone-800 dark:text-stone-100 bg-transparent border-b border-accent-400 outline-none"
           aria-label="아이템 이름 수정"

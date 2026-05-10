@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { forwardRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 
 interface Props {
   onAdd: (name: string) => Promise<boolean>
 }
 
-export function AddItemInput({ onAdd }: Props) {
+export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItemInput({ onAdd }, ref) {
   const [value, setValue] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -28,6 +28,7 @@ export function AddItemInput({ onAdd }: Props) {
   return (
     <form onSubmit={handleSubmit} className="flex gap-2 px-4 py-3">
       <input
+        ref={ref}
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -44,4 +45,4 @@ export function AddItemInput({ onAdd }: Props) {
       </button>
     </form>
   )
-}
+})

@@ -2,7 +2,12 @@ import { render, screen, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import { ReminderDetailView } from '@/components/reminders/ReminderDetailView'
-import { getReminderItems, getReminderList, updateReminderListGroup } from '@/lib/reminder-lists'
+import {
+  getReminderItems,
+  getReminderList,
+  renameReminderItem,
+  updateReminderListGroup,
+} from '@/lib/reminder-lists'
 
 const mockBroadcast = jest.fn()
 const mockUseRealtimeSync = jest.fn((...args: unknown[]) => {
@@ -55,6 +60,7 @@ jest.mock('@dnd-kit/utilities', () => ({
 
 const mockGetReminderList = getReminderList as jest.MockedFunction<typeof getReminderList>
 const mockGetReminderItems = getReminderItems as jest.MockedFunction<typeof getReminderItems>
+const mockRenameReminderItem = renameReminderItem as jest.MockedFunction<typeof renameReminderItem>
 const mockUpdateReminderListGroup = updateReminderListGroup as jest.MockedFunction<typeof updateReminderListGroup>
 
 describe('ReminderDetailView', () => {
@@ -75,6 +81,7 @@ describe('ReminderDetailView', () => {
       created_at: '2026-01-01T00:00:00Z',
     } as never)
     mockGetReminderItems.mockResolvedValue([] as never)
+    mockRenameReminderItem.mockResolvedValue(undefined as never)
     mockUpdateReminderListGroup.mockResolvedValue({
       id: 'list-1',
       family_id: 'fam-1',
@@ -235,6 +242,267 @@ describe('ReminderDetailView', () => {
     await waitFor(() => {
       expect(onListGroupChange).toHaveBeenCalledWith('list-1', 'group-1')
     })
+  })
+
+  it('아이템 이름 수정 후 Enter를 누르면 새 아이템 입력창으로 이동한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'item-2',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '달걀',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByText('우유'))
+    const firstInput = screen.getByLabelText('아이템 이름 수정')
+    await user.clear(firstInput)
+    await user.type(firstInput, '두유')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('아이템 추가...')).toHaveFocus()
+    })
+    expect(screen.queryByLabelText('아이템 이름 수정')).not.toBeInTheDocument()
+    expect(mockRenameReminderItem).toHaveBeenCalledWith('item-1', '두유')
+  })
+
+  it('마지막 아이템 이름 수정 후 Enter를 눌러도 새 아이템 입력창으로 이동한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByText('우유'))
+    const editInput = screen.getByLabelText('아이템 이름 수정')
+    await user.clear(editInput)
+    await user.type(editInput, '두유')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('아이템 추가...')).toHaveFocus()
+    })
+    expect(mockRenameReminderItem).toHaveBeenCalledWith('item-1', '두유')
+  })
+
+  it('이전 아이템 blur 저장이 늦게 완료되어도 새 편집 세션을 닫지 않는다', async () => {
+    const user = userEvent.setup()
+    let resolveRename: () => void = () => {}
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'item-2',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '달걀',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+    mockRenameReminderItem.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRename = resolve
+        }) as never
+    )
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByText('우유'))
+    const firstInput = screen.getByLabelText('아이템 이름 수정')
+    await user.clear(firstInput)
+    await user.type(firstInput, '두유')
+    await user.click(screen.getByText('달걀'))
+
+    const secondInput = screen.getByLabelText('아이템 이름 수정')
+    expect(secondInput).toHaveValue('달걀')
+
+    await act(async () => {
+      resolveRename()
+    })
+
+    await waitFor(() => {
+      const currentInput = screen.getByLabelText('아이템 이름 수정')
+      expect(currentInput).toHaveValue('달걀')
+      expect(currentInput).toHaveFocus()
+    })
+  })
+
+  it('이전 아이템 Enter 저장이 늦게 완료되어도 새 편집 세션을 닫지 않는다', async () => {
+    const user = userEvent.setup()
+    let resolveRename: () => void = () => {}
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'item-2',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '달걀',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+    mockRenameReminderItem.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRename = resolve
+        }) as never
+    )
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByText('우유'))
+    const firstInput = screen.getByLabelText('아이템 이름 수정')
+    await user.clear(firstInput)
+    await user.type(firstInput, '두유')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByText('달걀'))
+
+    expect(screen.getByLabelText('아이템 이름 수정')).toHaveValue('달걀')
+
+    await act(async () => {
+      resolveRename()
+    })
+
+    await waitFor(() => {
+      const currentInput = screen.getByLabelText('아이템 이름 수정')
+      expect(currentInput).toHaveValue('달걀')
+      expect(currentInput).toHaveFocus()
+    })
+    expect(screen.getByPlaceholderText('아이템 추가...')).not.toHaveFocus()
+  })
+
+  it('아이템 이름 저장 실패 시 다음 입력으로 이동하지 않고 현재 편집을 유지한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'item-2',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '달걀',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+    mockRenameReminderItem.mockRejectedValueOnce(new Error('rename failed'))
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByText('우유'))
+    const firstInput = screen.getByLabelText('아이템 이름 수정')
+    await user.clear(firstInput)
+    await user.type(firstInput, '두유')
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('아이템 이름을 저장하지 못했어요')).toBeInTheDocument()
+    expect(screen.getByLabelText('아이템 이름 수정')).toHaveValue('두유')
+    expect(screen.getByLabelText('아이템 이름 수정')).toHaveFocus()
   })
 
   it('리마인더 그룹 변경 실패 시 이전 그룹으로 되돌리고 에러를 표시한다', async () => {

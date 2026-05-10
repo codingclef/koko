@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ListChecks } from 'lucide-react'
 import {
   DndContext,
@@ -52,6 +52,8 @@ export function ReminderDetailView({
   const [status, setStatus] = useState<DetailStatus>('loading')
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [groupSaving, setGroupSaving] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const addInputRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -264,7 +266,7 @@ export function ReminderDetailView({
     }
   }
 
-  const handleRename = async (itemId: string, name: string) => {
+  const handleRename = async (itemId: string, name: string): Promise<boolean> => {
     setMutationError(null)
     const previousItems = items
     setItemsWithPreview((prev) =>
@@ -274,10 +276,12 @@ export function ReminderDetailView({
     try {
       await renameReminderItem(itemId, name)
       broadcast()
+      return true
     } catch (e) {
       console.error('[ReminderDetailView] renameReminderItem failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError('아이템 이름을 저장하지 못했어요')
+      return false
     }
   }
 
@@ -348,6 +352,19 @@ export function ReminderDetailView({
   const currentGroup = list?.reminder_group_id
     ? groups.find((group) => group.id === list.reminder_group_id) ?? null
     : null
+  const handleAdvanceEdit = useCallback((itemId: string) => {
+    setEditingItemId((currentItemId) => {
+      if (currentItemId !== itemId) return currentItemId
+
+      requestAnimationFrame(() => {
+        addInputRef.current?.focus()
+      })
+      return null
+    })
+  }, [])
+  const handleEditEnd = useCallback((itemId: string) => {
+    setEditingItemId((currentItemId) => (currentItemId === itemId ? null : currentItemId))
+  }, [])
 
   return (
     <div
@@ -460,6 +477,10 @@ export function ReminderDetailView({
                     onCheck={handleCheck}
                     onDelete={handleDelete}
                     onRename={handleRename}
+                    isEditing={editingItemId === item.id}
+                    onEditStart={setEditingItemId}
+                    onEditEnd={handleEditEnd}
+                    onAdvanceEdit={handleAdvanceEdit}
                     draggable
                   />
                 ))}
@@ -481,6 +502,10 @@ export function ReminderDetailView({
                     onCheck={handleCheck}
                     onDelete={handleDelete}
                     onRename={handleRename}
+                    isEditing={editingItemId === item.id}
+                    onEditStart={setEditingItemId}
+                    onEditEnd={handleEditEnd}
+                    onAdvanceEdit={handleAdvanceEdit}
                   />
                 ))}
               </>
@@ -491,7 +516,7 @@ export function ReminderDetailView({
             data-testid="reminder-detail-footer"
             className="shrink-0 border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe"
           >
-            <AddItemInput onAdd={handleAdd} />
+            <AddItemInput ref={addInputRef} onAdd={handleAdd} />
           </div>
         </div>
       )}
