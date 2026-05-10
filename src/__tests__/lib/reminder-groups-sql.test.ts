@@ -76,7 +76,7 @@ describe('reminder groups migration', () => {
     expect(migration).toContain('grant execute on function create_shopping_list_authorized')
   })
 
-  it('blocks direct shopping list inserts outside the authorized RPC', () => {
+  it('blocks direct reminder list inserts outside the authorized RPC', () => {
     const migration = lockDirectInsertSql()
 
     expect(migration).toContain('drop policy if exists "members can insert reminder lists"')

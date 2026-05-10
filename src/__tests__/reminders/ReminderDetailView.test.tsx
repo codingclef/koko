@@ -1,8 +1,8 @@
 import { render, screen, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
-import { ShoppingDetailView } from '@/components/shopping/ShoppingDetailView'
-import { getShoppingItems, getShoppingList, updateShoppingListGroup } from '@/lib/shopping'
+import { ReminderDetailView } from '@/components/reminders/ReminderDetailView'
+import { getReminderItems, getReminderList, updateReminderListGroup } from '@/lib/reminder-lists'
 
 const mockBroadcast = jest.fn()
 const mockUseRealtimeSync = jest.fn((...args: unknown[]) => {
@@ -16,15 +16,15 @@ jest.mock('@/hooks/useRealtimeSync', () => ({
     mockUseRealtimeSync(channelName, refresh, options),
 }))
 
-jest.mock('@/lib/shopping', () => ({
-  getShoppingList: jest.fn(),
-  getShoppingItems: jest.fn(),
-  addShoppingItem: jest.fn(),
-  checkShoppingItem: jest.fn(),
-  deleteShoppingItem: jest.fn(),
-  renameShoppingItem: jest.fn(),
-  reorderShoppingItems: jest.fn(),
-  updateShoppingListGroup: jest.fn(),
+jest.mock('@/lib/reminder-lists', () => ({
+  getReminderList: jest.fn(),
+  getReminderItems: jest.fn(),
+  addReminderItem: jest.fn(),
+  checkReminderItem: jest.fn(),
+  deleteReminderItem: jest.fn(),
+  renameReminderItem: jest.fn(),
+  reorderReminderItems: jest.fn(),
+  updateReminderListGroup: jest.fn(),
 }))
 
 jest.mock('@dnd-kit/core', () => ({
@@ -53,18 +53,18 @@ jest.mock('@dnd-kit/utilities', () => ({
   CSS: { Transform: { toString: () => '' } },
 }))
 
-const mockGetShoppingList = getShoppingList as jest.MockedFunction<typeof getShoppingList>
-const mockGetShoppingItems = getShoppingItems as jest.MockedFunction<typeof getShoppingItems>
-const mockUpdateShoppingListGroup = updateShoppingListGroup as jest.MockedFunction<typeof updateShoppingListGroup>
+const mockGetReminderList = getReminderList as jest.MockedFunction<typeof getReminderList>
+const mockGetReminderItems = getReminderItems as jest.MockedFunction<typeof getReminderItems>
+const mockUpdateReminderListGroup = updateReminderListGroup as jest.MockedFunction<typeof updateReminderListGroup>
 
-describe('ShoppingDetailView', () => {
+describe('ReminderDetailView', () => {
   const mockUser = { id: 'user-1' } as User
   const onClose = jest.fn()
   const onPreviewItemsChange = jest.fn()
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetShoppingList.mockResolvedValue({
+    mockGetReminderList.mockResolvedValue({
       id: 'list-1',
       family_id: 'fam-1',
       created_by: 'user-1',
@@ -74,8 +74,8 @@ describe('ShoppingDetailView', () => {
       sort_order: 0,
       created_at: '2026-01-01T00:00:00Z',
     } as never)
-    mockGetShoppingItems.mockResolvedValue([] as never)
-    mockUpdateShoppingListGroup.mockResolvedValue({
+    mockGetReminderItems.mockResolvedValue([] as never)
+    mockUpdateReminderListGroup.mockResolvedValue({
       id: 'list-1',
       family_id: 'fam-1',
       created_by: 'user-1',
@@ -93,7 +93,7 @@ describe('ShoppingDetailView', () => {
 
   it('refreshOnSubscribed: false를 전달하지 않는다', async () => {
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -108,7 +108,7 @@ describe('ShoppingDetailView', () => {
 
   it('정상 로드 시 상세 헤더를 렌더링한다', async () => {
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -121,10 +121,10 @@ describe('ShoppingDetailView', () => {
   })
 
   it('목록이 없으면 not found 상태를 보여준다', async () => {
-    mockGetShoppingList.mockResolvedValueOnce(null)
+    mockGetReminderList.mockResolvedValueOnce(null)
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="missing-list"
         user={mockUser}
         onClose={onClose}
@@ -139,10 +139,10 @@ describe('ShoppingDetailView', () => {
   })
 
   it('로드 실패 시 fetch error 상태와 재시도 버튼을 보여준다', async () => {
-    mockGetShoppingList.mockRejectedValueOnce(new Error('load failed'))
+    mockGetReminderList.mockRejectedValueOnce(new Error('load failed'))
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -158,7 +158,7 @@ describe('ShoppingDetailView', () => {
     const user = userEvent.setup()
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -172,7 +172,7 @@ describe('ShoppingDetailView', () => {
   })
 
   it('아이템 로드 결과를 preview 동기화에 반영한다', async () => {
-    mockGetShoppingItems.mockResolvedValueOnce([
+    mockGetReminderItems.mockResolvedValueOnce([
       {
         id: 'item-1',
         list_id: 'list-1',
@@ -187,7 +187,7 @@ describe('ShoppingDetailView', () => {
     ] as never)
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -208,7 +208,7 @@ describe('ShoppingDetailView', () => {
     const onListGroupChange = jest.fn()
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         groups={[
@@ -231,7 +231,7 @@ describe('ShoppingDetailView', () => {
 
     await user.selectOptions(await screen.findByLabelText('그룹'), 'group-1')
 
-    expect(mockUpdateShoppingListGroup).toHaveBeenCalledWith('list-1', 'user-1', 'group-1')
+    expect(mockUpdateReminderListGroup).toHaveBeenCalledWith('list-1', 'user-1', 'group-1')
     await waitFor(() => {
       expect(onListGroupChange).toHaveBeenCalledWith('list-1', 'group-1')
     })
@@ -240,10 +240,10 @@ describe('ShoppingDetailView', () => {
   it('리마인더 그룹 변경 실패 시 이전 그룹으로 되돌리고 에러를 표시한다', async () => {
     const user = userEvent.setup()
     const onListGroupChange = jest.fn()
-    mockUpdateShoppingListGroup.mockRejectedValueOnce(new Error('update failed'))
+    mockUpdateReminderListGroup.mockRejectedValueOnce(new Error('update failed'))
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         groups={[
@@ -274,7 +274,7 @@ describe('ShoppingDetailView', () => {
 
   it('가족 목록 refresh에서 접근할 수 없으면 not found 상태로 전환하고 preview를 비운다', async () => {
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -288,7 +288,7 @@ describe('ShoppingDetailView', () => {
     const familyRefresh = calls.find(([channelName]) => channelName === 'family_lists_fam-1')?.[1]
     expect(familyRefresh).toBeDefined()
 
-    mockGetShoppingList.mockResolvedValueOnce(null)
+    mockGetReminderList.mockResolvedValueOnce(null)
     await act(async () => {
       familyRefresh?.()
     })
@@ -298,7 +298,7 @@ describe('ShoppingDetailView', () => {
   })
 
   it('아이템이 많아도 목록만 스크롤되고 추가 입력란은 화면 안에 유지된다', async () => {
-    mockGetShoppingItems.mockResolvedValueOnce(
+    mockGetReminderItems.mockResolvedValueOnce(
       Array.from({ length: 40 }, (_, index) => ({
         id: `item-${index + 1}`,
         list_id: 'list-1',
@@ -313,7 +313,7 @@ describe('ShoppingDetailView', () => {
     )
 
     render(
-      <ShoppingDetailView
+      <ReminderDetailView
         listId="list-1"
         user={mockUser}
         onClose={onClose}
@@ -322,11 +322,11 @@ describe('ShoppingDetailView', () => {
     )
 
     expect(await screen.findByText('아이템 40')).toBeInTheDocument()
-    expect(screen.getByTestId('shopping-detail-overlay')).toHaveClass('overflow-hidden')
-    expect(screen.getByTestId('shopping-detail-shell')).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col')
-    expect(screen.getByTestId('shopping-detail-scroll')).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto')
+    expect(screen.getByTestId('reminder-detail-overlay')).toHaveClass('overflow-hidden')
+    expect(screen.getByTestId('reminder-detail-shell')).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col')
+    expect(screen.getByTestId('reminder-detail-scroll')).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto')
 
-    const footer = screen.getByTestId('shopping-detail-footer')
+    const footer = screen.getByTestId('reminder-detail-footer')
     expect(footer).toHaveClass('shrink-0')
     expect(within(footer).getByPlaceholderText('아이템 추가...')).toBeInTheDocument()
   })

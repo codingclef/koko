@@ -27,9 +27,10 @@ Kokoは、1つの共有アプリシェルを中心に動く家族向けコラボ
 アプリは1つの家族シェルを常時マウントしたまま利用します。
 
 - `/calendar` が実際のタブアプリの単一エントリールートです
-- `/shopping` と `/settings` は `/calendar` へリダイレクトされます
-- `TabsShell` が calendar、shopping、settings の各タブを常時マウントし、表示だけを切り替えます
-- `src/app/shopping/[id]/page.tsx` は古いリンクを `/calendar?tab=shopping&list=...` へつなぐbridge routeです
+- `/reminders` と `/settings` は `/calendar` のタブシェルへリダイレクトされます
+- `/shopping` は古いリンク互換用 route として残します
+- `TabsShell` が calendar、reminders、settings の各タブを常時マウントし、表示だけを切り替えます
+- `src/app/shopping/[id]/page.tsx` は古いリンクを `/calendar?tab=reminders&list=...` へつなぐbridge routeです
 
 この構成により、タブ切り替え時の再読み込みスピナーを減らし、状態も維持できます。
 
@@ -100,7 +101,7 @@ supabase/
 
 - [`src/components/TabsShell.tsx`](/Users/codingclef/workspace_codex/koko/src/components/TabsShell.tsx): keep-alive アプリシェル
 - [`src/components/tabs/CalendarTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/CalendarTab.tsx): カレンダー実行コンテナ
-- [`src/components/tabs/ShoppingTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/ShoppingTab.tsx): 買い物一覧コンテナ
+- [`src/components/tabs/ReminderTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/ReminderTab.tsx): 買い物一覧コンテナ
 - [`src/components/tabs/SettingsTab.tsx`](/Users/codingclef/workspace_codex/koko/src/components/tabs/SettingsTab.tsx): 設定と家族アクション
 - [`src/hooks/useRealtimeSync.ts`](/Users/codingclef/workspace_codex/koko/src/hooks/useRealtimeSync.ts): 共通broadcast購読パターン
 - [`src/app/api/family/me/route.ts`](/Users/codingclef/workspace_codex/koko/src/app/api/family/me/route.ts): 現在の家族とアプリロール取得
@@ -183,6 +184,7 @@ npx tsc --noEmit
 - `recurrence_series`
 - `shopping_lists`
 - `shopping_items`
+- この2つのテーブルは reminders ドメインの legacy DB 物理名です
 - `push_subscriptions`
 - `daily_digest_log`
 

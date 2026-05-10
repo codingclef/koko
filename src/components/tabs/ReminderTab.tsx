@@ -19,30 +19,30 @@ import {
   updateReminderGroup,
   deleteReminderGroup,
   setReminderGroupMembers,
-  getShoppingListsWithPreviews,
-  createShoppingList,
-  deleteShoppingList,
-  renameShoppingList,
-  reorderShoppingLists,
-} from '@/lib/shopping'
+  getReminderListsWithPreviews,
+  createReminderList,
+  deleteReminderList,
+  renameReminderList,
+  reorderReminderLists,
+} from '@/lib/reminder-lists'
 import { getFamilyMembers, type FamilyMember } from '@/lib/calendar'
-import { ShoppingListCard } from '@/components/shopping/ShoppingListCard'
-import { ShoppingDetailView } from '@/components/shopping/ShoppingDetailView'
-import { CreateListModal } from '@/components/shopping/CreateListModal'
-import { ReminderGroupListSheet } from '@/components/shopping/ReminderGroupListSheet'
+import { ReminderListCard } from '@/components/reminders/ReminderListCard'
+import { ReminderDetailView } from '@/components/reminders/ReminderDetailView'
+import { CreateReminderListModal } from '@/components/reminders/CreateReminderListModal'
+import { ReminderGroupListSheet } from '@/components/reminders/ReminderGroupListSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import type { ShoppingListWithPreview, ListType, ShoppingItem, ReminderGroup } from '@/lib/shopping'
+import type { ReminderListWithPreview, ListType, ReminderItem, ReminderGroup } from '@/lib/reminder-lists'
 import { toDisplayColor } from '@/lib/label-colors'
 
 // 라우트 이동으로 컴포넌트가 언마운트되어도 데이터를 유지하는 세션 캐시.
-const cachedListsByFamily = new Map<string, ShoppingListWithPreview[]>()
+const cachedListsByFamily = new Map<string, ReminderListWithPreview[]>()
 
-function getCachedLists(familyId: string | null): ShoppingListWithPreview[] | null {
+function getCachedLists(familyId: string | null): ReminderListWithPreview[] | null {
   if (!familyId) return null
   return cachedListsByFamily.get(familyId) ?? null
 }
 
-export function clearShoppingTabCache() {
+export function clearReminderTabCache() {
   cachedListsByFamily.clear()
 }
 
@@ -50,7 +50,7 @@ type Props = AuthState
 type ReminderGroupFilter = 'all' | 'family' | string
 
 function matchesReminderGroupFilter(
-  list: ShoppingListWithPreview,
+  list: ReminderListWithPreview,
   activeGroupId: ReminderGroupFilter
 ): boolean {
   if (activeGroupId === 'all') return true
@@ -58,10 +58,10 @@ function matchesReminderGroupFilter(
   return list.reminder_group_id === activeGroupId
 }
 
-export function ShoppingTab({ user, familyId, isInitializing }: Props) {
+export function ReminderTab({ user, familyId, isInitializing }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [lists, setLists] = useState<ShoppingListWithPreview[]>(
+  const [lists, setLists] = useState<ReminderListWithPreview[]>(
     () => getCachedLists(familyId) ?? []
   )
   const [fetchError, setFetchError] = useState(false)
@@ -93,7 +93,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
-  const updateLists = useCallback((value: ShoppingListWithPreview[] | ((prev: ShoppingListWithPreview[]) => ShoppingListWithPreview[])) => {
+  const updateLists = useCallback((value: ReminderListWithPreview[] | ((prev: ReminderListWithPreview[]) => ReminderListWithPreview[])) => {
     setLists((prev) => {
       const base = getCachedLists(familyId) ?? prev
       const next = typeof value === 'function' ? value(base) : value
@@ -106,13 +106,13 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
 
   const refresh = useCallback(() => {
     if (!familyId) return
-    getShoppingListsWithPreviews(familyId)
+    getReminderListsWithPreviews(familyId)
       .then((nextLists) => {
         updateLists(nextLists)
         setFetchError(false)
       })
       .catch((e) => {
-        console.error('[ShoppingTab] getShoppingListsWithPreviews failed:', e)
+        console.error('[ReminderTab] getReminderListsWithPreviews failed:', e)
         setFetchError(true)
       })
   }, [familyId, updateLists])
@@ -124,25 +124,25 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         if (groupsResult.status === 'fulfilled') {
           setGroups(groupsResult.value)
         } else {
-          console.error('[ShoppingTab] getReminderGroups failed:', groupsResult.reason)
+          console.error('[ReminderTab] getReminderGroups failed:', groupsResult.reason)
         }
 
         if (membersResult.status === 'fulfilled') {
           setFamilyMembers(membersResult.value)
         } else {
-          console.error('[ShoppingTab] getFamilyMembers failed:', membersResult.reason)
+          console.error('[ReminderTab] getFamilyMembers failed:', membersResult.reason)
         }
       })
   }, [familyId])
 
-  const refreshShoppingData = useCallback(() => {
+  const refreshReminderData = useCallback(() => {
     refresh()
     void refreshGroups()
   }, [refresh, refreshGroups])
 
   const broadcast = useRealtimeSync(
     familyId ? `family_lists_${familyId}` : null,
-    refreshShoppingData
+    refreshReminderData
   )
 
   useEffect(() => {
@@ -161,7 +161,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     if (!familyId || !user) return false
 
     setMutationError(null)
-    const optimisticList: ShoppingListWithPreview = {
+    const optimisticList: ReminderListWithPreview = {
       id: crypto.randomUUID(),
       family_id: familyId,
       created_by: user.id,
@@ -175,13 +175,13 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     updateLists((prev) => [optimisticList, ...prev])
 
     try {
-      const realList = await createShoppingList(familyId, user.id, name, type, reminderGroupId)
+      const realList = await createReminderList(familyId, user.id, name, type, reminderGroupId)
       updateLists((prev) => prev.map((l) => l.id === optimisticList.id ? { ...realList, previewItems: [] } : l))
       setShowModal(false)
       broadcast()
       return true
     } catch (e) {
-      console.error('[ShoppingTab] createShoppingList failed:', e)
+      console.error('[ReminderTab] createReminderList failed:', e)
       updateLists((prev) => prev.filter((l) => l.id !== optimisticList.id))
       setMutationError('목록을 저장하지 못했어요')
       return false
@@ -194,10 +194,10 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     updateLists((prev) => prev.filter((l) => l.id !== listId))
 
     try {
-      await deleteShoppingList(listId)
+      await deleteReminderList(listId)
       broadcast()
     } catch (e) {
-      console.error('[ShoppingTab] deleteShoppingList failed:', e)
+      console.error('[ReminderTab] deleteReminderList failed:', e)
       updateLists(previousLists)
       setMutationError('목록을 삭제하지 못했어요')
     }
@@ -209,10 +209,10 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     updateLists((prev) => prev.map((l) => l.id === listId ? { ...l, name } : l))
 
     try {
-      await renameShoppingList(listId, name)
+      await renameReminderList(listId, name)
       broadcast()
     } catch (e) {
-      console.error('[ShoppingTab] renameShoppingList failed:', e)
+      console.error('[ReminderTab] renameReminderList failed:', e)
       updateLists(previousLists)
       setMutationError('목록 이름을 저장하지 못했어요')
     }
@@ -259,7 +259,7 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       broadcast()
       return { status: 'success' }
     } catch (e) {
-      console.error('[ShoppingTab] setReminderGroupMembers failed:', e)
+      console.error('[ReminderTab] setReminderGroupMembers failed:', e)
       await refreshGroups()
       broadcast()
       return { status: 'partial' }
@@ -297,36 +297,36 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
     updateLists(reordered)
 
     try {
-      await reorderShoppingLists(reordered.map(({ id, sort_order }) => ({ id, sort_order })))
+      await reorderReminderLists(reordered.map(({ id, sort_order }) => ({ id, sort_order })))
       broadcast()
     } catch (e) {
-      console.error('[ShoppingTab] reorderShoppingLists failed:', e)
+      console.error('[ReminderTab] reorderReminderLists failed:', e)
       updateLists(lists)
       setMutationError('목록 순서를 저장하지 못했어요')
     }
   }
 
-  const buildShoppingHref = useCallback((listId?: string | null) => {
+  const buildReminderHref = useCallback((listId?: string | null) => {
     const params = new URLSearchParams()
-    params.set('tab', 'shopping')
+    params.set('tab', 'reminders')
     if (listId) {
       params.set('list', listId)
     }
     return `/calendar?${params.toString()}`
   }, [])
 
-  const openShoppingDetail = useCallback(
+  const openReminderDetail = useCallback(
     (listId: string) => {
-      router.push(buildShoppingHref(listId), { scroll: false })
+      router.push(buildReminderHref(listId), { scroll: false })
     },
-    [buildShoppingHref, router]
+    [buildReminderHref, router]
   )
 
-  const closeShoppingDetail = useCallback(() => {
-    router.replace(buildShoppingHref(), { scroll: false })
-  }, [buildShoppingHref, router])
+  const closeReminderDetail = useCallback(() => {
+    router.replace(buildReminderHref(), { scroll: false })
+  }, [buildReminderHref, router])
 
-  const handlePreviewItemsChange = useCallback((listId: string, items: ShoppingItem[]) => {
+  const handlePreviewItemsChange = useCallback((listId: string, items: ReminderItem[]) => {
     updateLists((prev) =>
       prev.map((list) =>
         list.id === listId
@@ -355,8 +355,8 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   }
 
   return (
-    <div data-testid="shopping-tab-container" className="px-4 pt-2 pb-24 min-h-screen">
-      <ShoppingListView
+    <div data-testid="reminder-tab-container" className="px-4 pt-2 pb-24 min-h-screen">
+      <ReminderListView
         lists={lists}
         visibleLists={visibleLists}
         fetchError={fetchError}
@@ -372,11 +372,11 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
         onDelete={handleDelete}
         onRename={handleRename}
         onDragEnd={handleDragEnd}
-        onOpen={openShoppingDetail}
+        onOpen={openReminderDetail}
       />
 
       {showModal && (
-        <CreateListModal groups={groups} onClose={() => setShowModal(false)} onCreate={handleCreate} />
+        <CreateReminderListModal groups={groups} onClose={() => setShowModal(false)} onCreate={handleCreate} />
       )}
 
       {showGroupList && user && (
@@ -392,12 +392,12 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
       )}
 
       {user && activeListId && (
-        <ShoppingDetailView
+        <ReminderDetailView
           key={activeListId}
           listId={activeListId}
           user={user}
           groups={groups}
-          onClose={closeShoppingDetail}
+          onClose={closeReminderDetail}
           onListGroupChange={handleListGroupChange}
           onPreviewItemsChange={handlePreviewItemsChange}
         />
@@ -406,9 +406,9 @@ export function ShoppingTab({ user, familyId, isInitializing }: Props) {
   )
 }
 
-interface ShoppingListViewProps {
-  lists: ShoppingListWithPreview[]
-  visibleLists: ShoppingListWithPreview[]
+interface ReminderListViewProps {
+  lists: ReminderListWithPreview[]
+  visibleLists: ReminderListWithPreview[]
   fetchError: boolean
   mutationError: string | null
   groups: ReminderGroup[]
@@ -425,7 +425,7 @@ interface ShoppingListViewProps {
   onOpen: (listId: string) => void
 }
 
-function ShoppingListView({
+function ReminderListView({
   lists,
   visibleLists,
   fetchError,
@@ -442,7 +442,7 @@ function ShoppingListView({
   onRename,
   onDragEnd,
   onOpen,
-}: ShoppingListViewProps) {
+}: ReminderListViewProps) {
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -554,7 +554,7 @@ function ShoppingListView({
           <SortableContext items={visibleLists.map((list) => list.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {visibleLists.map((list) => (
-                <ShoppingListCard
+                <ReminderListCard
                   key={list.id}
                   list={list}
                   group={list.reminder_group_id ? groupMap.get(list.reminder_group_id) : null}

@@ -197,7 +197,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
         inviteCode: joinCode.trim(),
         displayName: joinDisplayName.trim() || undefined,
       })
-      onNavigateToTab('shopping')
+      onNavigateToTab('reminders')
     } catch (e) {
       setJoinError(
         e instanceof ApiClientError && e.message === 'Invalid invite code'

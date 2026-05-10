@@ -146,8 +146,9 @@ DB migration -> src/types/database.ts -> src/lib/ -> src/hooks/ (shared only) ->
 ### Tab Structure
 
 - `/calendar` is the single live app entry point.
-- `/shopping` and `/settings` redirect into the calendar shell.
-- `TabsShell` keeps calendar, shopping, and settings mounted and only toggles visibility.
+- `/reminders` and `/settings` redirect into the calendar shell.
+- `/shopping` remains only as a legacy compatibility route.
+- `TabsShell` keeps calendar, reminders, and settings mounted and only toggles visibility.
 
 ### Realtime
 

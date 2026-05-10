@@ -4,11 +4,11 @@ import { useState, useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { ShoppingList, ItemPreview, ReminderGroup } from '@/lib/shopping'
+import type { ReminderList, ItemPreview, ReminderGroup } from '@/lib/reminder-lists'
 import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
-  list: ShoppingList
+  list: ReminderList
   group?: ReminderGroup | null
   previewItems?: ItemPreview[]
   onDelete: (listId: string) => void
@@ -16,7 +16,7 @@ interface Props {
   onOpen: (listId: string) => void
 }
 
-export function ShoppingListCard({ list, group, previewItems = [], onDelete, onRename, onOpen }: Props) {
+export function ReminderListCard({ list, group, previewItems = [], onDelete, onRename, onOpen }: Props) {
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(list.name)

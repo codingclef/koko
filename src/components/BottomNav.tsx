@@ -7,7 +7,7 @@ import type { Tab } from '@/types/tabs'
 
 const navItems = [
   { href: '/calendar', icon: CalendarDays, label: '캘린더' },
-  { href: '/shopping', icon: ListChecks, label: '리마인더' },
+  { href: '/reminders', icon: ListChecks, label: '리마인더' },
   { href: '/settings', icon: Settings, label: '설정' },
 ]
 

@@ -12,20 +12,20 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
-  getShoppingList,
-  getShoppingItems,
-  addShoppingItem,
-  checkShoppingItem,
-  deleteShoppingItem,
-  renameShoppingItem,
-  reorderShoppingItems,
-  updateShoppingListGroup,
-} from '@/lib/shopping'
-import { ShoppingItem } from '@/components/shopping/ShoppingItem'
-import { AddItemInput } from '@/components/shopping/AddItemInput'
+  getReminderList,
+  getReminderItems,
+  addReminderItem,
+  checkReminderItem,
+  deleteReminderItem,
+  renameReminderItem,
+  reorderReminderItems,
+  updateReminderListGroup,
+} from '@/lib/reminder-lists'
+import { ReminderItem } from '@/components/reminders/ReminderItem'
+import { AddItemInput } from '@/components/reminders/AddItemInput'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { toDisplayColor } from '@/lib/label-colors'
-import type { ShoppingItem as ShoppingItemType, ShoppingList, ReminderGroup } from '@/lib/shopping'
+import type { ReminderItem as ReminderItemType, ReminderList, ReminderGroup } from '@/lib/reminder-lists'
 import type { User } from '@supabase/supabase-js'
 
 type DetailStatus = 'loading' | 'ready' | 'not-found' | 'fetch-error'
@@ -36,10 +36,10 @@ interface Props {
   groups?: ReminderGroup[]
   onClose: () => void
   onListGroupChange?: (listId: string, reminderGroupId: string | null) => void
-  onPreviewItemsChange: (listId: string, items: ShoppingItemType[]) => void
+  onPreviewItemsChange: (listId: string, items: ReminderItemType[]) => void
 }
 
-export function ShoppingDetailView({
+export function ReminderDetailView({
   listId,
   user,
   groups = [],
@@ -47,8 +47,8 @@ export function ShoppingDetailView({
   onListGroupChange,
   onPreviewItemsChange,
 }: Props) {
-  const [list, setList] = useState<ShoppingList | null>(null)
-  const [items, setItems] = useState<ShoppingItemType[]>([])
+  const [list, setList] = useState<ReminderList | null>(null)
+  const [items, setItems] = useState<ReminderItemType[]>([])
   const [status, setStatus] = useState<DetailStatus>('loading')
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [groupSaving, setGroupSaving] = useState(false)
@@ -59,23 +59,23 @@ export function ShoppingDetailView({
   )
 
   const syncPreview = useCallback(
-    (nextItems: ShoppingItemType[]) => {
+    (nextItems: ReminderItemType[]) => {
       onPreviewItemsChange(listId, nextItems)
     },
     [listId, onPreviewItemsChange]
   )
 
   const refreshItems = useCallback(() => {
-    getShoppingItems(listId)
+    getReminderItems(listId)
       .then((nextItems) => {
         setItems(nextItems)
         syncPreview(nextItems)
       })
-      .catch((e) => console.error('[ShoppingDetailView] getShoppingItems failed:', e))
+      .catch((e) => console.error('[ReminderDetailView] getReminderItems failed:', e))
   }, [listId, syncPreview])
 
   const refreshList = useCallback(() => {
-    getShoppingList(listId)
+    getReminderList(listId)
       .then((nextList) => {
         if (nextList) {
           setList(nextList)
@@ -87,7 +87,7 @@ export function ShoppingDetailView({
           syncPreview([])
         }
       })
-      .catch((e) => console.error('[ShoppingDetailView] getShoppingList failed:', e))
+      .catch((e) => console.error('[ReminderDetailView] getReminderList failed:', e))
   }, [listId, onListGroupChange, syncPreview])
 
   const broadcast = useRealtimeSync(`list_items_${listId}`, refreshItems)
@@ -97,15 +97,15 @@ export function ShoppingDetailView({
   )
 
   const fetchDetailData = useCallback(async () => {
-    const shoppingList = await getShoppingList(listId)
-    if (!shoppingList) {
+    const reminderList = await getReminderList(listId)
+    if (!reminderList) {
       return { type: 'not-found' as const }
     }
 
-    const fetchedItems = await getShoppingItems(listId)
+    const fetchedItems = await getReminderItems(listId)
     return {
       type: 'ready' as const,
-      shoppingList,
+      reminderList,
       fetchedItems,
     }
   }, [listId])
@@ -114,7 +114,7 @@ export function ShoppingDetailView({
     (
       result:
         | { type: 'not-found' }
-        | { type: 'ready'; shoppingList: ShoppingList; fetchedItems: ShoppingItemType[] }
+        | { type: 'ready'; reminderList: ReminderList; fetchedItems: ReminderItemType[] }
     ) => {
       if (result.type === 'not-found') {
         setList(null)
@@ -124,7 +124,7 @@ export function ShoppingDetailView({
         return
       }
 
-      setList(result.shoppingList)
+      setList(result.reminderList)
       setItems(result.fetchedItems)
       syncPreview(result.fetchedItems)
       setStatus('ready')
@@ -142,7 +142,7 @@ export function ShoppingDetailView({
       })
       .catch((e) => {
         if (cancelled) return
-        console.error('[ShoppingDetailView] initial load failed:', e)
+        console.error('[ReminderDetailView] initial load failed:', e)
         setList(null)
         setItems([])
         setStatus('fetch-error')
@@ -161,7 +161,7 @@ export function ShoppingDetailView({
         applyLoadResult(result)
       })
       .catch((e) => {
-        console.error('[ShoppingDetailView] initial load failed:', e)
+        console.error('[ReminderDetailView] initial load failed:', e)
         setList(null)
         setItems([])
         setStatus('fetch-error')
@@ -169,7 +169,7 @@ export function ShoppingDetailView({
   }
 
   const setItemsWithPreview = useCallback(
-    (updater: ShoppingItemType[] | ((prev: ShoppingItemType[]) => ShoppingItemType[])) => {
+    (updater: ReminderItemType[] | ((prev: ReminderItemType[]) => ReminderItemType[])) => {
       setItems((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater
         syncPreview(next)
@@ -181,7 +181,7 @@ export function ShoppingDetailView({
 
   const handleAdd = async (name: string): Promise<boolean> => {
     setMutationError(null)
-    const optimisticItem: ShoppingItemType = {
+    const optimisticItem: ReminderItemType = {
       id: crypto.randomUUID(),
       list_id: listId,
       created_by: user.id,
@@ -196,14 +196,14 @@ export function ShoppingDetailView({
     setItemsWithPreview((prev) => [...prev, optimisticItem])
 
     try {
-      const realItem = await addShoppingItem(listId, user.id, name)
+      const realItem = await addReminderItem(listId, user.id, name)
       setItemsWithPreview((prev) =>
         prev.map((item) => (item.id === optimisticItem.id ? realItem : item))
       )
       broadcast()
       return true
     } catch (e) {
-      console.error('[ShoppingDetailView] addShoppingItem failed:', e)
+      console.error('[ReminderDetailView] addReminderItem failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError('아이템을 저장하지 못했어요')
       return false
@@ -233,13 +233,13 @@ export function ShoppingDetailView({
 
     try {
       if (list?.type === 'delete' && checked) {
-        await deleteShoppingItem(itemId)
+        await deleteReminderItem(itemId)
       } else {
-        await checkShoppingItem(itemId, user.id, checked)
+        await checkReminderItem(itemId, user.id, checked)
       }
       broadcast()
     } catch (e) {
-      console.error('[ShoppingDetailView] checkShoppingItem failed:', e)
+      console.error('[ReminderDetailView] checkReminderItem failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError(
         list?.type === 'delete' && checked
@@ -255,10 +255,10 @@ export function ShoppingDetailView({
     setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
 
     try {
-      await deleteShoppingItem(itemId)
+      await deleteReminderItem(itemId)
       broadcast()
     } catch (e) {
-      console.error('[ShoppingDetailView] deleteShoppingItem failed:', e)
+      console.error('[ReminderDetailView] deleteReminderItem failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError('아이템을 삭제하지 못했어요')
     }
@@ -272,10 +272,10 @@ export function ShoppingDetailView({
     )
 
     try {
-      await renameShoppingItem(itemId, name)
+      await renameReminderItem(itemId, name)
       broadcast()
     } catch (e) {
-      console.error('[ShoppingDetailView] renameShoppingItem failed:', e)
+      console.error('[ReminderDetailView] renameReminderItem failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError('아이템 이름을 저장하지 못했어요')
     }
@@ -299,12 +299,12 @@ export function ShoppingDetailView({
     setItemsWithPreview(nextItems)
 
     try {
-      await reorderShoppingItems(
+      await reorderReminderItems(
         reorderedUnchecked.map(({ id, sort_order }) => ({ id, sort_order }))
       )
       broadcast()
     } catch (e) {
-      console.error('[ShoppingDetailView] reorderShoppingItems failed:', e)
+      console.error('[ReminderDetailView] reorderReminderItems failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError('아이템 순서를 저장하지 못했어요')
     }
@@ -323,12 +323,12 @@ export function ShoppingDetailView({
     onListGroupChange?.(list.id, nextGroupId)
 
     try {
-      const updatedList = await updateShoppingListGroup(list.id, user.id, nextGroupId)
+      const updatedList = await updateReminderListGroup(list.id, user.id, nextGroupId)
       setList(updatedList)
       onListGroupChange?.(updatedList.id, updatedList.reminder_group_id)
       broadcastListChange()
     } catch (e) {
-      console.error('[ShoppingDetailView] updateShoppingListGroup failed:', e)
+      console.error('[ReminderDetailView] updateReminderListGroup failed:', e)
       setList(previousList)
       onListGroupChange?.(previousList.id, previousList.reminder_group_id)
       setMutationError('그룹을 변경하지 못했어요')
@@ -351,7 +351,7 @@ export function ShoppingDetailView({
 
   return (
     <div
-      data-testid="shopping-detail-overlay"
+      data-testid="reminder-detail-overlay"
       className="fixed inset-0 z-[55] overflow-hidden bg-white dark:bg-stone-950"
     >
       {status === 'loading' ? (
@@ -376,7 +376,7 @@ export function ShoppingDetailView({
         />
       ) : (
         <div
-          data-testid="shopping-detail-shell"
+          data-testid="reminder-detail-shell"
           className="max-w-lg mx-auto h-full min-h-0 flex flex-col bg-white dark:bg-stone-950"
         >
           <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
@@ -408,13 +408,13 @@ export function ShoppingDetailView({
                 style={currentGroup ? { backgroundColor: toDisplayColor(currentGroup.color) } : undefined}
               />
               <label
-                htmlFor="shopping-list-group"
+                htmlFor="reminder-list-group"
                 className="shrink-0 text-xs font-semibold text-stone-400 dark:text-stone-500"
               >
                 그룹
               </label>
               <select
-                id="shopping-list-group"
+                id="reminder-list-group"
                 value={list.reminder_group_id ?? ''}
                 disabled={groupSaving}
                 onChange={(event) => void handleGroupChange(event.target.value)}
@@ -430,7 +430,7 @@ export function ShoppingDetailView({
             </div>
           )}
 
-          <div data-testid="shopping-detail-scroll" className="flex-1 min-h-0 overflow-y-auto py-2">
+          <div data-testid="reminder-detail-scroll" className="flex-1 min-h-0 overflow-y-auto py-2">
             {mutationError && (
               <div className="px-4 pt-2">
                 <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
@@ -453,7 +453,7 @@ export function ShoppingDetailView({
                 strategy={verticalListSortingStrategy}
               >
                 {uncheckedItems.map((item) => (
-                  <ShoppingItem
+                  <ReminderItem
                     key={item.id}
                     item={item}
                     listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
@@ -474,7 +474,7 @@ export function ShoppingDetailView({
                   </p>
                 </div>
                 {checkedItems.map((item) => (
-                  <ShoppingItem
+                  <ReminderItem
                     key={item.id}
                     item={item}
                     listType="strikethrough"
@@ -488,7 +488,7 @@ export function ShoppingDetailView({
           </div>
 
           <div
-            data-testid="shopping-detail-footer"
+            data-testid="reminder-detail-footer"
             className="shrink-0 border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe"
           >
             <AddItemInput onAdd={handleAdd} />

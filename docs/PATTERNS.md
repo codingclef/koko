@@ -21,12 +21,13 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 ## 2. App Shell And Routing
 
 - `/calendar`가 가족 앱의 단일 live entry point다.
-- `/shopping`, `/settings`는 독립 화면이 아니라 `/calendar` 탭 셸로 리다이렉트한다.
-- 실제 탭 상태는 route path가 아니라 `/calendar?tab=shopping` 같은 search param으로 제어한다.
-- `TabsShell`은 `CalendarTab`, `ShoppingTab`, `SettingsTab`를 항상 마운트하고 `display`만 바꾼다.
+- `/reminders`, `/settings`는 독립 화면이 아니라 `/calendar` 탭 셸로 리다이렉트한다.
+- `/shopping`은 구형 링크 호환용 route로만 유지한다.
+- 실제 탭 상태는 route path가 아니라 `/calendar?tab=reminders` 같은 search param으로 제어한다.
+- `TabsShell`은 `CalendarTab`, `ReminderTab`, `SettingsTab`를 항상 마운트하고 `display`만 바꾼다.
 - 탭 상태 유지가 목적이므로 탭별 개별 route로 다시 분리하지 않는다.
-- 장보기 상세도 메인 흐름에서는 `/calendar?tab=shopping&list=<id>` search param으로 연다.
-- `src/app/shopping/[id]/page.tsx`는 canonical page가 아니라 구형 링크용 bridge route다.
+- 리마인더 상세도 메인 흐름에서는 `/calendar?tab=reminders&list=<id>` search param으로 연다.
+- `src/app/reminders/[id]/page.tsx`는 canonical bridge route이고, `src/app/shopping/[id]/page.tsx`는 구형 링크용 bridge route다.
 
 ## 3. Data And API Boundaries
 
@@ -83,14 +84,14 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 캘린더 메인 화면은 `height: 100dvh`와 `touchAction` 제어를 사용한다.
 - 세로 스크롤 차단이 필요하면 JS `preventDefault()`보다 CSS `touch-action`을 우선한다.
 
-## 7. Shopping Patterns
+## 7. Reminder Patterns
 
-- 장보기 목록과 아이템 생성은 optimistic UI를 허용한다.
+- 리마인더 목록과 아이템 생성은 optimistic UI를 허용한다.
 - optimistic UUID는 서버 응답을 받는 즉시 실제 DB row로 치환해야 한다.
 - optimistic UUID를 후속 수정/삭제/정렬 mutation의 기준 ID로 쓰지 않는다.
 - 목록 정렬과 아이템 정렬은 `sort_order`를 명시적으로 저장한다.
 - 재정렬 시 UI를 먼저 갱신하되, 실제 `sort_order` mutation도 즉시 보낸다.
-- 장보기 탭은 keep-alive 탭 전환과 상세 진입 복귀를 위해 가족별 module-level cache를 사용한다.
+- 리마인더 탭은 keep-alive 탭 전환과 상세 진입 복귀를 위해 가족별 module-level cache를 사용한다.
 - 이런 캐시는 탭 전환 성능과 초기 스피너 감소가 명확할 때만 추가한다.
 
 ## 8. Preferences And Theme
@@ -126,7 +127,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 ## 11. Testing Expectations
 
 - 코드 변경 시 관련 테스트를 같이 갱신한다.
-- 우선 위치는 `src/__tests__/lib`, `src/__tests__/hooks`, `src/__tests__/api`, `src/__tests__/components`, `src/__tests__/shopping`, `src/__tests__/settings`다.
+- 우선 위치는 `src/__tests__/lib`, `src/__tests__/hooks`, `src/__tests__/api`, `src/__tests__/components`, `src/__tests__/reminders`, `src/__tests__/settings`다.
 - API route를 추가하거나 권한 로직을 바꾸면 route 테스트를 먼저 보강한다.
 - 회귀 위험이 큰 변경은 "lib 테스트 + 화면/훅 테스트"를 함께 추가하는 쪽을 우선한다.
 - 코드 작업 마무리 전 `npx tsc --noEmit`를 실행한다.

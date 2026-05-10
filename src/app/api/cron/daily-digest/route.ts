@@ -143,10 +143,10 @@ async function handleDailyDigest(req: NextRequest) {
   const subsByUser = new Map<string, PushSubRow[]>()
   for (const sub of allSubsRows.data ?? []) {
     if (!sub.user_id) continue
-    const { user_id: _uid, ...pushSub } = sub
-    const arr = subsByUser.get(sub.user_id) ?? []
+    const { user_id, ...pushSub } = sub
+    const arr = subsByUser.get(user_id) ?? []
     arr.push(pushSub)
-    subsByUser.set(sub.user_id, arr)
+    subsByUser.set(user_id, arr)
   }
 
   let sentUsers = 0

@@ -32,7 +32,7 @@ function JoinInner() {
 
     try {
       await postJsonWithAuth('/api/family/join', { inviteCode: joinCode.trim() })
-      router.replace('/shopping')
+      router.replace('/reminders')
     } catch (e) {
       setError(
         e instanceof ApiClientError && e.message === 'Invalid invite code'
