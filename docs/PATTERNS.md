@@ -22,12 +22,11 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 
 - `/calendar`가 가족 앱의 단일 live entry point다.
 - `/reminders`, `/settings`는 독립 화면이 아니라 `/calendar` 탭 셸로 리다이렉트한다.
-- `/shopping`은 구형 링크 호환용 route로만 유지한다.
 - 실제 탭 상태는 route path가 아니라 `/calendar?tab=reminders` 같은 search param으로 제어한다.
 - `TabsShell`은 `CalendarTab`, `ReminderTab`, `SettingsTab`를 항상 마운트하고 `display`만 바꾼다.
 - 탭 상태 유지가 목적이므로 탭별 개별 route로 다시 분리하지 않는다.
 - 리마인더 상세도 메인 흐름에서는 `/calendar?tab=reminders&list=<id>` search param으로 연다.
-- `src/app/reminders/[id]/page.tsx`는 canonical bridge route이고, `src/app/shopping/[id]/page.tsx`는 구형 링크용 bridge route다.
+- `src/app/reminders/[id]/page.tsx`는 리마인더 상세 링크용 bridge route다.
 
 ## 3. Data And API Boundaries
 

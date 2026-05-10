@@ -28,9 +28,7 @@ Kokoは、1つの共有アプリシェルを中心に動く家族向けコラボ
 
 - `/calendar` が実際のタブアプリの単一エントリールートです
 - `/reminders` と `/settings` は `/calendar` のタブシェルへリダイレクトされます
-- `/shopping` は古いリンク互換用 route として残します
 - `TabsShell` が calendar、reminders、settings の各タブを常時マウントし、表示だけを切り替えます
-- `src/app/shopping/[id]/page.tsx` は古いリンクを `/calendar?tab=reminders&list=...` へつなぐbridge routeです
 
 この構成により、タブ切り替え時の再読み込みスピナーを減らし、状態も維持できます。
 

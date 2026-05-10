@@ -14,7 +14,7 @@ describe('parseInviteCodeFromNext', () => {
   })
 
   it('초대 코드 없으면 null 반환', () => {
-    expect(parseInviteCodeFromNext('/shopping')).toBeNull()
+    expect(parseInviteCodeFromNext('/reminders')).toBeNull()
     expect(parseInviteCodeFromNext('/join')).toBeNull()
     expect(parseInviteCodeFromNext('')).toBeNull()
   })

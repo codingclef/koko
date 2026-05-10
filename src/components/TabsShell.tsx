@@ -34,7 +34,7 @@ export function TabsShell() {
   const needsFamilyOnboarding =
     !authLoading && !familyLoading && !familyError && Boolean(user) && familyId === null
 
-  const tabParam = searchParams.get('tab') === 'shopping' ? 'reminders' : searchParams.get('tab')
+  const tabParam = searchParams.get('tab')
   const activeTab: Tab = tabParam && TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'calendar'
 
   useEffect(() => {

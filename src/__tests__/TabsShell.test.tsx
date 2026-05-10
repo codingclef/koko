@@ -130,13 +130,6 @@ describe('TabsShell', () => {
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveClass('hidden')
   })
 
-  it('레거시 ?tab=shopping 파라미터도 리마인더 탭으로 처리한다', () => {
-    mockTabParam = 'shopping'
-    render(<TabsShell />)
-    expect(screen.getByTestId('reminder-tab').parentElement).not.toHaveClass('hidden')
-    expect(screen.getByTestId('calendar-tab').parentElement).toHaveClass('hidden')
-  })
-
   it('유효하지 않은 ?tab 값이면 캘린더 탭이 표시된다', () => {
     mockTabParam = 'invalid'
     render(<TabsShell />)
