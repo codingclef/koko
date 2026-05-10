@@ -57,8 +57,6 @@ Koko는 가족 단위로 일정을 공유하고 리마인더와 설정을 함께
   - 앱 초대 링크 진입점. 로그인 후 callback 판정으로 이어짐
 - `src/app/reminders/[id]/page.tsx`
   - 리마인더 상세 링크를 `?tab=reminders&list=...` 형태로 브리지
-- `src/app/shopping/[id]/page.tsx`
-  - 구형 리마인더 상세 링크를 `?tab=reminders&list=...` 형태로 브리지
 - `src/app/privacy/page.tsx`
 - `src/app/terms/page.tsx`
 
@@ -66,7 +64,6 @@ Koko는 가족 단위로 일정을 공유하고 리마인더와 설정을 함께
 
 - `src/app/settings/page.tsx`
 - `src/app/reminders/page.tsx`
-- `src/app/shopping/page.tsx`
 
 이 두 route는 독립 화면을 렌더링하지 않고 `/calendar` 기반 탭 셸로 리다이렉트한다.
 
@@ -155,7 +152,6 @@ Current behavior:
 - Tab container: `src/components/tabs/ReminderTab.tsx`
 - Detail view: `src/components/reminders/ReminderDetailView.tsx`
 - Bridge route: `src/app/reminders/[id]/page.tsx`
-- Legacy bridge route: `src/app/shopping/[id]/page.tsx`
 - Data layer: `src/lib/reminder-lists.ts`
 - Key UI:
   - `src/components/reminders/ReminderListCard.tsx`

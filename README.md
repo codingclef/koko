@@ -28,9 +28,7 @@ The app uses a single mounted family shell:
 
 - `/calendar` is the only live tab entry route
 - `/reminders` and `/settings` redirect back to the `/calendar` tab shell
-- `/shopping` remains as a legacy-link compatibility route
 - `TabsShell` keeps calendar, reminders, and settings mounted, then toggles visibility with a keep-alive pattern
-- `src/app/shopping/[id]/page.tsx` is a legacy-link bridge into `/calendar?tab=reminders&list=...`
 
 This structure avoids tab reload spinners and preserves state while switching between tabs.
 
