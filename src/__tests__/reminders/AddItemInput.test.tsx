@@ -9,6 +9,13 @@ describe('AddItemInput', () => {
     expect(screen.getByLabelText('추가')).toBeInTheDocument()
   })
 
+  it('입력창은 text-base 클래스를 가진다 (iOS Safari zoom 방지)', () => {
+    render(<AddItemInput onAdd={jest.fn()} />)
+    const input = screen.getByPlaceholderText('아이템 추가...')
+    expect(input).toHaveClass('text-base')
+    expect(input).not.toHaveClass('text-sm')
+  })
+
   it('빈 값으로는 onAdd가 호출되지 않는다', async () => {
     const onAdd = jest.fn()
     render(<AddItemInput onAdd={onAdd} />)
