@@ -773,6 +773,15 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["shopping_lists"]["Row"]
       }
+      add_shopping_item_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_list_id: string
+          p_name: string
+          p_after_item_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["shopping_items"]["Row"]
+      }
       get_my_calendar_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]

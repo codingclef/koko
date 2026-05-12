@@ -50,4 +50,28 @@ describe('AddItemInput', () => {
       expect(screen.getByLabelText('추가')).not.toBeDisabled()
     })
   })
+
+  it('inline 입력창이 비어 있는 상태로 blur되면 취소 콜백을 호출한다', async () => {
+    const onCancelEmpty = jest.fn()
+    const user = userEvent.setup()
+    render(<AddItemInput onAdd={jest.fn()} onCancelEmpty={onCancelEmpty} inline />)
+
+    const input = screen.getByPlaceholderText('아이템 추가...')
+    await user.click(input)
+    await user.tab()
+
+    expect(onCancelEmpty).toHaveBeenCalledTimes(1)
+  })
+
+  it('inline 입력창에 값이 있으면 blur되어도 취소하지 않는다', async () => {
+    const onCancelEmpty = jest.fn()
+    const user = userEvent.setup()
+    render(<AddItemInput onAdd={jest.fn()} onCancelEmpty={onCancelEmpty} inline />)
+
+    const input = screen.getByPlaceholderText('아이템 추가...')
+    await user.type(input, '우유')
+    await user.tab()
+
+    expect(onCancelEmpty).not.toHaveBeenCalled()
+  })
 })
