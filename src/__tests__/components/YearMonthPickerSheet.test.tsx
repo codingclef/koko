@@ -200,4 +200,5 @@ describe('WheelPickerColumn — 키보드 방향키 탐색', () => {
     expect(options[0]).toHaveAttribute('aria-selected', 'false')
     expect(options[2]).toHaveAttribute('aria-selected', 'false')
   })
+
 })
