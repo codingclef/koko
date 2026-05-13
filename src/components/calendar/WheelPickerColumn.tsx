@@ -64,7 +64,7 @@ export function WheelPickerColumn({ values, selected, onSelect, label }: Props) 
     <div className="relative flex-1">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bg-accent-50 dark:bg-accent-950/30 rounded-xl z-10"
+        className="pointer-events-none absolute inset-x-0 z-0 rounded-xl bg-accent-50 dark:bg-accent-950/30"
         style={{ top: WHEEL_ITEM_H * 2, height: WHEEL_ITEM_H }}
       />
       <div
@@ -90,7 +90,7 @@ export function WheelPickerColumn({ values, selected, onSelect, label }: Props) 
             role="option"
             aria-selected={i === selected}
             style={{ height: WHEEL_ITEM_H, scrollSnapAlign: 'center' }}
-            className="flex items-center justify-center text-lg font-semibold text-stone-800 dark:text-stone-100"
+            className="relative z-10 flex items-center justify-center text-lg font-semibold text-stone-800 dark:text-stone-100"
           >
             {v}
           </div>

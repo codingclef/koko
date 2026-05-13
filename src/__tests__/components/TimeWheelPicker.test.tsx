@@ -19,4 +19,14 @@ describe('TimeWheelPicker', () => {
     expect(screen.getAllByText('30').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('59').length).toBeGreaterThanOrEqual(1)
   })
+
+  it('선택 영역 배경이 선택된 시간 텍스트를 덮지 않도록 레이어를 분리한다', () => {
+    render(<TimeWheelPicker hours={9} minutes={30} onChange={jest.fn()} />)
+
+    const [selectedHour] = screen.getAllByRole('option', { selected: true })
+    const highlight = selectedHour.parentElement?.previousElementSibling
+
+    expect(highlight).toHaveClass('z-0')
+    expect(selectedHour).toHaveClass('relative', 'z-10')
+  })
 })
