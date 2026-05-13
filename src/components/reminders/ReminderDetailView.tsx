@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ListChecks } from 'lucide-react'
+import { ArrowLeft, ListChecks, Plus } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -76,7 +76,8 @@ export function ReminderDetailView({
   const [groupSaving, setGroupSaving] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [inlineAddAfterItemId, setInlineAddAfterItemId] = useState<string | null>(null)
-  const addInputRef = useRef<HTMLInputElement>(null)
+  const [showBottomAddInput, setShowBottomAddInput] = useState(false)
+  const bottomAddInputRef = useRef<HTMLInputElement>(null)
   const inlineAddInputRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
@@ -243,9 +244,14 @@ export function ReminderDetailView({
     }
   }, [broadcast, items, listId, setItemsWithPreview, user.id])
 
-  const handleFooterAdd = useCallback(
+  const handleBottomAdd = useCallback(
     async (name: string): Promise<boolean> => {
       const createdItem = await handleAddItem(name)
+      if (createdItem) {
+        requestAnimationFrame(() => {
+          bottomAddInputRef.current?.focus()
+        })
+      }
       return createdItem !== null
     },
     [handleAddItem]
@@ -422,6 +428,7 @@ export function ReminderDetailView({
     setEditingItemId((currentItemId) => {
       if (currentItemId !== itemId) return currentItemId
 
+      setShowBottomAddInput(false)
       setInlineAddAfterItemId(itemId)
       requestAnimationFrame(() => {
         inlineAddInputRef.current?.focus()
@@ -431,11 +438,22 @@ export function ReminderDetailView({
   }, [])
   const handleEditStart = useCallback((itemId: string) => {
     setInlineAddAfterItemId(null)
+    setShowBottomAddInput(false)
     setEditingItemId(itemId)
   }, [])
   const handleEditEnd = useCallback((itemId: string) => {
     setEditingItemId((currentItemId) => (currentItemId === itemId ? null : currentItemId))
   }, [])
+  const handleOpenBottomAdd = useCallback(() => {
+    setInlineAddAfterItemId(null)
+    setShowBottomAddInput(true)
+    requestAnimationFrame(() => {
+      bottomAddInputRef.current?.focus()
+    })
+  }, [])
+
+  const showFloatingAddButton =
+    editingItemId === null && inlineAddAfterItemId === null && !showBottomAddInput
 
   return (
     <div
@@ -465,7 +483,7 @@ export function ReminderDetailView({
       ) : (
         <div
           data-testid="reminder-detail-shell"
-          className="max-w-lg mx-auto h-full min-h-0 flex flex-col bg-white dark:bg-stone-950"
+          className="relative max-w-lg mx-auto h-full min-h-0 flex flex-col bg-white dark:bg-stone-950"
         >
           <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
             <button
@@ -518,7 +536,11 @@ export function ReminderDetailView({
             </div>
           )}
 
-          <div data-testid="reminder-detail-scroll" className="flex-1 min-h-0 overflow-y-auto py-2">
+          <div
+            data-testid="reminder-detail-scroll"
+            className="flex-1 min-h-0 overflow-y-auto pt-2"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)' }}
+          >
             {mutationError && (
               <div className="px-4 pt-2">
                 <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
@@ -527,11 +549,11 @@ export function ReminderDetailView({
               </div>
             )}
 
-            {uncheckedItems.length === 0 && checkedItems.length === 0 && (
+            {uncheckedItems.length === 0 && checkedItems.length === 0 && !showBottomAddInput && (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="text-5xl mb-4">📝</div>
                 <p className="text-stone-500 dark:text-stone-400 font-medium">아직 아이템이 없어요</p>
-                <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">아래 입력창에 추가해보세요</p>
+                <p className="text-sm text-stone-400 dark:text-stone-500 mt-1">오른쪽 아래에서 추가해보세요</p>
               </div>
             )}
 
@@ -568,6 +590,16 @@ export function ReminderDetailView({
               </SortableContext>
             </DndContext>
 
+            {showBottomAddInput && (
+              <AddItemInput
+                ref={bottomAddInputRef}
+                onAdd={handleBottomAdd}
+                onCancelEmpty={() => setShowBottomAddInput(false)}
+                inline
+                testId="bottom-add-item-input"
+              />
+            )}
+
             {list?.type === 'strikethrough' && checkedItems.length > 0 && (
               <>
                 <div className="px-4 py-2 mt-2">
@@ -603,12 +635,17 @@ export function ReminderDetailView({
             )}
           </div>
 
-          <div
-            data-testid="reminder-detail-footer"
-            className="shrink-0 border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe"
-          >
-            <AddItemInput ref={addInputRef} onAdd={handleFooterAdd} />
-          </div>
+          {showFloatingAddButton && (
+            <button
+              type="button"
+              onClick={handleOpenBottomAdd}
+              className="absolute right-4 bottom-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-accent-400 text-white shadow-lg transition-colors hover:bg-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-300"
+              aria-label="아이템 추가"
+              data-testid="floating-add-item-button"
+            >
+              <Plus size={18} />
+            </button>
+          )}
         </div>
       )}
     </div>

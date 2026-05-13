@@ -146,7 +146,8 @@ describe('ReminderDetailView', () => {
     )
 
     expect(await screen.findByText('이마트')).toBeInTheDocument()
-    expect(screen.getByText('아래 입력창에 추가해보세요')).toBeInTheDocument()
+    expect(screen.getByText('오른쪽 아래에서 추가해보세요')).toBeInTheDocument()
+    expect(screen.getByTestId('floating-add-item-button')).toBeInTheDocument()
   })
 
   it('목록이 없으면 not found 상태를 보여준다', async () => {
@@ -556,6 +557,173 @@ describe('ReminderDetailView', () => {
     })
   })
 
+  it('floating 추가 버튼으로 목록 맨 아래에 입력창을 연다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    expect(screen.queryByTestId('floating-add-item-button')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(within(bottomAddInput).getByPlaceholderText('아이템 추가...')).toHaveFocus()
+    })
+  })
+
+  it('floating 추가 입력창에서 저장하면 목록 마지막에 추가하고 입력창을 유지한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+    mockAddReminderItem.mockResolvedValueOnce({
+      id: 'item-new',
+      list_id: 'list-1',
+      created_by: 'user-1',
+      name: '버터',
+      is_checked: false,
+      checked_by: null,
+      checked_at: null,
+      sort_order: 1,
+      created_at: '2026-01-01T00:00:01Z',
+    } as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    await user.type(within(bottomAddInput).getByPlaceholderText('아이템 추가...'), '버터')
+    await user.keyboard('{Enter}')
+
+    expect(mockAddReminderItem).toHaveBeenCalledWith('list-1', 'user-1', '버터', null)
+    await waitFor(() => {
+      expect(screen.getByTestId('bottom-add-item-input')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('floating-add-item-button')).not.toBeInTheDocument()
+    expect(onPreviewItemsChange).toHaveBeenLastCalledWith(
+      'list-1',
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'item-1', sort_order: 0 }),
+        expect.objectContaining({ id: 'item-new', name: '버터', sort_order: 1 }),
+      ])
+    )
+  })
+
+  it('완료 아이템이 있어도 floating 추가 입력창은 완료 섹션 위에 열린다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'item-2',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '완료된 항목',
+        is_checked: true,
+        checked_by: 'user-1',
+        checked_at: '2026-01-01T00:00:00Z',
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+
+    const scroll = screen.getByTestId('reminder-detail-scroll')
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    const completedHeading = screen.getByText('완료 (1)')
+
+    expect(
+      Array.from(scroll.children).indexOf(bottomAddInput)
+    ).toBeLessThan(Array.from(scroll.children).indexOf(completedHeading.parentElement!))
+  })
+
+  it('수정 중에는 floating 추가 버튼을 숨긴다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    expect(await screen.findByTestId('floating-add-item-button')).toBeInTheDocument()
+    await user.click(screen.getByText('우유'))
+
+    expect(screen.queryByTestId('floating-add-item-button')).not.toBeInTheDocument()
+  })
+
   it('이전 아이템 blur 저장이 늦게 완료되어도 새 편집 세션을 닫지 않는다', async () => {
     const user = userEvent.setup()
     let resolveRename: () => void = () => {}
@@ -791,7 +959,7 @@ describe('ReminderDetailView', () => {
     expect(onPreviewItemsChange).toHaveBeenLastCalledWith('list-1', [])
   })
 
-  it('아이템이 많아도 목록만 스크롤되고 추가 입력란은 화면 안에 유지된다', async () => {
+  it('아이템이 많아도 목록만 스크롤되고 floating 추가 버튼은 화면 안에 유지된다', async () => {
     mockGetReminderItems.mockResolvedValueOnce(
       Array.from({ length: 40 }, (_, index) => ({
         id: `item-${index + 1}`,
@@ -818,10 +986,11 @@ describe('ReminderDetailView', () => {
     expect(await screen.findByText('아이템 40')).toBeInTheDocument()
     expect(screen.getByTestId('reminder-detail-overlay')).toHaveClass('overflow-hidden')
     expect(screen.getByTestId('reminder-detail-shell')).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col')
-    expect(screen.getByTestId('reminder-detail-scroll')).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto')
+    const scroll = screen.getByTestId('reminder-detail-scroll')
+    expect(scroll).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto', 'pt-2')
+    expect(scroll).toHaveStyle({ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)' })
 
-    const footer = screen.getByTestId('reminder-detail-footer')
-    expect(footer).toHaveClass('shrink-0')
-    expect(within(footer).getByPlaceholderText('아이템 추가...')).toBeInTheDocument()
+    expect(screen.queryByTestId('reminder-detail-footer')).not.toBeInTheDocument()
+    expect(screen.getByTestId('floating-add-item-button')).toHaveClass('absolute')
   })
 })
