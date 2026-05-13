@@ -225,13 +225,15 @@ export async function getReminderItems(listId: string): Promise<ReminderItem[]> 
 export async function addReminderItem(
   listId: string,
   userId: string,
-  name: string
+  name: string,
+  afterItemId: string | null = null
 ): Promise<ReminderItem> {
-  const { data, error } = await supabase
-    .from('shopping_items')
-    .insert({ list_id: listId, created_by: userId, name })
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('add_shopping_item_authorized', {
+    p_actor_user_id: userId,
+    p_list_id: listId,
+    p_name: name,
+    p_after_item_id: afterItemId,
+  })
 
   if (error) throw error
   return data

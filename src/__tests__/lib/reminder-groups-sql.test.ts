@@ -21,12 +21,17 @@ const updateListGroupMigrationPath = path.join(
   process.cwd(),
   'supabase/migrations/20260509003000_update_shopping_list_group_authorized.sql'
 )
+const addItemMigrationPath = path.join(
+  process.cwd(),
+  'supabase/migrations/20260513000000_add_shopping_item_authorized.sql'
+)
 
 const sql = () => fs.readFileSync(migrationPath, 'utf8')
 const ownerAccessSql = () => fs.readFileSync(ownerAccessMigrationPath, 'utf8')
 const createListSql = () => fs.readFileSync(createListMigrationPath, 'utf8')
 const lockDirectInsertSql = () => fs.readFileSync(lockDirectInsertMigrationPath, 'utf8')
 const updateListGroupSql = () => fs.readFileSync(updateListGroupMigrationPath, 'utf8')
+const addItemSql = () => fs.readFileSync(addItemMigrationPath, 'utf8')
 
 describe('reminder groups migration', () => {
   it('does not expose grouped lists by clearing reminder_group_id on group delete', () => {
@@ -98,5 +103,18 @@ describe('reminder groups migration', () => {
     expect(migration).toContain("set_config('app.allow_reminder_list_scope_change', 'on', true)")
     expect(migration).toContain('set reminder_group_id = p_reminder_group_id')
     expect(migration).toContain('grant execute on function update_shopping_list_group_authorized')
+  })
+
+  it('adds reminder items below an anchor through one authorized RPC', () => {
+    const migration = addItemSql()
+
+    expect(migration).toContain('create or replace function add_shopping_item_authorized')
+    expect(migration).toContain('v_actor_id uuid := auth.uid()')
+    expect(migration).toContain('where fm.family_id = v_list.family_id')
+    expect(migration).toContain('where id = p_after_item_id')
+    expect(migration).toContain('and list_id = p_list_id')
+    expect(migration).toContain('set sort_order = sort_order + 1')
+    expect(migration).toContain('insert into shopping_items')
+    expect(migration).toContain('grant execute on function add_shopping_item_authorized')
   })
 })

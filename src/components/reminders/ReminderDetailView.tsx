@@ -30,6 +30,28 @@ import type { User } from '@supabase/supabase-js'
 
 type DetailStatus = 'loading' | 'ready' | 'not-found' | 'fetch-error'
 
+const withInsertedReminderItem = (
+  currentItems: ReminderItemType[],
+  itemToInsert: ReminderItemType,
+  afterItemId?: string
+): ReminderItemType[] => {
+  const orderedItems = [...currentItems].sort((a, b) => {
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order
+    return a.created_at.localeCompare(b.created_at)
+  })
+  const anchorIndex = afterItemId
+    ? orderedItems.findIndex((item) => item.id === afterItemId)
+    : -1
+  const insertIndex = anchorIndex >= 0 ? anchorIndex + 1 : orderedItems.length
+  const nextItems = [
+    ...orderedItems.slice(0, insertIndex),
+    itemToInsert,
+    ...orderedItems.slice(insertIndex),
+  ]
+
+  return nextItems.map((item, index) => ({ ...item, sort_order: index }))
+}
+
 interface Props {
   listId: string
   user: User
@@ -53,7 +75,9 @@ export function ReminderDetailView({
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [groupSaving, setGroupSaving] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [inlineAddAfterItemId, setInlineAddAfterItemId] = useState<string | null>(null)
   const addInputRef = useRef<HTMLInputElement>(null)
+  const inlineAddInputRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -181,7 +205,10 @@ export function ReminderDetailView({
     [syncPreview]
   )
 
-  const handleAdd = async (name: string): Promise<boolean> => {
+  const handleAddItem = useCallback(async (
+    name: string,
+    afterItemId?: string
+  ): Promise<ReminderItemType | null> => {
     setMutationError(null)
     const optimisticItem: ReminderItemType = {
       id: crypto.randomUUID(),
@@ -195,26 +222,56 @@ export function ReminderDetailView({
       created_at: new Date().toISOString(),
     }
     const previousItems = items
-    setItemsWithPreview((prev) => [...prev, optimisticItem])
+    const optimisticItems = withInsertedReminderItem(items, optimisticItem, afterItemId)
+    setItemsWithPreview(optimisticItems)
 
     try {
-      const realItem = await addReminderItem(listId, user.id, name)
-      setItemsWithPreview((prev) =>
-        prev.map((item) => (item.id === optimisticItem.id ? realItem : item))
+      const realItem = await addReminderItem(listId, user.id, name, afterItemId ?? null)
+      const nextItems = optimisticItems.map((item) =>
+        item.id === optimisticItem.id
+          ? { ...realItem, sort_order: item.sort_order }
+          : item
       )
+      setItemsWithPreview(nextItems)
       broadcast()
-      return true
+      return nextItems.find((item) => item.id === realItem.id) ?? realItem
     } catch (e) {
       console.error('[ReminderDetailView] addReminderItem failed:', e)
       setItemsWithPreview(previousItems)
       setMutationError('아이템을 저장하지 못했어요')
-      return false
+      return null
     }
-  }
+  }, [broadcast, items, listId, setItemsWithPreview, user.id])
+
+  const handleFooterAdd = useCallback(
+    async (name: string): Promise<boolean> => {
+      const createdItem = await handleAddItem(name)
+      return createdItem !== null
+    },
+    [handleAddItem]
+  )
+
+  const handleInlineAdd = useCallback(
+    (afterItemId: string) =>
+      async (name: string): Promise<boolean> => {
+        const createdItem = await handleAddItem(name, afterItemId)
+        if (!createdItem) return false
+
+        setInlineAddAfterItemId(createdItem.id)
+        requestAnimationFrame(() => {
+          inlineAddInputRef.current?.focus()
+        })
+        return true
+      },
+    [handleAddItem]
+  )
 
   const handleCheck = async (itemId: string, checked: boolean) => {
     setMutationError(null)
     const previousItems = items
+    if (inlineAddAfterItemId === itemId) {
+      setInlineAddAfterItemId(null)
+    }
 
     if (list?.type === 'delete' && checked) {
       setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
@@ -243,6 +300,9 @@ export function ReminderDetailView({
     } catch (e) {
       console.error('[ReminderDetailView] checkReminderItem failed:', e)
       setItemsWithPreview(previousItems)
+      if (inlineAddAfterItemId === itemId) {
+        setInlineAddAfterItemId(itemId)
+      }
       setMutationError(
         list?.type === 'delete' && checked
           ? '아이템을 삭제하지 못했어요'
@@ -254,6 +314,9 @@ export function ReminderDetailView({
   const handleDelete = async (itemId: string) => {
     setMutationError(null)
     const previousItems = items
+    if (inlineAddAfterItemId === itemId) {
+      setInlineAddAfterItemId(null)
+    }
     setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
 
     try {
@@ -262,6 +325,9 @@ export function ReminderDetailView({
     } catch (e) {
       console.error('[ReminderDetailView] deleteReminderItem failed:', e)
       setItemsWithPreview(previousItems)
+      if (inlineAddAfterItemId === itemId) {
+        setInlineAddAfterItemId(itemId)
+      }
       setMutationError('아이템을 삭제하지 못했어요')
     }
   }
@@ -356,11 +422,16 @@ export function ReminderDetailView({
     setEditingItemId((currentItemId) => {
       if (currentItemId !== itemId) return currentItemId
 
+      setInlineAddAfterItemId(itemId)
       requestAnimationFrame(() => {
-        addInputRef.current?.focus()
+        inlineAddInputRef.current?.focus()
       })
       return null
     })
+  }, [])
+  const handleEditStart = useCallback((itemId: string) => {
+    setInlineAddAfterItemId(null)
+    setEditingItemId(itemId)
   }, [])
   const handleEditEnd = useCallback((itemId: string) => {
     setEditingItemId((currentItemId) => (currentItemId === itemId ? null : currentItemId))
@@ -470,19 +541,29 @@ export function ReminderDetailView({
                 strategy={verticalListSortingStrategy}
               >
                 {uncheckedItems.map((item) => (
-                  <ReminderItem
-                    key={item.id}
-                    item={item}
-                    listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
-                    onCheck={handleCheck}
-                    onDelete={handleDelete}
-                    onRename={handleRename}
-                    isEditing={editingItemId === item.id}
-                    onEditStart={setEditingItemId}
-                    onEditEnd={handleEditEnd}
-                    onAdvanceEdit={handleAdvanceEdit}
-                    draggable
-                  />
+                  <div key={item.id}>
+                    <ReminderItem
+                      item={item}
+                      listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
+                      onCheck={handleCheck}
+                      onDelete={handleDelete}
+                      onRename={handleRename}
+                      isEditing={editingItemId === item.id}
+                      onEditStart={handleEditStart}
+                      onEditEnd={handleEditEnd}
+                      onAdvanceEdit={handleAdvanceEdit}
+                      draggable
+                    />
+                    {inlineAddAfterItemId === item.id && (
+                      <AddItemInput
+                        ref={inlineAddInputRef}
+                        onAdd={handleInlineAdd(item.id)}
+                        onCancelEmpty={() => setInlineAddAfterItemId(null)}
+                        inline
+                        testId="inline-add-item-input"
+                      />
+                    )}
+                  </div>
                 ))}
               </SortableContext>
             </DndContext>
@@ -495,18 +576,28 @@ export function ReminderDetailView({
                   </p>
                 </div>
                 {checkedItems.map((item) => (
-                  <ReminderItem
-                    key={item.id}
-                    item={item}
-                    listType="strikethrough"
-                    onCheck={handleCheck}
-                    onDelete={handleDelete}
-                    onRename={handleRename}
-                    isEditing={editingItemId === item.id}
-                    onEditStart={setEditingItemId}
-                    onEditEnd={handleEditEnd}
-                    onAdvanceEdit={handleAdvanceEdit}
-                  />
+                  <div key={item.id}>
+                    <ReminderItem
+                      item={item}
+                      listType="strikethrough"
+                      onCheck={handleCheck}
+                      onDelete={handleDelete}
+                      onRename={handleRename}
+                      isEditing={editingItemId === item.id}
+                      onEditStart={handleEditStart}
+                      onEditEnd={handleEditEnd}
+                      onAdvanceEdit={handleAdvanceEdit}
+                    />
+                    {inlineAddAfterItemId === item.id && (
+                      <AddItemInput
+                        ref={inlineAddInputRef}
+                        onAdd={handleInlineAdd(item.id)}
+                        onCancelEmpty={() => setInlineAddAfterItemId(null)}
+                        inline
+                        testId="inline-add-item-input"
+                      />
+                    )}
+                  </div>
                 ))}
               </>
             )}
@@ -516,7 +607,7 @@ export function ReminderDetailView({
             data-testid="reminder-detail-footer"
             className="shrink-0 border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-950 pb-safe"
           >
-            <AddItemInput ref={addInputRef} onAdd={handleAdd} />
+            <AddItemInput ref={addInputRef} onAdd={handleFooterAdd} />
           </div>
         </div>
       )}

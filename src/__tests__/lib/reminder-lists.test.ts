@@ -393,13 +393,19 @@ describe('getReminderItems', () => {
 describe('addReminderItem', () => {
   it('생성된 아이템을 반환한다', async () => {
     const mockItem = { id: 'item-1', name: '우유', is_checked: false }
-    mockFrom.mockReturnValue(makeChain({ data: mockItem, error: null }))
-    const result = await addReminderItem('list-1', 'user-1', '우유')
+    mockRpc.mockResolvedValue({ data: mockItem, error: null })
+    const result = await addReminderItem('list-1', 'user-1', '우유', 'item-0')
     expect(result).toEqual(mockItem)
+    expect(mockRpc).toHaveBeenCalledWith('add_shopping_item_authorized', {
+      p_actor_user_id: 'user-1',
+      p_list_id: 'list-1',
+      p_name: '우유',
+      p_after_item_id: 'item-0',
+    })
   })
 
   it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'insert error' } }))
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'insert error' } })
     await expect(addReminderItem('list-1', 'user-1', '우유')).rejects.toEqual({ message: 'insert error' })
   })
 })
