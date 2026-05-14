@@ -36,6 +36,10 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 인증이 필요한 API route는 `src/lib/api-auth.ts`의 helper를 사용해 사용자 식별을 처리한다.
 - 클라이언트에서 API route를 호출할 때는 `src/lib/api-client.ts`의 auth helper로 bearer token을 붙인다.
 - 권한 검증, 원자 저장, cross-table mutation, push fan-out이 필요한 로직은 API route + admin client + DB RPC 조합을 우선한다.
+- `public` schema에 새 테이블을 만들 때는 Data API 접근 role에 대한 table-level `GRANT`를 migration에 명시한다.
+- RLS policy만으로는 Supabase Data API 접근이 열리지 않는다. Data API로 접근할 테이블은 `GRANT`와 `alter table ... enable row level security`, policy가 모두 필요하다.
+- 로그인 사용자용 앱 테이블은 보통 `authenticated`에 필요한 권한을 grant한다. `anon` grant는 익명 접근이 의도된 경우에만 추가한다.
+- `service_role`은 RLS를 우회하지만 PostgREST/Data API 권한 계약을 명확히 하기 위해 필요한 table 권한을 명시한다.
 
 ## 4. Auth And Onboarding Flow
 
