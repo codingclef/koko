@@ -10,7 +10,7 @@ import {
   getSingleEventDisplayBudget,
   getHolidayBlockHeight,
   getHolidayOverlayOffset,
-  getRowHolidayOverlayOffset,
+  splitSegmentsByHolidayOffsets,
 } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
@@ -330,8 +330,29 @@ describe('holiday overlay helpers', () => {
     expect(getHolidayOverlayOffset(2)).toBe(38)
   })
 
-  it('같은 주에서는 가장 높은 공휴일 스택 아래로 멀티데이 레인을 일괄 내린다', () => {
-    expect(getRowHolidayOverlayOffset([0, 1, 0, 2, 0, 0, 0])).toBe(38)
+  it('같은 lane의 멀티데이 이벤트도 공휴일 높이가 바뀌는 지점에서 분할된다', () => {
+    const row = makeRow(2025, 5, 15)
+    const segments = computeSegments(row, [
+      makeEvent({
+        id: 'trip',
+        is_all_day: true,
+        start_at: '2025-06-15T00:00:00Z',
+        end_at: '2025-06-18T00:00:00Z',
+      }),
+    ])
+    const displaySegments = splitSegmentsByHolidayOffsets(segments, [0, 0, 1, 1, 0, 0, 0])
+
+    expect(displaySegments).toHaveLength(2)
+    expect(displaySegments.map((seg) => ({
+      colStart: seg.colStart,
+      colSpan: seg.colSpan,
+      holidayOffset: seg.holidayOffset,
+      isStart: seg.isStart,
+      isEnd: seg.isEnd,
+    }))).toEqual([
+      { colStart: 0, colSpan: 2, holidayOffset: 0, isStart: true, isEnd: false },
+      { colStart: 2, colSpan: 2, holidayOffset: 19, isStart: false, isEnd: true },
+    ])
   })
 
   it('공휴일이 있는 열과 없는 열의 spacer 높이를 다르게 예약한다', () => {
@@ -344,8 +365,9 @@ describe('holiday overlay helpers', () => {
         end_at: '2025-06-16T00:00:00Z',
       }),
     ])
+    const displaySegments = splitSegmentsByHolidayOffsets(segments, [1, 0, 0, 0, 0, 0, 0])
 
-    expect(computeReservedLaneHeightsByColumn(segments, 19, [1, 0, 0, 0, 0, 0, 0])).toEqual([20, 37, 0, 0, 0, 0, 0])
+    expect(computeReservedLaneHeightsByColumn(displaySegments, [1, 0, 0, 0, 0, 0, 0])).toEqual([20, 18, 0, 0, 0, 0, 0])
   })
 })
 
@@ -774,8 +796,9 @@ describe('공휴일-이벤트 칩 간격', () => {
     render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
 
     expect(screen.getByTestId('lane-spacer-2025-06-15')).toHaveStyle({ height: '20px' })
-    expect(screen.getByTestId('lane-spacer-2025-06-16')).toHaveStyle({ height: '37px' })
-    expect(screen.getByTestId('multi-segment-row-priority-row2')).toHaveStyle({ top: '0px' })
+    expect(screen.getByTestId('lane-spacer-2025-06-16')).toHaveStyle({ height: '18px' })
+    expect(screen.getByTestId('multi-segment-row-priority-row2-piece0')).toHaveStyle({ top: '19px' })
+    expect(screen.getByTestId('multi-segment-row-priority-row2-piece1')).toHaveStyle({ top: '0px' })
   })
 })
 
