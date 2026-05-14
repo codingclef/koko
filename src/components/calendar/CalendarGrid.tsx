@@ -87,6 +87,8 @@ export function getHolidayOverlayOffset(holidayCount: number): number {
 
 interface DisplaySegment extends EventSegment {
   holidayOffset: number
+  showLeadingContinuation: boolean
+  showTrailingContinuation: boolean
 }
 
 export function splitSegmentsByHolidayOffsets(
@@ -111,6 +113,8 @@ export function splitSegmentsByHolidayOffsets(
         isStart: seg.isStart && pieceStart === seg.colStart,
         isEnd: seg.isEnd && col === segmentEnd,
         holidayOffset: getHolidayOverlayOffset(currentHolidayCount),
+        showLeadingContinuation: !seg.isStart && pieceStart === seg.colStart,
+        showTrailingContinuation: !seg.isEnd && col === segmentEnd,
       })
 
       pieceStart = col
@@ -578,9 +582,9 @@ export function CalendarGrid({
                           }}
                           onClick={() => onSelectDate(dateOnly(new Date(seg.event.start_at)))}
                         >
-                          {!seg.isStart && <span className="shrink-0 opacity-70">‹</span>}
+                          {seg.showLeadingContinuation && <span className="shrink-0 opacity-70">‹</span>}
                           <span className="overflow-hidden min-w-0">{seg.event.title}</span>
-                          {!seg.isEnd && <span className="shrink-0 opacity-70">›</span>}
+                          {seg.showTrailingContinuation && <span className="shrink-0 opacity-70">›</span>}
                         </button>
                       </div>
                     )

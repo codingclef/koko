@@ -349,9 +349,27 @@ describe('holiday overlay helpers', () => {
       holidayOffset: seg.holidayOffset,
       isStart: seg.isStart,
       isEnd: seg.isEnd,
+      showLeadingContinuation: seg.showLeadingContinuation,
+      showTrailingContinuation: seg.showTrailingContinuation,
     }))).toEqual([
-      { colStart: 0, colSpan: 2, holidayOffset: 0, isStart: true, isEnd: false },
-      { colStart: 2, colSpan: 2, holidayOffset: 19, isStart: false, isEnd: true },
+      {
+        colStart: 0,
+        colSpan: 2,
+        holidayOffset: 0,
+        isStart: true,
+        isEnd: false,
+        showLeadingContinuation: false,
+        showTrailingContinuation: false,
+      },
+      {
+        colStart: 2,
+        colSpan: 2,
+        holidayOffset: 19,
+        isStart: false,
+        isEnd: true,
+        showLeadingContinuation: false,
+        showTrailingContinuation: false,
+      },
     ])
   })
 
@@ -799,6 +817,27 @@ describe('공휴일-이벤트 칩 간격', () => {
     expect(screen.getByTestId('lane-spacer-2025-06-16')).toHaveStyle({ height: '18px' })
     expect(screen.getByTestId('multi-segment-row-priority-row2-piece0')).toHaveStyle({ top: '19px' })
     expect(screen.getByTestId('multi-segment-row-priority-row2-piece1')).toHaveStyle({ top: '0px' })
+  })
+
+  it('같은 주 내부 holiday split으로 생긴 조각에는 가짜 continuation 화살표가 보이지 않는다', () => {
+    const holidays: Holiday[] = [
+      { date: '2025-06-17', localName: '테스트공휴일', countryCode: 'KR' },
+      { date: '2025-06-18', localName: '테스트공휴일2', countryCode: 'KR' },
+    ]
+    const event = makeEvent({
+      id: 'holiday-split',
+      title: '연속휴가',
+      is_all_day: true,
+      start_at: '2025-06-15T00:00:00Z',
+      end_at: '2025-06-18T00:00:00Z',
+    })
+
+    render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
+
+    const bars = screen.getAllByTitle('연속휴가')
+    expect(bars).toHaveLength(2)
+    expect(bars[0].textContent).not.toMatch(/[‹›]/)
+    expect(bars[1].textContent).not.toMatch(/[‹›]/)
   })
 })
 
