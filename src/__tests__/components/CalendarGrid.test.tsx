@@ -6,7 +6,11 @@ import {
   isEventOnDate,
   computeSegments,
   computeLaneHeightsByColumn,
+  computeReservedLaneHeightsByColumn,
   getSingleEventDisplayBudget,
+  getHolidayBlockHeight,
+  getHolidayOverlayOffset,
+  getRowHolidayOverlayOffset,
 } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
@@ -313,6 +317,35 @@ describe('computeLaneHeightsByColumn', () => {
     ])
 
     expect(computeLaneHeightsByColumn(segs)).toEqual([0, 18, 36, 36, 18, 0, 0])
+  })
+})
+
+describe('holiday overlay helpers', () => {
+  it('공휴일 block 높이와 overlay offset을 올바르게 계산한다', () => {
+    expect(getHolidayBlockHeight(0)).toBe(0)
+    expect(getHolidayBlockHeight(1)).toBe(17)
+    expect(getHolidayBlockHeight(2)).toBe(36)
+    expect(getHolidayOverlayOffset(0)).toBe(0)
+    expect(getHolidayOverlayOffset(1)).toBe(19)
+    expect(getHolidayOverlayOffset(2)).toBe(38)
+  })
+
+  it('같은 주에서는 가장 높은 공휴일 스택 아래로 멀티데이 레인을 일괄 내린다', () => {
+    expect(getRowHolidayOverlayOffset([0, 1, 0, 2, 0, 0, 0])).toBe(38)
+  })
+
+  it('공휴일이 있는 열과 없는 열의 spacer 높이를 다르게 예약한다', () => {
+    const row = makeRow(2025, 5, 15)
+    const segments = computeSegments(row, [
+      makeEvent({
+        id: 'trip',
+        is_all_day: true,
+        start_at: '2025-06-15T00:00:00Z',
+        end_at: '2025-06-16T00:00:00Z',
+      }),
+    ])
+
+    expect(computeReservedLaneHeightsByColumn(segments, 19, [1, 0, 0, 0, 0, 0, 0])).toEqual([20, 37, 0, 0, 0, 0, 0])
   })
 })
 
@@ -726,6 +759,23 @@ describe('공휴일-이벤트 칩 간격', () => {
     // 이벤트(생일파티)는 6/15, 공휴일은 6/6 → 6/15 이벤트 블록에 mt-0.5 없어야 함
     const chip = screen.getByText('생일파티')
     expect(chip.parentElement).not.toHaveClass('mt-0.5')
+  })
+
+  it('같은 주에 공휴일과 멀티데이 종일 일정이 겹치면 멀티데이 bar가 공휴일 아래에서 시작한다', () => {
+    const holidays: Holiday[] = [{ date: '2025-06-15', localName: '테스트공휴일', countryCode: 'KR' }]
+    const event = makeEvent({
+      id: 'row-priority',
+      title: '연속휴가',
+      is_all_day: true,
+      start_at: '2025-06-15T00:00:00Z',
+      end_at: '2025-06-16T00:00:00Z',
+    })
+
+    render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
+
+    expect(screen.getByTestId('lane-spacer-2025-06-15')).toHaveStyle({ height: '20px' })
+    expect(screen.getByTestId('lane-spacer-2025-06-16')).toHaveStyle({ height: '37px' })
+    expect(screen.getByTestId('multi-segment-row-priority-row2')).toHaveStyle({ top: '0px' })
   })
 })
 

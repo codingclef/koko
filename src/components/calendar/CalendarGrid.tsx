@@ -75,6 +75,23 @@ function getChipStyle(isAllDay: boolean, color: string): CSSProperties {
   return { backgroundColor: color + '26', color }
 }
 
+export function getHolidayBlockHeight(holidayCount: number): number {
+  if (holidayCount <= 0) return 0
+  return holidayCount * CHIP_HEIGHT + Math.max(0, holidayCount - 1) * CHIP_GAP
+}
+
+export function getHolidayOverlayOffset(holidayCount: number): number {
+  if (holidayCount <= 0) return 0
+  return getHolidayBlockHeight(holidayCount) + HOLIDAY_EVENT_GAP
+}
+
+export function getRowHolidayOverlayOffset(holidayCountsByColumn: number[]): number {
+  return holidayCountsByColumn.reduce(
+    (maxOffset, count) => Math.max(maxOffset, getHolidayOverlayOffset(count)),
+    0
+  )
+}
+
 export function getSingleEventDisplayBudget({
   rowHeight,
   dateHeaderHeight,
@@ -192,6 +209,25 @@ export function computeLaneHeightsByColumn(segments: EventSegment[]): number[] {
     const endCol = seg.colStart + seg.colSpan
     for (let col = seg.colStart; col < endCol; col += 1) {
       if (laneHeight > heights[col]) heights[col] = laneHeight
+    }
+  }
+
+  return heights
+}
+
+export function computeReservedLaneHeightsByColumn(
+  segments: EventSegment[],
+  rowHolidayOffset: number,
+  holidayCountsByColumn: number[]
+): number[] {
+  const heights = Array.from({ length: 7 }, () => 0)
+
+  for (const seg of segments) {
+    const segmentBottom = rowHolidayOffset + (seg.lane + 1) * LANE_HEIGHT
+    const endCol = seg.colStart + seg.colSpan
+    for (let col = seg.colStart; col < endCol; col += 1) {
+      const reservedHeight = Math.max(0, segmentBottom - getHolidayBlockHeight(holidayCountsByColumn[col] ?? 0))
+      if (reservedHeight > heights[col]) heights[col] = reservedHeight
     }
   }
 
@@ -346,7 +382,17 @@ export function CalendarGrid({
       {/* 주 단위 행 — minmax(0,1fr) 트랙 */}
       {rows.map((row, rowIdx) => {
         const segments = computeSegments(row, multiDayEvents)
-        const laneHeightsByColumn = computeLaneHeightsByColumn(segments)
+        const holidayCountsByColumn = row.map((cell) => {
+          const d = cell.date
+          const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          return holidaysByDate.get(ymd)?.length ?? 0
+        })
+        const rowHolidayOffset = getRowHolidayOverlayOffset(holidayCountsByColumn)
+        const laneHeightsByColumn = computeReservedLaneHeightsByColumn(
+          segments,
+          rowHolidayOffset,
+          holidayCountsByColumn
+        )
 
         return (
             <div key={rowIdx} className="relative min-h-0">
@@ -424,13 +470,6 @@ export function CalendarGrid({
                         )}
                       </div>
 
-                      {/* 멀티데이 lane 공간 확보용 spacer */}
-                      <div
-                        aria-hidden="true"
-                        data-testid={`lane-spacer-${ymd}`}
-                        style={{ height: laneAreaHeight }}
-                      />
-
                       {/* 공휴일 chips */}
                       <div className="w-full space-y-0.5">
                         {dayHolidays.map((h) => (
@@ -442,6 +481,13 @@ export function CalendarGrid({
                           </div>
                         ))}
                       </div>
+
+                      {/* 멀티데이 lane 공간 확보용 spacer */}
+                      <div
+                        aria-hidden="true"
+                        data-testid={`lane-spacer-${ymd}`}
+                        style={{ height: laneAreaHeight }}
+                      />
 
                       {/* 단일 일정 pills */}
                       <div className={`w-full space-y-0.5${hasHolidaysAndEvents ? ' mt-0.5' : ''}`}>
@@ -473,7 +519,7 @@ export function CalendarGrid({
                 <div
                   aria-hidden="true"
                   className="absolute inset-x-0 pointer-events-none"
-                  style={{ top: effectiveDateHeaderHeight }}
+                  style={{ top: effectiveDateHeaderHeight + rowHolidayOffset }}
                 >
                   {segments.map((seg) => {
                     const color = getEventColor(seg.event)
@@ -484,6 +530,7 @@ export function CalendarGrid({
                     return (
                       <div
                         key={`${seg.event.id}-row${rowIdx}`}
+                        data-testid={`multi-segment-${seg.event.id}-row${rowIdx}`}
                         className="absolute px-0.5 pointer-events-none"
                         style={{
                           left: `${(seg.colStart / 7) * 100}%`,
