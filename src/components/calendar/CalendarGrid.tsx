@@ -85,46 +85,6 @@ export function getHolidayOverlayOffset(holidayCount: number): number {
   return getHolidayBlockHeight(holidayCount) + HOLIDAY_EVENT_GAP
 }
 
-interface DisplaySegment extends EventSegment {
-  holidayOffset: number
-  showLeadingContinuation: boolean
-  showTrailingContinuation: boolean
-}
-
-export function splitSegmentsByHolidayOffsets(
-  segments: EventSegment[],
-  holidayCountsByColumn: number[]
-): DisplaySegment[] {
-  const displaySegments: DisplaySegment[] = []
-
-  for (const seg of segments) {
-    const segmentEnd = seg.colStart + seg.colSpan
-    let pieceStart = seg.colStart
-    let currentHolidayCount = holidayCountsByColumn[pieceStart] ?? 0
-
-    for (let col = seg.colStart + 1; col <= segmentEnd; col += 1) {
-      const nextHolidayCount = col < segmentEnd ? (holidayCountsByColumn[col] ?? 0) : null
-      if (nextHolidayCount === currentHolidayCount) continue
-
-      displaySegments.push({
-        ...seg,
-        colStart: pieceStart,
-        colSpan: col - pieceStart,
-        isStart: seg.isStart && pieceStart === seg.colStart,
-        isEnd: seg.isEnd && col === segmentEnd,
-        holidayOffset: getHolidayOverlayOffset(currentHolidayCount),
-        showLeadingContinuation: !seg.isStart && pieceStart === seg.colStart,
-        showTrailingContinuation: !seg.isEnd && col === segmentEnd,
-      })
-
-      pieceStart = col
-      currentHolidayCount = nextHolidayCount ?? 0
-    }
-  }
-
-  return displaySegments
-}
-
 export function getSingleEventDisplayBudget({
   rowHeight,
   dateHeaderHeight,
@@ -234,32 +194,14 @@ export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[])
   return segments
 }
 
-export function computeLaneHeightsByColumn(segments: EventSegment[]): number[] {
+export function computeLaneHeightsByColumn(segments: EventSegment[], baseOffset = 0): number[] {
   const heights = Array.from({ length: 7 }, () => 0)
 
   for (const seg of segments) {
-    const laneHeight = (seg.lane + 1) * LANE_HEIGHT
+    const laneHeight = baseOffset + (seg.lane + 1) * LANE_HEIGHT
     const endCol = seg.colStart + seg.colSpan
     for (let col = seg.colStart; col < endCol; col += 1) {
       if (laneHeight > heights[col]) heights[col] = laneHeight
-    }
-  }
-
-  return heights
-}
-
-export function computeReservedLaneHeightsByColumn(
-  segments: DisplaySegment[],
-  holidayCountsByColumn: number[]
-): number[] {
-  const heights = Array.from({ length: 7 }, () => 0)
-
-  for (const seg of segments) {
-    const segmentBottom = seg.holidayOffset + (seg.lane + 1) * LANE_HEIGHT
-    const endCol = seg.colStart + seg.colSpan
-    for (let col = seg.colStart; col < endCol; col += 1) {
-      const reservedHeight = Math.max(0, segmentBottom - getHolidayBlockHeight(holidayCountsByColumn[col] ?? 0))
-      if (reservedHeight > heights[col]) heights[col] = reservedHeight
     }
   }
 
@@ -419,11 +361,8 @@ export function CalendarGrid({
           const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           return holidaysByDate.get(ymd)?.length ?? 0
         })
-        const displaySegments = splitSegmentsByHolidayOffsets(segments, holidayCountsByColumn)
-        const laneHeightsByColumn = computeReservedLaneHeightsByColumn(
-          displaySegments,
-          holidayCountsByColumn
-        )
+        const rowHolidayOffset = getHolidayOverlayOffset(Math.max(0, ...holidayCountsByColumn))
+        const laneHeightsByColumn = computeLaneHeightsByColumn(segments, rowHolidayOffset)
 
         return (
             <div key={rowIdx} className="relative min-h-0">
@@ -546,13 +485,13 @@ export function CalendarGrid({
               </div>
 
               {/* 멀티데이 이벤트 overlay */}
-              {displaySegments.length > 0 && (
+              {segments.length > 0 && (
                 <div
                   aria-hidden="true"
                   className="absolute inset-x-0 pointer-events-none"
                   style={{ top: effectiveDateHeaderHeight }}
                 >
-                  {displaySegments.map((seg, segIdx) => {
+                  {segments.map((seg) => {
                     const color = getEventColor(seg.event)
                     const s = seg.isStart ? '4px' : '0'
                     const e = seg.isEnd ? '4px' : '0'
@@ -560,13 +499,13 @@ export function CalendarGrid({
 
                     return (
                       <div
-                        key={`${seg.event.id}-row${rowIdx}-piece${segIdx}`}
-                        data-testid={`multi-segment-${seg.event.id}-row${rowIdx}-piece${segIdx}`}
+                        key={`${seg.event.id}-row${rowIdx}`}
+                        data-testid={`multi-segment-${seg.event.id}-row${rowIdx}`}
                         className="absolute px-0.5 pointer-events-none"
                         style={{
                           left: `${(seg.colStart / 7) * 100}%`,
                           width: `${(seg.colSpan / 7) * 100}%`,
-                          top: seg.holidayOffset + seg.lane * LANE_HEIGHT,
+                          top: rowHolidayOffset + seg.lane * LANE_HEIGHT,
                           height: 16,
                         }}
                       >
@@ -582,9 +521,9 @@ export function CalendarGrid({
                           }}
                           onClick={() => onSelectDate(dateOnly(new Date(seg.event.start_at)))}
                         >
-                          {seg.showLeadingContinuation && <span className="shrink-0 opacity-70">‹</span>}
+                          {!seg.isStart && <span className="shrink-0 opacity-70">‹</span>}
                           <span className="overflow-hidden min-w-0">{seg.event.title}</span>
-                          {seg.showTrailingContinuation && <span className="shrink-0 opacity-70">›</span>}
+                          {!seg.isEnd && <span className="shrink-0 opacity-70">›</span>}
                         </button>
                       </div>
                     )
