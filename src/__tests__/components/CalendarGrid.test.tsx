@@ -6,9 +6,11 @@ import {
   isEventOnDate,
   computeSegments,
   computeLaneHeightsByColumn,
+  computeReservedLaneHeightsByColumn,
   getSingleEventDisplayBudget,
   getHolidayBlockHeight,
   getHolidayOverlayOffset,
+  splitSegmentsByHolidayOffsets,
 } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
@@ -328,7 +330,56 @@ describe('holiday overlay helpers', () => {
     expect(getHolidayOverlayOffset(2)).toBe(38)
   })
 
-  it('같은 주에서는 최대 공휴일 높이만큼 멀티데이 lane을 일괄 오프셋한다', () => {
+  it('같은 lane의 멀티데이 이벤트도 공휴일 높이가 바뀌는 지점에서 분할된다', () => {
+    const row = makeRow(2025, 5, 15)
+    const segments = computeSegments(row, [
+      makeEvent({
+        id: 'trip',
+        is_all_day: true,
+        start_at: '2025-06-15T00:00:00Z',
+        end_at: '2025-06-18T00:00:00Z',
+      }),
+    ])
+    const displaySegments = splitSegmentsByHolidayOffsets(segments, [0, 0, 1, 1, 0, 0, 0])
+
+    expect(displaySegments).toHaveLength(2)
+    expect(displaySegments.map((seg) => ({
+      colStart: seg.colStart,
+      colSpan: seg.colSpan,
+      holidayOffset: seg.holidayOffset,
+      isStart: seg.isStart,
+      isEnd: seg.isEnd,
+      showLeadingContinuation: seg.showLeadingContinuation,
+      showTrailingContinuation: seg.showTrailingContinuation,
+      insetLeft: seg.insetLeft,
+      insetRight: seg.insetRight,
+    }))).toEqual([
+      {
+        colStart: 0,
+        colSpan: 2,
+        holidayOffset: 0,
+        isStart: true,
+        isEnd: false,
+        showLeadingContinuation: false,
+        showTrailingContinuation: false,
+        insetLeft: true,
+        insetRight: false,
+      },
+      {
+        colStart: 2,
+        colSpan: 2,
+        holidayOffset: 19,
+        isStart: false,
+        isEnd: true,
+        showLeadingContinuation: false,
+        showTrailingContinuation: false,
+        insetLeft: false,
+        insetRight: true,
+      },
+    ])
+  })
+
+  it('공휴일이 있는 열과 없는 열의 spacer 높이를 다르게 예약한다', () => {
     const row = makeRow(2025, 5, 15)
     const segments = computeSegments(row, [
       makeEvent({
@@ -338,8 +389,9 @@ describe('holiday overlay helpers', () => {
         end_at: '2025-06-16T00:00:00Z',
       }),
     ])
+    const displaySegments = splitSegmentsByHolidayOffsets(segments, [1, 0, 0, 0, 0, 0, 0])
 
-    expect(computeLaneHeightsByColumn(segments, getHolidayOverlayOffset(1))).toEqual([37, 37, 0, 0, 0, 0, 0])
+    expect(computeReservedLaneHeightsByColumn(displaySegments, [1, 0, 0, 0, 0, 0, 0])).toEqual([20, 18, 0, 0, 0, 0, 0])
   })
 })
 
@@ -767,12 +819,13 @@ describe('공휴일-이벤트 칩 간격', () => {
 
     render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
 
-    expect(screen.getByTestId('lane-spacer-2025-06-15')).toHaveStyle({ height: '37px' })
-    expect(screen.getByTestId('lane-spacer-2025-06-16')).toHaveStyle({ height: '37px' })
-    expect(screen.getByTestId('multi-segment-row-priority-row2')).toHaveStyle({ top: '19px' })
+    expect(screen.getByTestId('lane-spacer-2025-06-15')).toHaveStyle({ height: '20px' })
+    expect(screen.getByTestId('lane-spacer-2025-06-16')).toHaveStyle({ height: '18px' })
+    expect(screen.getByTestId('multi-segment-row-priority-row2-piece0')).toHaveStyle({ top: '19px' })
+    expect(screen.getByTestId('multi-segment-row-priority-row2-piece1')).toHaveStyle({ top: '0px' })
   })
 
-  it('같은 주 내부 공휴일 변화로 멀티데이 bar가 분절되지 않는다', () => {
+  it('같은 주 내부 holiday split으로 생긴 조각에는 가짜 continuation 화살표가 보이지 않는다', () => {
     const holidays: Holiday[] = [
       { date: '2025-06-17', localName: '테스트공휴일', countryCode: 'KR' },
       { date: '2025-06-18', localName: '테스트공휴일2', countryCode: 'KR' },
@@ -788,8 +841,28 @@ describe('공휴일-이벤트 칩 간격', () => {
     render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
 
     const bars = screen.getAllByTitle('연속휴가')
-    expect(bars).toHaveLength(1)
+    expect(bars).toHaveLength(2)
     expect(bars[0].textContent).not.toMatch(/[‹›]/)
+    expect(bars[1].textContent).not.toMatch(/[‹›]/)
+  })
+
+  it('공휴일이 없는 구간은 같은 주 안에서도 불필요하게 아래로 처지지 않는다', () => {
+    const holidays: Holiday[] = [
+      { date: '2026-05-24', localName: '부처님오신날', countryCode: 'KR' },
+      { date: '2026-05-25', localName: '대체공휴일', countryCode: 'KR' },
+    ]
+    const event = makeEvent({
+      id: 'geunchang-japan',
+      title: '근짱 일본',
+      is_all_day: true,
+      start_at: '2026-05-28T00:00:00Z',
+      end_at: '2026-06-02T00:00:00Z',
+    })
+
+    render(<CalendarGrid {...defaultProps} year={2026} month={4} events={[event]} holidays={holidays} />)
+
+    expect(screen.getByTestId('multi-segment-geunchang-japan-row4-piece0')).toHaveStyle({ top: '0px' })
+    expect(screen.getByTestId('multi-segment-geunchang-japan-row5-piece0')).toHaveStyle({ top: '0px' })
   })
 })
 
