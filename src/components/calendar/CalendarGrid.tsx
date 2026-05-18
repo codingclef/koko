@@ -97,6 +97,8 @@ export function shouldRenderMultiDayAboveHolidays(
   segments: EventSegment[],
   holidayCountsByColumn: number[]
 ): boolean {
+  // Default policy keeps holiday-aware splits so holiday-free days do not drop.
+  // Long holiday streaks are the exception: keep one continuous multi-day bar above them.
   let streakStart = -1
 
   for (let col = 0; col <= holidayCountsByColumn.length; col += 1) {
