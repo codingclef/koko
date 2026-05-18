@@ -93,6 +93,39 @@ interface DisplaySegment extends EventSegment {
   insetRight: boolean
 }
 
+export function shouldRenderMultiDayAboveHolidays(
+  segments: EventSegment[],
+  holidayCountsByColumn: number[]
+): boolean {
+  let streakStart = -1
+
+  for (let col = 0; col <= holidayCountsByColumn.length; col += 1) {
+    const hasHoliday = col < holidayCountsByColumn.length && (holidayCountsByColumn[col] ?? 0) > 0
+
+    if (hasHoliday) {
+      if (streakStart === -1) streakStart = col
+      continue
+    }
+
+    if (streakStart === -1) continue
+
+    const streakEnd = col
+    const streakLength = streakEnd - streakStart
+    if (streakLength >= 2) {
+      const crossesHolidayStreak = segments.some((seg) => (
+        seg.colStart < streakStart &&
+        seg.colStart + seg.colSpan > streakStart &&
+        seg.colStart + seg.colSpan >= streakEnd
+      ))
+      if (crossesHolidayStreak) return true
+    }
+
+    streakStart = -1
+  }
+
+  return false
+}
+
 export function splitSegmentsByHolidayOffsets(
   segments: EventSegment[],
   holidayCountsByColumn: number[]
@@ -425,11 +458,20 @@ export function CalendarGrid({
           const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           return holidaysByDate.get(ymd)?.length ?? 0
         })
-        const displaySegments = splitSegmentsByHolidayOffsets(segments, holidayCountsByColumn)
-        const laneHeightsByColumn = computeReservedLaneHeightsByColumn(
-          displaySegments,
-          holidayCountsByColumn
-        )
+        const renderMultiDayAboveHolidays = shouldRenderMultiDayAboveHolidays(segments, holidayCountsByColumn)
+        const displaySegments = renderMultiDayAboveHolidays
+          ? segments.map((seg) => ({
+              ...seg,
+              holidayOffset: 0,
+              showLeadingContinuation: !seg.isStart,
+              showTrailingContinuation: !seg.isEnd,
+              insetLeft: true,
+              insetRight: true,
+            }))
+          : splitSegmentsByHolidayOffsets(segments, holidayCountsByColumn)
+        const laneHeightsByColumn = renderMultiDayAboveHolidays
+          ? computeLaneHeightsByColumn(segments)
+          : computeReservedLaneHeightsByColumn(displaySegments, holidayCountsByColumn)
 
         return (
             <div key={rowIdx} className="relative min-h-0">
@@ -447,6 +489,8 @@ export function CalendarGrid({
                   const isSat = dow === 6
                   const hasHolidaysAndEvents = dayHolidays.length > 0 && daySingleEvents.length > 0
                   const laneAreaHeight = laneHeightsByColumn[colIdx] ?? 0
+                  const holidaySpacerBefore = renderMultiDayAboveHolidays ? laneAreaHeight : 0
+                  const holidaySpacerAfter = renderMultiDayAboveHolidays ? 0 : laneAreaHeight
                   const singleEventDisplay = getSingleEventDisplayBudget({
                     rowHeight,
                     dateHeaderHeight: effectiveDateHeaderHeight,
@@ -507,6 +551,15 @@ export function CalendarGrid({
                         )}
                       </div>
 
+                      {/* 멀티데이 lane 공간 확보용 spacer - 공휴일 위 모드 */}
+                      {holidaySpacerBefore > 0 && (
+                        <div
+                          aria-hidden="true"
+                          data-testid={`lane-spacer-${ymd}`}
+                          style={{ height: holidaySpacerBefore }}
+                        />
+                      )}
+
                       {/* 공휴일 chips */}
                       <div className="w-full space-y-0.5">
                         {dayHolidays.map((h) => (
@@ -519,12 +572,14 @@ export function CalendarGrid({
                         ))}
                       </div>
 
-                      {/* 멀티데이 lane 공간 확보용 spacer */}
-                      <div
-                        aria-hidden="true"
-                        data-testid={`lane-spacer-${ymd}`}
-                        style={{ height: laneAreaHeight }}
-                      />
+                      {/* 멀티데이 lane 공간 확보용 spacer - 공휴일 아래 모드 */}
+                      {holidaySpacerAfter > 0 && (
+                        <div
+                          aria-hidden="true"
+                          data-testid={`lane-spacer-${ymd}`}
+                          style={{ height: holidaySpacerAfter }}
+                        />
+                      )}
 
                       {/* 단일 일정 pills */}
                       <div className={`w-full space-y-0.5${hasHolidaysAndEvents ? ' mt-0.5' : ''}`}>

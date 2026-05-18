@@ -11,6 +11,7 @@ import {
   getHolidayBlockHeight,
   getHolidayOverlayOffset,
   splitSegmentsByHolidayOffsets,
+  shouldRenderMultiDayAboveHolidays,
 } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
@@ -393,6 +394,34 @@ describe('holiday overlay helpers', () => {
 
     expect(computeReservedLaneHeightsByColumn(displaySegments, [1, 0, 0, 0, 0, 0, 0])).toEqual([20, 18, 0, 0, 0, 0, 0])
   })
+
+  it('연속 공휴일 구간을 멀티데이 일정이 가로지르면 멀티데이를 공휴일 위에 둔다', () => {
+    const row = makeRow(2026, 8, 20)
+    const segments = computeSegments(row, [
+      makeEvent({
+        id: 'holiday-bridge',
+        is_all_day: true,
+        start_at: '2026-09-20T00:00:00Z',
+        end_at: '2026-09-26T00:00:00Z',
+      }),
+    ])
+
+    expect(shouldRenderMultiDayAboveHolidays(segments, [0, 1, 1, 1, 1, 1, 1])).toBe(true)
+  })
+
+  it('연속 공휴일을 가로지르지 않으면 기존 holiday-aware split을 유지한다', () => {
+    const row = makeRow(2026, 4, 24)
+    const segments = computeSegments(row, [
+      makeEvent({
+        id: 'geunchang-japan',
+        is_all_day: true,
+        start_at: '2026-05-28T00:00:00Z',
+        end_at: '2026-06-02T00:00:00Z',
+      }),
+    ])
+
+    expect(shouldRenderMultiDayAboveHolidays(segments, [1, 1, 0, 0, 0, 0, 0])).toBe(false)
+  })
 })
 
 // ── 동적 단일 일정 표시 개수 ─────────────────────────────────
@@ -615,8 +644,8 @@ describe('CalendarGrid', () => {
 
     render(<CalendarGrid {...defaultProps} year={2026} month={4} events={events} />)
 
-    expect(screen.getByTestId('lane-spacer-2026-05-24')).toHaveStyle({ height: '0px' })
-    expect(screen.getByTestId('lane-spacer-2026-05-25')).toHaveStyle({ height: '0px' })
+    expect(screen.queryByTestId('lane-spacer-2026-05-24')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('lane-spacer-2026-05-25')).not.toBeInTheDocument()
     expect(screen.getByTestId('lane-spacer-2026-05-28')).toHaveStyle({ height: '18px' })
     expect(screen.getByTestId('lane-spacer-2026-05-29')).toHaveStyle({ height: '18px' })
     expect(screen.getByTestId('lane-spacer-2026-05-30')).toHaveStyle({ height: '18px' })
@@ -828,7 +857,6 @@ describe('공휴일-이벤트 칩 간격', () => {
   it('같은 주 내부 holiday split으로 생긴 조각에는 가짜 continuation 화살표가 보이지 않는다', () => {
     const holidays: Holiday[] = [
       { date: '2025-06-17', localName: '테스트공휴일', countryCode: 'KR' },
-      { date: '2025-06-18', localName: '테스트공휴일2', countryCode: 'KR' },
     ]
     const event = makeEvent({
       id: 'holiday-split',
@@ -841,9 +869,10 @@ describe('공휴일-이벤트 칩 간격', () => {
     render(<CalendarGrid {...defaultProps} events={[event]} holidays={holidays} />)
 
     const bars = screen.getAllByTitle('연속휴가')
-    expect(bars).toHaveLength(2)
+    expect(bars).toHaveLength(3)
     expect(bars[0].textContent).not.toMatch(/[‹›]/)
     expect(bars[1].textContent).not.toMatch(/[‹›]/)
+    expect(bars[2].textContent).not.toMatch(/[‹›]/)
   })
 
   it('공휴일이 없는 구간은 같은 주 안에서도 불필요하게 아래로 처지지 않는다', () => {
@@ -863,6 +892,30 @@ describe('공휴일-이벤트 칩 간격', () => {
 
     expect(screen.getByTestId('multi-segment-geunchang-japan-row4-piece0')).toHaveStyle({ top: '0px' })
     expect(screen.getByTestId('multi-segment-geunchang-japan-row5-piece0')).toHaveStyle({ top: '0px' })
+  })
+
+  it('연속 공휴일 구간을 가로지르는 멀티데이 일정은 공휴일보다 위에 유지된다', () => {
+    const holidays: Holiday[] = [
+      { date: '2026-09-21', localName: '敬老の日', countryCode: 'JP' },
+      { date: '2026-09-22', localName: '国民の休日', countryCode: 'JP' },
+      { date: '2026-09-23', localName: '秋分の日', countryCode: 'JP' },
+      { date: '2026-09-24', localName: '추석', countryCode: 'KR' },
+      { date: '2026-09-25', localName: '추석', countryCode: 'KR' },
+      { date: '2026-09-26', localName: '추석', countryCode: 'KR' },
+    ]
+    const event = makeEvent({
+      id: 'jeonju-japan',
+      title: '전주in日本',
+      is_all_day: true,
+      start_at: '2026-09-20T00:00:00Z',
+      end_at: '2026-09-26T00:00:00Z',
+    })
+
+    render(<CalendarGrid {...defaultProps} year={2026} month={8} events={[event]} holidays={holidays} />)
+
+    expect(screen.getByTestId('lane-spacer-2026-09-21')).toHaveStyle({ height: '18px' })
+    expect(screen.getByTestId('lane-spacer-2026-09-26')).toHaveStyle({ height: '18px' })
+    expect(screen.getByTestId('multi-segment-jeonju-japan-row3-piece0')).toHaveStyle({ top: '0px' })
   })
 })
 
