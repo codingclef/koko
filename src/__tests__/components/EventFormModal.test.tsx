@@ -338,6 +338,25 @@ describe('EventFormModal', () => {
     expect(screen.getByPlaceholderText('메모 (선택)')).not.toHaveClass('text-sm')
   })
 
+  it('메모 입력창은 내용이 길어지면 높이를 자동으로 늘린다', () => {
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return 160
+      },
+    })
+
+    render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
+
+    const textarea = screen.getByPlaceholderText('메모 (선택)') as HTMLTextAreaElement
+    fireEvent.change(textarea, { target: { value: '첫 줄\n둘째 줄\n셋째 줄\n넷째 줄' } })
+
+    expect(textarea.style.height).toBe('160px')
+    expect(textarea.style.overflowY).toBe('hidden')
+
+    delete (HTMLTextAreaElement.prototype as { scrollHeight?: number }).scrollHeight
+  })
+
   it('showPicker()가 없는 브라우저에서는 native 날짜 input 기본 동작을 막지 않는다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
     const dateInputs = document.querySelectorAll('input[type="date"]')
