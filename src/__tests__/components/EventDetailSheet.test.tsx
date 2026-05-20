@@ -86,4 +86,21 @@ describe('EventDetailSheet', () => {
     expect(screen.getByText('매주 수요일')).toBeInTheDocument()
     expect(screen.getByText('종료일 미설정 · 시작일 기준 1년 생성')).toBeInTheDocument()
   })
+
+  it('메모 상세는 개행을 보존해서 표시한다', () => {
+    const { container } = render(
+      <EventDetailSheet
+        {...defaultProps}
+        event={{
+          ...defaultProps.event,
+          description: '첫 줄\n둘째 줄',
+        }}
+      />
+    )
+
+    const note = container.querySelector('.whitespace-pre-wrap') as HTMLElement
+    expect(note.firstChild?.nodeValue).toBe('첫 줄\n둘째 줄')
+    expect(note).toHaveClass('whitespace-pre-wrap')
+    expect(note).toHaveClass('break-words')
+  })
 })

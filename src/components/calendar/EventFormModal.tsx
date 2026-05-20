@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, type MouseEvent } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, type MouseEvent } from 'react'
 import { X, Bell, RefreshCw, Check, Tag, CalendarDays, Clock3, ChevronRight, AlignLeft } from 'lucide-react'
 import { REMINDER_OPTIONS, LABEL_COLORS, LABEL_COLOR_NAMES, type Calendar, type CalendarEvent } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
@@ -151,6 +151,7 @@ export function EventFormModal({
   const titleInputRef = useRef<HTMLInputElement>(null)
   const startDateInputRef = useRef<HTMLInputElement>(null)
   const endDateInputRef = useRef<HTMLInputElement>(null)
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -158,6 +159,16 @@ export function EventFormModal({
     }, 300)
     return () => clearTimeout(timer)
   }, [])
+
+  useLayoutEffect(() => {
+    const textarea = descriptionTextareaRef.current
+    if (!textarea) return
+
+    const maxHeight = 224
+    textarea.style.height = 'auto'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [description])
 
   const triggerShake = () => {
     setEndShake(false)
@@ -611,6 +622,7 @@ export function EventFormModal({
             </div>
             <div className="py-3 pr-4 sm:py-5 sm:pr-5">
               <textarea
+                ref={descriptionTextareaRef}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="메모 (선택)"

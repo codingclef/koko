@@ -140,7 +140,7 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
 
           {/* 메모 */}
           {event.description && (
-            <div className="text-sm text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-800 rounded-xl px-3 py-2">
+            <div className="whitespace-pre-wrap break-words text-sm text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-800 rounded-xl px-3 py-2">
               {event.description}
             </div>
           )}
