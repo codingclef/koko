@@ -21,16 +21,28 @@ function buildTime(h: number, m: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+function formatLocalDate(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function formatLocalTime(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function buildLocalDateTime(date: string, time: string): Date {
+  return new Date(`${date}T${time}`)
+}
+
 function parseDate(isoString: string): string {
   const d = new Date(isoString)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return formatLocalDate(d)
 }
 
 function parseTime(isoString: string): string {
   const d = new Date(isoString)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return formatLocalTime(d)
 }
 
 function buildISO(date: string, time: string): string {
@@ -255,8 +267,17 @@ export function EventFormModal({
 
   const handleStartTimeChange = (h: number, m: number) => {
     const newStartTime = buildTime(h, m)
+    const currentStart = buildLocalDateTime(startDate, startTime)
+    const currentEnd = initial && !initial.end_at
+      ? new Date(currentStart.getTime() + 60 * 60 * 1000)
+      : buildLocalDateTime(endDate, endTime)
+    const durationMs = Math.max(0, currentEnd.getTime() - currentStart.getTime())
+    const newStart = buildLocalDateTime(startDate, newStartTime)
+    const newEnd = new Date(newStart.getTime() + durationMs)
+
     setStartTime(newStartTime)
-    keepEndAtOrAfterStart(startDate, newStartTime)
+    setEndDate(formatLocalDate(newEnd))
+    setEndTime(formatLocalTime(newEnd))
   }
 
   const handleEndTimeChange = (h: number, m: number) => {
