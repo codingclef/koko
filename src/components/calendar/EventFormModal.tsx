@@ -123,10 +123,16 @@ export function EventFormModal({
   })
   const [endDate, setEndDate] = useState<string>(() => {
     if (initial?.end_at) return parseDate(initial.end_at)
+    if (initial && !initial.is_all_day) {
+      return formatLocalDate(new Date(new Date(initial.start_at).getTime() + 60 * 60 * 1000))
+    }
     return defaultDateStr
   })
   const [endTime, setEndTime] = useState<string>(() => {
     if (initial?.end_at && !initial.is_all_day) return parseTime(initial.end_at)
+    if (initial && !initial.is_all_day) {
+      return formatLocalTime(new Date(new Date(initial.start_at).getTime() + 60 * 60 * 1000))
+    }
     return '10:00'
   })
 
@@ -268,9 +274,7 @@ export function EventFormModal({
   const handleStartTimeChange = (h: number, m: number) => {
     const newStartTime = buildTime(h, m)
     const currentStart = buildLocalDateTime(startDate, startTime)
-    const currentEnd = initial && !initial.end_at
-      ? new Date(currentStart.getTime() + 60 * 60 * 1000)
-      : buildLocalDateTime(endDate, endTime)
+    const currentEnd = buildLocalDateTime(endDate, endTime)
     const durationMs = Math.max(0, currentEnd.getTime() - currentStart.getTime())
     const newStart = buildLocalDateTime(startDate, newStartTime)
     const newEnd = new Date(newStart.getTime() + durationMs)

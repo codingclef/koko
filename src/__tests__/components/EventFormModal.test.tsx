@@ -290,6 +290,83 @@ describe('EventFormModal', () => {
     expect(screen.getByText('17:30')).toBeInTheDocument()
   })
 
+  it('end_at 없는 기존 일정도 사용자가 바꾼 현재 일정 길이를 유지한다', () => {
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '종료 없음',
+      description: null,
+      start_at: new Date('2026-03-31T09:00').toISOString(),
+      end_at: null,
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: null,
+      series_occurrence_date: null,
+      created_at: '',
+      updated_at: '',
+    }
+    render(<EventFormModal {...defaultProps} initial={initial} />)
+
+    fireEvent.click(screen.getByText('10:00'))
+    let hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    let minutesInput = screen.getByTestId('wheel-minutes') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '12' } })
+    fireEvent.change(minutesInput, { target: { value: '30' } })
+    expect(screen.getByText('12:30')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('09:00'))
+    hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    minutesInput = screen.getByTestId('wheel-minutes') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '11' } })
+    fireEvent.change(minutesInput, { target: { value: '0' } })
+
+    expect(screen.getByText('11:00')).toBeInTheDocument()
+    expect(screen.getByText('14:30')).toBeInTheDocument()
+  })
+
+  it('end_at 없는 기존 일정의 종료 날짜를 다음날로 바꾼 뒤에도 현재 일정 길이를 유지한다', () => {
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '다음날 종료',
+      description: null,
+      start_at: new Date('2026-03-31T09:00').toISOString(),
+      end_at: null,
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: null,
+      series_occurrence_date: null,
+      created_at: '',
+      updated_at: '',
+    }
+    render(<EventFormModal {...defaultProps} initial={initial} />)
+
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    fireEvent.change(dateInputs[1] as HTMLInputElement, { target: { value: '2026-04-01' } })
+    fireEvent.click(screen.getByText('10:00'))
+    let hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    let minutesInput = screen.getByTestId('wheel-minutes') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '0' } })
+    fireEvent.change(minutesInput, { target: { value: '30' } })
+    expect(screen.getByText('00:30')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('09:00'))
+    hoursInput = screen.getByTestId('wheel-hours') as HTMLInputElement
+    minutesInput = screen.getByTestId('wheel-minutes') as HTMLInputElement
+    fireEvent.change(hoursInput, { target: { value: '10' } })
+    fireEvent.change(minutesInput, { target: { value: '0' } })
+
+    expect((dateInputs[1] as HTMLInputElement).value).toBe('2026-04-01')
+    expect(screen.getByText('10:00')).toBeInTheDocument()
+    expect(screen.getByText('01:30')).toBeInTheDocument()
+  })
+
   it('시작 시간 변경으로 종료 시간이 자정을 넘으면 종료 날짜를 다음날로 이동한다', () => {
     render(<EventFormModal {...defaultProps} initialDate={new Date('2026-03-31')} />)
 
