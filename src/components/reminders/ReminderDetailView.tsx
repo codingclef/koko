@@ -301,11 +301,7 @@ export function ReminderDetailView({
   const handleCheck = async (itemId: string, checked: boolean) => {
     setMutationError(null)
     const previousItems = items
-    setAddSession((currentSession) =>
-      currentSession?.mode === 'inline' && currentSession.anchorItemId === itemId
-        ? null
-        : currentSession
-    )
+    setAddSession(null)
 
     if (list?.type === 'delete' && checked) {
       setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))

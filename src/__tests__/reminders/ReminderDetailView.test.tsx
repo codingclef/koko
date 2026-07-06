@@ -828,6 +828,113 @@ describe('ReminderDetailView', () => {
     expect(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...')).toHaveValue('치즈')
   })
 
+  it('작성 중인 추가 draft가 있어도 체크를 시작하면 추가 세션을 닫는다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    await user.type(within(bottomAddInput).getByPlaceholderText('아이템 추가...'), '치즈')
+
+    await user.click(screen.getByLabelText('체크'))
+
+    expect(mockCheckReminderItem).toHaveBeenCalledWith('item-1', 'user-1', true)
+    await waitFor(() => {
+      expect(screen.queryByTestId('bottom-add-item-input')).not.toBeInTheDocument()
+    })
+  })
+
+  it('작성 중인 추가 draft가 있어도 삭제를 시작하면 추가 세션을 닫고 삭제 확인을 표시한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    await user.type(within(bottomAddInput).getByPlaceholderText('아이템 추가...'), '치즈')
+
+    await user.click(screen.getByLabelText('삭제'))
+
+    expect(screen.queryByTestId('bottom-add-item-input')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '아이템 삭제' })).toBeInTheDocument()
+  })
+
+  it('작성 중인 추가 draft가 있어도 편집을 시작하면 추가 세션을 닫는다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    await user.type(within(bottomAddInput).getByPlaceholderText('아이템 추가...'), '치즈')
+
+    await user.click(screen.getByText('우유'))
+
+    expect(screen.queryByTestId('bottom-add-item-input')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('아이템 이름 수정')).toHaveValue('우유')
+  })
+
   it('완료 아이템이 있어도 floating 추가 입력창은 완료 섹션 위에 열린다', async () => {
     const user = userEvent.setup()
     mockGetReminderItems.mockResolvedValueOnce([
