@@ -96,6 +96,7 @@ export function TabsShell() {
   useEffect(() => {
     let cancelled = false
 
+    // Mount URL-selected tabs on the next tick to avoid cascading effect updates.
     queueMicrotask(() => {
       if (cancelled) return
       setMountedTabs((prev) => {
@@ -114,6 +115,7 @@ export function TabsShell() {
   useEffect(() => {
     if (isInitializing || startupError || !user || needsFamilyOnboarding) return
 
+    // Let the calendar paint first, then hidden-mount secondary tabs to warm their data.
     return scheduleIdlePreload(() => {
       setMountedTabs((prev) => {
         if (IDLE_PRELOAD_TABS.every((tab) => prev.has(tab))) return prev
