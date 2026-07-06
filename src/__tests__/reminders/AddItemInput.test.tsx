@@ -28,12 +28,14 @@ describe('AddItemInput', () => {
     const user = userEvent.setup()
     render(<AddItemInput onAdd={onAdd} />)
 
-    await user.type(screen.getByPlaceholderText('아이템 추가...'), '우유')
+    const input = screen.getByPlaceholderText('아이템 추가...')
+    await user.type(input, '우유')
     await user.click(screen.getByLabelText('추가'))
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledWith('우유')
-      expect(screen.getByPlaceholderText('아이템 추가...')).toHaveValue('')
+      expect(input).toHaveValue('')
+      expect(input).toHaveFocus()
     })
   })
 
@@ -73,5 +75,22 @@ describe('AddItemInput', () => {
     await user.tab()
 
     expect(onCancelEmpty).not.toHaveBeenCalled()
+  })
+
+  it('일반 입력창도 비어 있는 상태로 blur되면 취소 콜백을 호출한다', async () => {
+    const onCancelEmpty = jest.fn()
+    const user = userEvent.setup()
+    render(
+      <div>
+        <AddItemInput onAdd={jest.fn()} onCancelEmpty={onCancelEmpty} />
+        <button type="button">바깥</button>
+      </div>
+    )
+
+    const input = screen.getByPlaceholderText('아이템 추가...')
+    await user.click(input)
+    await user.click(screen.getByText('바깥'))
+
+    expect(onCancelEmpty).toHaveBeenCalledTimes(1)
   })
 })

@@ -29,6 +29,10 @@ import type { ReminderItem as ReminderItemType, ReminderList, ReminderGroup } fr
 import type { User } from '@supabase/supabase-js'
 
 type DetailStatus = 'loading' | 'ready' | 'not-found' | 'fetch-error'
+type AddSession =
+  | null
+  | { mode: 'bottom' }
+  | { mode: 'inline'; anchorItemId: string }
 
 const withInsertedReminderItem = (
   currentItems: ReminderItemType[],
@@ -75,11 +79,10 @@ export function ReminderDetailView({
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [groupSaving, setGroupSaving] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [inlineAddAfterItemId, setInlineAddAfterItemId] = useState<string | null>(null)
-  const [showBottomAddInput, setShowBottomAddInput] = useState(false)
+  const [addSession, setAddSession] = useState<AddSession>(null)
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<ReminderItemType | null>(null)
-  const bottomAddInputRef = useRef<HTMLInputElement>(null)
-  const inlineAddInputRef = useRef<HTMLInputElement>(null)
+  const addInputRef = useRef<HTMLInputElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -92,6 +95,12 @@ export function ReminderDetailView({
     },
     [listId, onPreviewItemsChange]
   )
+
+  const closeAddSessionIfDraftEmpty = useCallback(() => {
+    const input = addInputRef.current
+    if (input?.value.trim()) return
+    setAddSession(null)
+  }, [])
 
   const refreshItems = useCallback(() => {
     getReminderItems(listId)
@@ -181,6 +190,27 @@ export function ReminderDetailView({
     }
   }, [applyLoadResult, fetchDetailData])
 
+  useEffect(() => {
+    if (!addSession) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const input = addInputRef.current
+      const shell = shellRef.current
+      const target = event.target
+      if (!(target instanceof Node) || !input || !shell || !shell.contains(target)) return
+
+      if (input === target || input.contains(target)) return
+      if (target instanceof Element && target.closest('form')?.contains(input)) return
+
+      closeAddSessionIfDraftEmpty()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [addSession, closeAddSessionIfDraftEmpty])
+
   const handleRetry = () => {
     setStatus('loading')
     setMutationError(null)
@@ -250,7 +280,7 @@ export function ReminderDetailView({
       const createdItem = await handleAddItem(name)
       if (createdItem) {
         requestAnimationFrame(() => {
-          bottomAddInputRef.current?.focus()
+          addInputRef.current?.focus()
         })
       }
       return createdItem !== null
@@ -264,9 +294,9 @@ export function ReminderDetailView({
         const createdItem = await handleAddItem(name, afterItemId)
         if (!createdItem) return false
 
-        setInlineAddAfterItemId(createdItem.id)
+        setAddSession({ mode: 'inline', anchorItemId: createdItem.id })
         requestAnimationFrame(() => {
-          inlineAddInputRef.current?.focus()
+          addInputRef.current?.focus()
         })
         return true
       },
@@ -276,9 +306,7 @@ export function ReminderDetailView({
   const handleCheck = async (itemId: string, checked: boolean) => {
     setMutationError(null)
     const previousItems = items
-    if (inlineAddAfterItemId === itemId) {
-      setInlineAddAfterItemId(null)
-    }
+    setAddSession(null)
 
     if (list?.type === 'delete' && checked) {
       setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
@@ -307,9 +335,6 @@ export function ReminderDetailView({
     } catch (e) {
       console.error('[ReminderDetailView] checkReminderItem failed:', e)
       setItemsWithPreview(previousItems)
-      if (inlineAddAfterItemId === itemId) {
-        setInlineAddAfterItemId(itemId)
-      }
       setMutationError(
         list?.type === 'delete' && checked
           ? '아이템을 삭제하지 못했어요'
@@ -322,9 +347,11 @@ export function ReminderDetailView({
     setMutationError(null)
     setDeleteConfirmItem(null)
     const previousItems = items
-    if (inlineAddAfterItemId === itemId) {
-      setInlineAddAfterItemId(null)
-    }
+    setAddSession((currentSession) =>
+      currentSession?.mode === 'inline' && currentSession.anchorItemId === itemId
+        ? null
+        : currentSession
+    )
     setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
 
     try {
@@ -333,9 +360,6 @@ export function ReminderDetailView({
     } catch (e) {
       console.error('[ReminderDetailView] deleteReminderItem failed:', e)
       setItemsWithPreview(previousItems)
-      if (inlineAddAfterItemId === itemId) {
-        setInlineAddAfterItemId(itemId)
-      }
       setMutationError('아이템을 삭제하지 못했어요')
     }
   }
@@ -430,32 +454,32 @@ export function ReminderDetailView({
     setEditingItemId((currentItemId) => {
       if (currentItemId !== itemId) return currentItemId
 
-      setShowBottomAddInput(false)
-      setInlineAddAfterItemId(itemId)
+      setAddSession({ mode: 'inline', anchorItemId: itemId })
       requestAnimationFrame(() => {
-        inlineAddInputRef.current?.focus()
+        addInputRef.current?.focus()
       })
       return null
     })
   }, [])
   const handleEditStart = useCallback((itemId: string) => {
-    setInlineAddAfterItemId(null)
-    setShowBottomAddInput(false)
+    setAddSession(null)
+    setDeleteConfirmItem(null)
     setEditingItemId(itemId)
   }, [])
   const handleEditEnd = useCallback((itemId: string) => {
     setEditingItemId((currentItemId) => (currentItemId === itemId ? null : currentItemId))
   }, [])
   const handleOpenBottomAdd = useCallback(() => {
-    setInlineAddAfterItemId(null)
-    setShowBottomAddInput(true)
+    setDeleteConfirmItem(null)
+    setEditingItemId(null)
+    setAddSession({ mode: 'bottom' })
     requestAnimationFrame(() => {
-      bottomAddInputRef.current?.focus()
+      addInputRef.current?.focus()
     })
   }, [])
 
   const showFloatingAddButton =
-    editingItemId === null && inlineAddAfterItemId === null && !showBottomAddInput
+    editingItemId === null && addSession === null
   const handleCancelDelete = () => setDeleteConfirmItem(null)
   const handleConfirmDelete = () => {
     if (!deleteConfirmItem) return
@@ -489,6 +513,7 @@ export function ReminderDetailView({
         />
       ) : (
         <div
+          ref={shellRef}
           data-testid="reminder-detail-shell"
           className="relative max-w-lg mx-auto h-full min-h-0 flex flex-col bg-white dark:bg-stone-950"
         >
@@ -556,7 +581,7 @@ export function ReminderDetailView({
               </div>
             )}
 
-            {uncheckedItems.length === 0 && checkedItems.length === 0 && !showBottomAddInput && (
+            {uncheckedItems.length === 0 && checkedItems.length === 0 && addSession?.mode !== 'bottom' && (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="text-5xl mb-4">📝</div>
                 <p className="text-stone-500 dark:text-stone-400 font-medium">아직 아이템이 없어요</p>
@@ -575,7 +600,10 @@ export function ReminderDetailView({
                       item={item}
                       listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
                       onCheck={handleCheck}
-                      onDelete={() => setDeleteConfirmItem(item)}
+                      onDelete={() => {
+                        setAddSession(null)
+                        setDeleteConfirmItem(item)
+                      }}
                       onRename={handleRename}
                       isEditing={editingItemId === item.id}
                       onEditStart={handleEditStart}
@@ -583,11 +611,11 @@ export function ReminderDetailView({
                       onAdvanceEdit={handleAdvanceEdit}
                       draggable
                     />
-                    {inlineAddAfterItemId === item.id && (
+                    {addSession?.mode === 'inline' && addSession.anchorItemId === item.id && (
                       <AddItemInput
-                        ref={inlineAddInputRef}
+                        ref={addInputRef}
                         onAdd={handleInlineAdd(item.id)}
-                        onCancelEmpty={() => setInlineAddAfterItemId(null)}
+                        onCancelEmpty={closeAddSessionIfDraftEmpty}
                         inline
                         testId="inline-add-item-input"
                       />
@@ -597,11 +625,11 @@ export function ReminderDetailView({
               </SortableContext>
             </DndContext>
 
-            {showBottomAddInput && (
+            {addSession?.mode === 'bottom' && (
               <AddItemInput
-                ref={bottomAddInputRef}
+                ref={addInputRef}
                 onAdd={handleBottomAdd}
-                onCancelEmpty={() => setShowBottomAddInput(false)}
+                onCancelEmpty={closeAddSessionIfDraftEmpty}
                 inline
                 testId="bottom-add-item-input"
               />
@@ -620,18 +648,21 @@ export function ReminderDetailView({
                       item={item}
                       listType="strikethrough"
                       onCheck={handleCheck}
-                      onDelete={() => setDeleteConfirmItem(item)}
+                      onDelete={() => {
+                        setAddSession(null)
+                        setDeleteConfirmItem(item)
+                      }}
                       onRename={handleRename}
                       isEditing={editingItemId === item.id}
                       onEditStart={handleEditStart}
                       onEditEnd={handleEditEnd}
                       onAdvanceEdit={handleAdvanceEdit}
                     />
-                    {inlineAddAfterItemId === item.id && (
+                    {addSession?.mode === 'inline' && addSession.anchorItemId === item.id && (
                       <AddItemInput
-                        ref={inlineAddInputRef}
+                        ref={addInputRef}
                         onAdd={handleInlineAdd(item.id)}
-                        onCancelEmpty={() => setInlineAddAfterItemId(null)}
+                        onCancelEmpty={closeAddSessionIfDraftEmpty}
                         inline
                         testId="inline-add-item-input"
                       />
