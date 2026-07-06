@@ -754,6 +754,80 @@ describe('ReminderDetailView', () => {
     expect(screen.getByTestId('floating-add-item-button')).toBeInTheDocument()
   })
 
+  it('floating 추가 입력창에 작성 중인 값이 있으면 바깥 빈 공간을 눌러도 draft를 유지한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const bottomAddInput = await screen.findByTestId('bottom-add-item-input')
+    const input = within(bottomAddInput).getByPlaceholderText('아이템 추가...')
+    await user.type(input, '치즈')
+
+    await user.click(screen.getByTestId('reminder-detail-shell'))
+
+    expect(screen.getByTestId('bottom-add-item-input')).toBeInTheDocument()
+    expect(within(screen.getByTestId('bottom-add-item-input')).getByPlaceholderText('아이템 추가...')).toHaveValue('치즈')
+    expect(screen.queryByTestId('floating-add-item-button')).not.toBeInTheDocument()
+  })
+
+  it('인라인 추가 입력창에 작성 중인 값이 있으면 바깥 빈 공간을 눌러도 draft를 유지한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByText('우유'))
+    await user.keyboard('{Enter}')
+    const inlineAddInput = await screen.findByTestId('inline-add-item-input')
+    const input = within(inlineAddInput).getByPlaceholderText('아이템 추가...')
+    await user.type(input, '치즈')
+
+    await user.click(screen.getByTestId('reminder-detail-shell'))
+
+    expect(screen.getByTestId('inline-add-item-input')).toBeInTheDocument()
+    expect(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...')).toHaveValue('치즈')
+  })
+
   it('완료 아이템이 있어도 floating 추가 입력창은 완료 섹션 위에 열린다', async () => {
     const user = userEvent.setup()
     mockGetReminderItems.mockResolvedValueOnce([

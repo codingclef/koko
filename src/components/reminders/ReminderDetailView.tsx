@@ -196,6 +196,7 @@ export function ReminderDetailView({
       if (input === target || input.contains(target)) return
       if (target instanceof Element && target.closest('form')?.contains(input)) return
 
+      if (input.value.trim()) return
       setAddSession(null)
     }
 
