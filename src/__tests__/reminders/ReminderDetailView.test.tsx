@@ -392,6 +392,17 @@ describe('ReminderDetailView', () => {
       sort_order: 1,
       created_at: '2026-01-01T00:00:01Z',
     } as never)
+    mockAddReminderItem.mockResolvedValueOnce({
+      id: 'item-new-2',
+      list_id: 'list-1',
+      created_by: 'user-1',
+      name: '치즈',
+      is_checked: false,
+      checked_by: null,
+      checked_at: null,
+      sort_order: 2,
+      created_at: '2026-01-01T00:00:02Z',
+    } as never)
 
     render(
       <ReminderDetailView
@@ -413,13 +424,21 @@ describe('ReminderDetailView', () => {
     await user.keyboard('{Enter}')
 
     expect(mockAddReminderItem).toHaveBeenCalledWith('list-1', 'user-1', '버터', 'item-1')
+    await waitFor(() => {
+      expect(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...')).toHaveFocus()
+    })
+    await user.type(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...'), '치즈')
+    await user.keyboard('{Enter}')
+
+    expect(mockAddReminderItem).toHaveBeenNthCalledWith(2, 'list-1', 'user-1', '치즈', 'item-new')
     expect(mockReorderReminderItems).not.toHaveBeenCalled()
     expect(onPreviewItemsChange).toHaveBeenLastCalledWith(
       'list-1',
       expect.arrayContaining([
         expect.objectContaining({ id: 'item-1', sort_order: 0 }),
         expect.objectContaining({ id: 'item-new', name: '버터', sort_order: 1 }),
-        expect.objectContaining({ id: 'item-2', sort_order: 2 }),
+        expect.objectContaining({ id: 'item-new-2', name: '치즈', sort_order: 2 }),
+        expect.objectContaining({ id: 'item-2', sort_order: 3 }),
       ])
     )
   })
@@ -653,6 +672,17 @@ describe('ReminderDetailView', () => {
       sort_order: 1,
       created_at: '2026-01-01T00:00:01Z',
     } as never)
+    mockAddReminderItem.mockResolvedValueOnce({
+      id: 'item-new-2',
+      list_id: 'list-1',
+      created_by: 'user-1',
+      name: '치즈',
+      is_checked: false,
+      checked_by: null,
+      checked_at: null,
+      sort_order: 2,
+      created_at: '2026-01-01T00:00:02Z',
+    } as never)
 
     render(
       <ReminderDetailView
@@ -671,15 +701,57 @@ describe('ReminderDetailView', () => {
     expect(mockAddReminderItem).toHaveBeenCalledWith('list-1', 'user-1', '버터', null)
     await waitFor(() => {
       expect(screen.getByTestId('bottom-add-item-input')).toBeInTheDocument()
+      expect(within(screen.getByTestId('bottom-add-item-input')).getByPlaceholderText('아이템 추가...')).toHaveFocus()
     })
+    await user.type(within(screen.getByTestId('bottom-add-item-input')).getByPlaceholderText('아이템 추가...'), '치즈')
+    await user.keyboard('{Enter}')
+
+    expect(mockAddReminderItem).toHaveBeenNthCalledWith(2, 'list-1', 'user-1', '치즈', null)
     expect(screen.queryByTestId('floating-add-item-button')).not.toBeInTheDocument()
     expect(onPreviewItemsChange).toHaveBeenLastCalledWith(
       'list-1',
       expect.arrayContaining([
         expect.objectContaining({ id: 'item-1', sort_order: 0 }),
         expect.objectContaining({ id: 'item-new', name: '버터', sort_order: 1 }),
+        expect.objectContaining({ id: 'item-new-2', name: '치즈', sort_order: 2 }),
       ])
     )
+  })
+
+  it('floating 추가 입력창 바깥 빈 공간을 누르면 연속 추가를 종료한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    expect(await screen.findByTestId('bottom-add-item-input')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('reminder-detail-shell'))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('bottom-add-item-input')).not.toBeInTheDocument()
+    })
+    expect(screen.getByTestId('floating-add-item-button')).toBeInTheDocument()
   })
 
   it('완료 아이템이 있어도 floating 추가 입력창은 완료 섹션 위에 열린다', async () => {

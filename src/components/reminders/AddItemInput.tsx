@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useState } from 'react'
+import { forwardRef, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 
 interface Props {
@@ -16,6 +16,17 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
 ) {
   const [value, setValue] = useState('')
   const [loading, setLoading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const ignoreNextEmptyBlurRef = useRef(false)
+
+  const setRefs = (node: HTMLInputElement | null) => {
+    inputRef.current = node
+    if (typeof ref === 'function') {
+      ref(node)
+    } else if (ref) {
+      ref.current = node
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,7 +35,11 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
     try {
       const created = await onAdd(value.trim())
       if (created) {
+        ignoreNextEmptyBlurRef.current = true
         setValue('')
+        requestAnimationFrame(() => {
+          inputRef.current?.focus()
+        })
       }
     } finally {
       setLoading(false)
@@ -41,12 +56,16 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
         <span className="h-6 w-6 flex-shrink-0 rounded-full border-2 border-stone-300 dark:border-stone-600" />
       )}
       <input
-        ref={ref}
+        ref={setRefs}
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => {
-          if (inline && !loading && !value.trim()) {
+          if (ignoreNextEmptyBlurRef.current) {
+            ignoreNextEmptyBlurRef.current = false
+            return
+          }
+          if (!loading && !value.trim()) {
             onCancelEmpty?.()
           }
         }}
