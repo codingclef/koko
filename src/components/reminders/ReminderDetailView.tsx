@@ -96,6 +96,12 @@ export function ReminderDetailView({
     [listId, onPreviewItemsChange]
   )
 
+  const closeAddSessionIfDraftEmpty = useCallback(() => {
+    const input = addInputRef.current
+    if (input?.value.trim()) return
+    setAddSession(null)
+  }, [])
+
   const refreshItems = useCallback(() => {
     getReminderItems(listId)
       .then((nextItems) => {
@@ -196,15 +202,14 @@ export function ReminderDetailView({
       if (input === target || input.contains(target)) return
       if (target instanceof Element && target.closest('form')?.contains(input)) return
 
-      if (input.value.trim()) return
-      setAddSession(null)
+      closeAddSessionIfDraftEmpty()
     }
 
     document.addEventListener('pointerdown', handlePointerDown)
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown)
     }
-  }, [addSession])
+  }, [addSession, closeAddSessionIfDraftEmpty])
 
   const handleRetry = () => {
     setStatus('loading')
@@ -610,7 +615,7 @@ export function ReminderDetailView({
                       <AddItemInput
                         ref={addInputRef}
                         onAdd={handleInlineAdd(item.id)}
-                        onCancelEmpty={() => setAddSession(null)}
+                        onCancelEmpty={closeAddSessionIfDraftEmpty}
                         inline
                         testId="inline-add-item-input"
                       />
@@ -624,7 +629,7 @@ export function ReminderDetailView({
               <AddItemInput
                 ref={addInputRef}
                 onAdd={handleBottomAdd}
-                onCancelEmpty={() => setAddSession(null)}
+                onCancelEmpty={closeAddSessionIfDraftEmpty}
                 inline
                 testId="bottom-add-item-input"
               />
@@ -657,7 +662,7 @@ export function ReminderDetailView({
                       <AddItemInput
                         ref={addInputRef}
                         onAdd={handleInlineAdd(item.id)}
-                        onCancelEmpty={() => setAddSession(null)}
+                        onCancelEmpty={closeAddSessionIfDraftEmpty}
                         inline
                         testId="inline-add-item-input"
                       />
