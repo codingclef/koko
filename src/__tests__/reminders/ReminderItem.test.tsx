@@ -48,28 +48,15 @@ describe('ReminderItem', () => {
     expect(screen.getByText('우유')).toHaveClass('line-through')
   })
 
-  it('삭제 버튼 클릭 시 확인 다이얼로그가 나타난다', () => {
-    render(<ReminderItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} />)
-    fireEvent.click(screen.getByLabelText('삭제'))
-    expect(screen.getByText('아이템 삭제')).toBeInTheDocument()
-    expect(screen.getByLabelText('삭제 확인')).toBeInTheDocument()
-    expect(screen.getByLabelText('취소')).toBeInTheDocument()
-  })
-
-  it('다이얼로그에서 삭제 확인 시 onDelete가 호출된다', () => {
+  it('삭제 버튼 클릭 시 onDelete가 호출된다', () => {
     const onDelete = jest.fn()
     render(<ReminderItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={onDelete} onRename={jest.fn()} />)
     fireEvent.click(screen.getByLabelText('삭제'))
-    fireEvent.click(screen.getByLabelText('삭제 확인'))
     expect(onDelete).toHaveBeenCalledWith('item-1')
   })
 
-  it('다이얼로그에서 취소 시 onDelete가 호출되지 않는다', () => {
-    const onDelete = jest.fn()
-    render(<ReminderItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={onDelete} onRename={jest.fn()} />)
-    fireEvent.click(screen.getByLabelText('삭제'))
-    fireEvent.click(screen.getByLabelText('취소'))
-    expect(onDelete).not.toHaveBeenCalled()
+  it('아이템 내부에서 삭제 확인 다이얼로그를 직접 렌더링하지 않는다', () => {
+    render(<ReminderItem item={mockItem} listType="strikethrough" onCheck={jest.fn()} onDelete={jest.fn()} onRename={jest.fn()} />)
     expect(screen.queryByText('아이템 삭제')).not.toBeInTheDocument()
   })
 

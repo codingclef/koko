@@ -473,6 +473,42 @@ describe('ReminderDetailView', () => {
     })
   })
 
+  it('완료 아이템 삭제 확인 다이얼로그를 상세 화면 최상위 레이어에 렌더링한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '완료된 항목',
+        is_checked: true,
+        checked_by: 'user-1',
+        checked_at: '2026-01-01T00:00:00Z',
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByLabelText('삭제'))
+
+    const dialog = screen.getByRole('dialog', { name: '아이템 삭제' })
+    expect(dialog).toHaveClass('fixed', 'z-[60]')
+    expect(screen.getByTestId('reminder-detail-shell')).toContainElement(dialog)
+    expect(screen.getByText(/완료된 항목.*삭제할까요/)).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('삭제 확인'))
+    expect(mockDeleteReminderItem).toHaveBeenCalledWith('item-1')
+  })
+
   it('인라인 입력 기준 아이템을 완료 처리하면 인라인 입력창을 닫는다', async () => {
     const user = userEvent.setup()
     mockGetReminderItems.mockResolvedValueOnce([
