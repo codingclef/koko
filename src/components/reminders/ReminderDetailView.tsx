@@ -77,6 +77,7 @@ export function ReminderDetailView({
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [inlineAddAfterItemId, setInlineAddAfterItemId] = useState<string | null>(null)
   const [showBottomAddInput, setShowBottomAddInput] = useState(false)
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<ReminderItemType | null>(null)
   const bottomAddInputRef = useRef<HTMLInputElement>(null)
   const inlineAddInputRef = useRef<HTMLInputElement>(null)
 
@@ -319,6 +320,7 @@ export function ReminderDetailView({
 
   const handleDelete = async (itemId: string) => {
     setMutationError(null)
+    setDeleteConfirmItem(null)
     const previousItems = items
     if (inlineAddAfterItemId === itemId) {
       setInlineAddAfterItemId(null)
@@ -454,6 +456,11 @@ export function ReminderDetailView({
 
   const showFloatingAddButton =
     editingItemId === null && inlineAddAfterItemId === null && !showBottomAddInput
+  const handleCancelDelete = () => setDeleteConfirmItem(null)
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmItem) return
+    void handleDelete(deleteConfirmItem.id)
+  }
 
   return (
     <div
@@ -568,7 +575,7 @@ export function ReminderDetailView({
                       item={item}
                       listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
                       onCheck={handleCheck}
-                      onDelete={handleDelete}
+                      onDelete={() => setDeleteConfirmItem(item)}
                       onRename={handleRename}
                       isEditing={editingItemId === item.id}
                       onEditStart={handleEditStart}
@@ -613,7 +620,7 @@ export function ReminderDetailView({
                       item={item}
                       listType="strikethrough"
                       onCheck={handleCheck}
-                      onDelete={handleDelete}
+                      onDelete={() => setDeleteConfirmItem(item)}
                       onRename={handleRename}
                       isEditing={editingItemId === item.id}
                       onEditStart={handleEditStart}
@@ -645,6 +652,41 @@ export function ReminderDetailView({
             >
               <Plus size={18} />
             </button>
+          )}
+
+          {deleteConfirmItem && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reminder-item-delete-title"
+              className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center"
+            >
+              <div className="absolute inset-0 bg-black/40" onClick={handleCancelDelete} />
+              <div className="relative w-full rounded-2xl bg-stone-50 p-6 shadow-xl dark:bg-stone-900 sm:max-w-xs">
+                <p id="reminder-item-delete-title" className="mb-1 font-semibold text-stone-800 dark:text-stone-100">
+                  아이템 삭제
+                </p>
+                <p className="mb-6 text-sm text-stone-500 dark:text-stone-400">
+                  &ldquo;{deleteConfirmItem.name}&rdquo;을(를) 삭제할까요?
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelDelete}
+                    className="flex-1 rounded-xl bg-stone-100 py-2.5 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+                    aria-label="취소"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleConfirmDelete}
+                    className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600"
+                    aria-label="삭제 확인"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
