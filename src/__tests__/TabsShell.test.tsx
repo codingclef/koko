@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TabsShell } from '@/components/TabsShell'
 import { registerPushSubscription } from '@/lib/push'
@@ -86,6 +86,7 @@ describe('TabsShell', () => {
     mockFamilyError = null
     mockCalendarsError = null
     mockAuthUser = { id: 'user-1' }
+    jest.useRealTimers()
   })
 
   it('인증 로딩 중에는 AppSplash를 표시한다', () => {
@@ -120,13 +121,13 @@ describe('TabsShell', () => {
   it('?tab 파라미터가 없으면 캘린더 탭이 표시된다', () => {
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
-    expect(screen.getByTestId('reminder-tab').parentElement).toHaveClass('hidden')
+    expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
   })
 
-  it('?tab=reminders 파라미터가 있으면 리마인더 탭이 활성화된다', () => {
+  it('?tab=reminders 파라미터가 있으면 리마인더 탭이 활성화된다', async () => {
     mockTabParam = 'reminders'
     render(<TabsShell />)
-    expect(screen.getByTestId('reminder-tab').parentElement).not.toHaveClass('hidden')
+    expect((await screen.findByTestId('reminder-tab')).parentElement).not.toHaveClass('hidden')
     expect(screen.getByTestId('calendar-tab').parentElement).toHaveClass('hidden')
   })
 
@@ -134,7 +135,26 @@ describe('TabsShell', () => {
     mockTabParam = 'invalid'
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
+  })
+
+  it('캘린더 진입 후 idle 시점에 리마인더와 설정 탭을 hidden 상태로 예열한다', async () => {
+    jest.useFakeTimers()
+
+    render(<TabsShell />)
+
+    expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument()
+
+    await act(async () => {
+      jest.advanceTimersByTime(1200)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
     expect(screen.getByTestId('reminder-tab').parentElement).toHaveClass('hidden')
+    expect(screen.getByTestId('settings-tab').parentElement).toHaveClass('hidden')
   })
 
   it('초기 진입 시 자동으로 푸시 구독을 요청하지 않는다', () => {
