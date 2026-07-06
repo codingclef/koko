@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import dynamic from 'next/dynamic'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { ReminderTab } from '@/components/tabs/ReminderTab'
-import { SettingsTab } from '@/components/tabs/SettingsTab'
 import { BottomNav } from '@/components/BottomNav'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamily } from '@/hooks/useFamily'
@@ -12,6 +11,46 @@ import { useCalendars } from '@/hooks/useCalendars'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { type Tab, TABS } from '@/types/tabs'
 import { AppSplash } from '@/components/AppSplash'
+
+const IDLE_PRELOAD_TABS: Tab[] = ['reminders', 'settings']
+
+type RequestIdleCallback = (callback: () => void, options?: { timeout?: number }) => number
+type CancelIdleCallback = (handle: number) => void
+
+const ReminderTab = dynamic(
+  () => import('@/components/tabs/ReminderTab').then((mod) => mod.ReminderTab),
+  { loading: () => <TabChunkFallback /> }
+)
+
+const SettingsTab = dynamic(
+  () => import('@/components/tabs/SettingsTab').then((mod) => mod.SettingsTab),
+  { loading: () => <TabChunkFallback /> }
+)
+
+function TabChunkFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
+      <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
+    </div>
+  )
+}
+
+function scheduleIdlePreload(callback: () => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  const idleWindow = window as Window & {
+    requestIdleCallback?: RequestIdleCallback
+    cancelIdleCallback?: CancelIdleCallback
+  }
+
+  if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
+    const handle = idleWindow.requestIdleCallback(callback, { timeout: 2000 })
+    return () => idleWindow.cancelIdleCallback?.(handle)
+  }
+
+  const handle = window.setTimeout(callback, 1200)
+  return () => window.clearTimeout(handle)
+}
 
 export function TabsShell() {
   const searchParams = useSearchParams()
@@ -36,6 +75,7 @@ export function TabsShell() {
 
   const tabParam = searchParams.get('tab')
   const activeTab: Tab = tabParam && TABS.includes(tabParam as Tab) ? (tabParam as Tab) : 'calendar'
+  const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(() => new Set(['calendar', activeTab]))
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login')
@@ -52,6 +92,39 @@ export function TabsShell() {
       document.documentElement.setAttribute('data-theme', preferences.app_theme)
     }
   }, [preferences?.app_theme])
+
+  useEffect(() => {
+    let cancelled = false
+
+    // Mount URL-selected tabs on the next tick to avoid cascading effect updates.
+    queueMicrotask(() => {
+      if (cancelled) return
+      setMountedTabs((prev) => {
+        if (prev.has(activeTab)) return prev
+        const next = new Set(prev)
+        next.add(activeTab)
+        return next
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (isInitializing || startupError || !user || needsFamilyOnboarding) return
+
+    // Let the calendar paint first, then hidden-mount secondary tabs to warm their data.
+    return scheduleIdlePreload(() => {
+      setMountedTabs((prev) => {
+        if (IDLE_PRELOAD_TABS.every((tab) => prev.has(tab))) return prev
+        const next = new Set(prev)
+        IDLE_PRELOAD_TABS.forEach((tab) => next.add(tab))
+        return next
+      })
+    })
+  }, [isInitializing, needsFamilyOnboarding, startupError, user])
 
   const handleStartupRetry = async () => {
     await Promise.allSettled([reloadFamily(), reloadCalendars()])
@@ -120,25 +193,29 @@ export function TabsShell() {
             reloadCalendars={reloadCalendars}
           />
         </div>
-        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'reminders' ? ' hidden' : ''}`}>
-          <ReminderTab
-            key={familyId ?? 'no-family'}
-            user={user}
-            familyId={familyId}
-            isInitializing={isInitializing}
-          />
-        </div>
-        <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'settings' ? ' hidden' : ''}`}>
-          <SettingsTab
-            onNavigateToTab={handleTabChange}
-            preferences={preferences}
-            updatePreferences={updatePreferences}
-            user={user}
-            familyId={familyId}
-            appRole={appRole}
-            isInitializing={isInitializing}
-          />
-        </div>
+        {mountedTabs.has('reminders') && (
+          <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'reminders' ? ' hidden' : ''}`}>
+            <ReminderTab
+              key={familyId ?? 'no-family'}
+              user={user}
+              familyId={familyId}
+              isInitializing={isInitializing}
+            />
+          </div>
+        )}
+        {mountedTabs.has('settings') && (
+          <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'settings' ? ' hidden' : ''}`}>
+            <SettingsTab
+              onNavigateToTab={handleTabChange}
+              preferences={preferences}
+              updatePreferences={updatePreferences}
+              user={user}
+              familyId={familyId}
+              appRole={appRole}
+              isInitializing={isInitializing}
+            />
+          </div>
+        )}
       </div>
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
