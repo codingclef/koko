@@ -186,13 +186,15 @@ jest.mock('@/components/calendar/CalendarFormModal', () => ({
 }))
 jest.mock('@/components/calendar/CalendarListSheet', () => ({
   CalendarListSheet: ({
+    familyMembers,
     onSave,
     onDelete,
   }: {
+    familyMembers: { user_id: string }[]
     onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<{ status: string }>
     onDelete: (calendarId: string) => Promise<void>
   }) => (
-    <div data-testid="calendar-list-sheet">
+    <div data-testid="calendar-list-sheet" data-member-count={familyMembers.length}>
       <button data-testid="list-save-null-members" onClick={() => onSave('cal-1', '가족', '#f97316', null)} />
       <button data-testid="list-save-with-members" onClick={() => onSave('cal-1', '가족', '#f97316', ['user-2'])} />
       <button data-testid="list-delete" onClick={() => onDelete('cal-1')} />
@@ -268,6 +270,10 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   afterAll(() => {
     consoleErrorSpy.mockRestore()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
   beforeEach(() => {
@@ -394,6 +400,107 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     expect(screen.queryByText('이번 달 등록된 일정이 없어요.')).not.toBeInTheDocument()
   })
 
+  it('초기 렌더에서는 가족 멤버를 즉시 불러오지 않는다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    expect(mockGetFamilyMembers).not.toHaveBeenCalled()
+  })
+
+  it('캘린더 리스트를 열 때 가족 멤버를 준비한 뒤 시트를 표시한다', async () => {
+    mockGetFamilyMembers.mockResolvedValueOnce([
+      {
+        user_id: 'user-2',
+        display_name: '보호자',
+      } as Awaited<ReturnType<typeof getFamilyMembers>>[number],
+    ])
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: '캘린더 리스트' }))
+
+    const sheet = await screen.findByTestId('calendar-list-sheet')
+    expect(sheet).toHaveAttribute('data-member-count', '1')
+    expect(mockGetFamilyMembers).toHaveBeenCalledTimes(1)
+  })
+
+  it('가족 멤버 로드 실패 시 캘린더 리스트를 열지 않고 에러 배너를 표시한다', async () => {
+    mockGetFamilyMembers.mockRejectedValueOnce(new Error('family members failed'))
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: '캘린더 리스트' }))
+
+    expect(await screen.findByText('가족 멤버를 불러오지 못했어요')).toBeInTheDocument()
+    expect(screen.queryByTestId('calendar-list-sheet')).not.toBeInTheDocument()
+  })
+
+  it('가족 멤버 로드 중 가족이 바뀌면 이전 요청 완료로 캘린더 리스트를 열지 않는다', async () => {
+    let resolveMembers: ((members: Awaited<ReturnType<typeof getFamilyMembers>>) => void) | null = null
+    const membersPromise = new Promise<Awaited<ReturnType<typeof getFamilyMembers>>>((resolve) => {
+      resolveMembers = resolve
+    })
+    mockGetFamilyMembers.mockReturnValueOnce(membersPromise)
+
+    const { rerender } = render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: '캘린더 리스트' }))
+
+    rerender(<CalendarTab {...defaultProps} familyId="fam-2" calendars={[{
+      id: 'cal-2',
+      family_id: 'fam-2',
+      created_by: 'user-1',
+      name: '다른 가족',
+      color: '#3b82f6',
+      created_at: '',
+      updated_at: '',
+    }]} />)
+    await act(async () => {})
+
+    await act(async () => {
+      resolveMembers?.([
+        {
+          user_id: 'user-2',
+          display_name: '이전 가족',
+        } as Awaited<ReturnType<typeof getFamilyMembers>>[number],
+      ])
+      await membersPromise
+    })
+
+    expect(screen.queryByTestId('calendar-list-sheet')).not.toBeInTheDocument()
+    expect(screen.queryByText('가족 멤버를 불러오지 못했어요')).not.toBeInTheDocument()
+  })
+
+  it('silent preload 실패를 사용자 열기가 재사용해도 에러 배너를 표시하고 리스트를 닫는다', async () => {
+    jest.useFakeTimers()
+    let rejectMembers: ((error: Error) => void) | null = null
+    const membersPromise = new Promise<Awaited<ReturnType<typeof getFamilyMembers>>>((_, reject) => {
+      rejectMembers = reject
+    })
+    mockGetFamilyMembers.mockReturnValueOnce(membersPromise)
+
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    act(() => {
+      jest.advanceTimersByTime(700)
+    })
+    expect(mockGetFamilyMembers).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: '캘린더 리스트' }))
+
+    await act(async () => {
+      rejectMembers?.(new Error('preload failed'))
+      await membersPromise.catch(() => {})
+    })
+
+    expect(await screen.findByText('가족 멤버를 불러오지 못했어요')).toBeInTheDocument()
+    expect(screen.queryByTestId('calendar-list-sheet')).not.toBeInTheDocument()
+  })
+
   it('재시도 버튼 클릭 시 캘린더 데이터를 다시 불러온다', async () => {
     mockGetEventsByMonth
       .mockRejectedValueOnce(new Error('load failed'))
@@ -427,7 +534,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     const headerButton = screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) })
     fireEvent.click(headerButton)
 
-    expect(screen.getByTestId('year-month-picker')).toBeInTheDocument()
+    expect(await screen.findByTestId('year-month-picker')).toBeInTheDocument()
   })
 
   it('피커 취소 시 연월이 변경되지 않고 피커가 닫힌다', async () => {
@@ -436,9 +543,9 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
 
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
-    expect(screen.getByTestId('year-month-picker')).toBeInTheDocument()
+    expect(await screen.findByTestId('year-month-picker')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('picker-cancel'))
+    fireEvent.click(await screen.findByTestId('picker-cancel'))
 
     expect(screen.queryByTestId('year-month-picker')).not.toBeInTheDocument()
     expect(screen.getByText(`${today.getFullYear()}년 ${today.getMonth() + 1}월`)).toBeInTheDocument()
@@ -450,7 +557,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
 
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
-    fireEvent.click(screen.getByTestId('picker-confirm'))
+    fireEvent.click(await screen.findByTestId('picker-confirm'))
 
     await waitFor(() => {
       expect(screen.queryByTestId('year-month-picker')).not.toBeInTheDocument()
@@ -508,8 +615,8 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
 
     fireEvent.click(screen.getByTestId('select-date'))
-    fireEvent.click(screen.getByTestId('select-recurring-event'))
-    fireEvent.click(screen.getByTestId('detail-delete'))
+    fireEvent.click(await screen.findByTestId('select-recurring-event'))
+    fireEvent.click(await screen.findByTestId('detail-delete'))
     fireEvent.click(await screen.findByTestId('scope-all'))
 
     await waitFor(() => {
@@ -524,8 +631,8 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
 
     fireEvent.click(screen.getByTestId('select-date'))
-    fireEvent.click(screen.getByTestId('select-recurring-event'))
-    fireEvent.click(screen.getByTestId('detail-edit'))
+    fireEvent.click(await screen.findByTestId('select-recurring-event'))
+    fireEvent.click(await screen.findByTestId('detail-edit'))
     fireEvent.click(await screen.findByTestId('scope-following'))
     fireEvent.click(await screen.findByTestId('event-form-save-following-date'))
 
@@ -549,8 +656,8 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
 
     fireEvent.click(screen.getByTestId('select-date'))
-    fireEvent.click(screen.getByTestId('select-recurring-event'))
-    fireEvent.click(screen.getByTestId('detail-edit'))
+    fireEvent.click(await screen.findByTestId('select-recurring-event'))
+    fireEvent.click(await screen.findByTestId('detail-edit'))
     fireEvent.click(await screen.findByTestId('scope-following'))
 
     const saveButton = await screen.findByTestId('event-form-save-following-recurrence')

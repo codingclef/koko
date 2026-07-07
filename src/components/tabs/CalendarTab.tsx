@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useSwipe } from '@/hooks/useSwipe'
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { useAsyncData } from '@/hooks/useAsyncData'
 import { useHolidays } from '@/hooks/useHolidays'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState } from '@/types/tabs'
@@ -23,13 +23,6 @@ import {
 } from '@/lib/calendar'
 import { CalendarFilter } from '@/components/calendar/CalendarFilter'
 import { CalendarGrid } from '@/components/calendar/CalendarGrid'
-import { CalendarListSheet } from '@/components/calendar/CalendarListSheet'
-import { DayEventsSheet } from '@/components/calendar/DayEventsSheet'
-import { EventDetailSheet } from '@/components/calendar/EventDetailSheet'
-import { EventFormModal } from '@/components/calendar/EventFormModal'
-import { CalendarFormModal } from '@/components/calendar/CalendarFormModal'
-import { YearMonthPickerSheet } from '@/components/calendar/YearMonthPickerSheet'
-import { RecurrenceScopeSheet } from '@/components/calendar/RecurrenceScopeSheet'
 import type { RecurrenceRule, RecurrenceScope } from '@/types/recurrence'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { postJsonWithAuth, patchJsonWithAuth, deleteWithAuth } from '@/lib/api-client'
@@ -44,6 +37,79 @@ interface Props extends AuthState {
 }
 
 const MAX_MONTH_EVENT_CACHE = 12
+
+type FamilyMembersStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+interface FamilyMembersState {
+  familyId: string | null
+  members: FamilyMember[]
+  status: FamilyMembersStatus
+}
+
+// Keep dynamic render loaders and idle preload loaders identical so first-open chunks are actually warmed.
+const loadCalendarListSheet = () =>
+  import('@/components/calendar/CalendarListSheet').then((mod) => mod.CalendarListSheet)
+const loadDayEventsSheet = () =>
+  import('@/components/calendar/DayEventsSheet').then((mod) => mod.DayEventsSheet)
+const loadEventDetailSheet = () =>
+  import('@/components/calendar/EventDetailSheet').then((mod) => mod.EventDetailSheet)
+const loadEventFormModal = () =>
+  import('@/components/calendar/EventFormModal').then((mod) => mod.EventFormModal)
+const loadCalendarFormModal = () =>
+  import('@/components/calendar/CalendarFormModal').then((mod) => mod.CalendarFormModal)
+const loadYearMonthPickerSheet = () =>
+  import('@/components/calendar/YearMonthPickerSheet').then((mod) => mod.YearMonthPickerSheet)
+const loadRecurrenceScopeSheet = () =>
+  import('@/components/calendar/RecurrenceScopeSheet').then((mod) => mod.RecurrenceScopeSheet)
+
+function CalendarOverlayFallback() {
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/20 backdrop-blur-[1px]"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="h-8 w-8 rounded-full border-2 border-white/80 border-t-accent-400 animate-spin" />
+      <span className="sr-only">화면을 준비 중이에요</span>
+    </div>
+  )
+}
+
+const CalendarListSheet = dynamic(loadCalendarListSheet, { loading: CalendarOverlayFallback })
+const DayEventsSheet = dynamic(loadDayEventsSheet, { loading: CalendarOverlayFallback })
+const EventDetailSheet = dynamic(loadEventDetailSheet, { loading: CalendarOverlayFallback })
+const EventFormModal = dynamic(loadEventFormModal, { loading: CalendarOverlayFallback })
+const CalendarFormModal = dynamic(loadCalendarFormModal, { loading: CalendarOverlayFallback })
+const YearMonthPickerSheet = dynamic(loadYearMonthPickerSheet, { loading: CalendarOverlayFallback })
+const RecurrenceScopeSheet = dynamic(loadRecurrenceScopeSheet, { loading: CalendarOverlayFallback })
+
+const calendarOverlayLoaders = [
+  loadCalendarListSheet,
+  loadDayEventsSheet,
+  loadEventDetailSheet,
+  loadEventFormModal,
+  loadCalendarFormModal,
+  loadYearMonthPickerSheet,
+  loadRecurrenceScopeSheet,
+]
+
+type WindowWithIdleCallback = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
+  cancelIdleCallback?: (handle: number) => void
+}
+
+function scheduleIdleWork(callback: () => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  const idleWindow = window as WindowWithIdleCallback
+  if (idleWindow.requestIdleCallback) {
+    const handle = idleWindow.requestIdleCallback(callback, { timeout: 2500 })
+    return () => idleWindow.cancelIdleCallback?.(handle)
+  }
+
+  const timeoutId = window.setTimeout(callback, 700)
+  return () => window.clearTimeout(timeoutId)
+}
 
 function getMonthEventsKey(familyId: string, year: number, month: number) {
   return `${familyId}:${year}:${month}`
@@ -122,19 +188,24 @@ export function CalendarTab({
 
   const [slideKey, setSlideKey] = useState(0)
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
+  const [preparingCalendarForm, setPreparingCalendarForm] = useState(false)
 
-  const isModalOpen = selectedDate !== null || selectedEvent !== null || editingEvent !== null || calendarForm !== null || showYearMonthPicker
+  const isModalOpen = selectedDate !== null ||
+    selectedEvent !== null ||
+    editingEvent !== null ||
+    calendarForm !== null ||
+    preparingCalendarForm ||
+    showYearMonthPicker ||
+    showCalendarList ||
+    seriesScopeTarget !== null
 
-  const {
-    value: familyMembers,
-    reload: reloadFamilyMembers,
-  } = useAsyncData<FamilyMember[]>({
-    enabled: Boolean(familyId),
-    initialValue: [],
-    reloadKey: familyId,
-    load: () => getFamilyMembers(familyId!),
-    onError: (e) => console.error('[CalendarTab] getFamilyMembers failed:', e),
-  })
+  const familyMembersCacheRef = useRef(new Map<string, FamilyMember[]>())
+  const familyMembersRequestsRef = useRef(new Map<string, Promise<FamilyMember[]>>())
+  const [familyMembersState, setFamilyMembersState] = useState<FamilyMembersState>(() => ({
+    familyId: familyId ?? null,
+    members: [],
+    status: familyId ? 'idle' : 'ready',
+  }))
 
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [adjacentMonthEvents, setAdjacentMonthEvents] = useState<CalendarEvent[]>([])
@@ -142,8 +213,130 @@ export function CalendarTab({
   const [eventsError, setEventsError] = useState<unknown>(null)
   const monthEventsCacheRef = useRef(new Map<string, CalendarEvent[]>())
   const monthEventsRequestsRef = useRef(new Map<string, Promise<CalendarEvent[]>>())
+  const currentFamilyIdRef = useRef<string | null>(familyId ?? null)
+  const calendarOpenRequestSeqRef = useRef(0)
   const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
   const visibleMonthKeyRef = useRef<string | null>(familyId ? getMonthEventsKey(familyId, year, month) : null)
+  currentFamilyIdRef.current = familyId ?? null
+
+  useEffect(() => {
+    const nextFamilyId = familyId ?? null
+    currentFamilyIdRef.current = nextFamilyId
+    calendarOpenRequestSeqRef.current += 1
+    setShowCalendarList(false)
+    setCalendarForm(null)
+    setCalendarMemberIds([])
+    setPreparingCalendarForm(false)
+
+    if (!nextFamilyId) {
+      setFamilyMembersState({
+        familyId: null,
+        members: [],
+        status: 'ready',
+      })
+      return
+    }
+
+    const cachedMembers = familyMembersCacheRef.current.get(nextFamilyId)
+    setFamilyMembersState({
+      familyId: nextFamilyId,
+      members: cachedMembers ?? [],
+      status: cachedMembers ? 'ready' : 'idle',
+    })
+  }, [familyId])
+
+  const isCurrentCalendarOpenRequest = useCallback((requestFamilyId: string, requestSeq: number) => (
+    currentFamilyIdRef.current === requestFamilyId &&
+    calendarOpenRequestSeqRef.current === requestSeq
+  ), [])
+
+  const loadFamilyMembers = useCallback(async ({
+    force = false,
+    silent = false,
+  }: {
+    force?: boolean
+    // silent is only for background preload/refresh paths; user-initiated opens must surface failures.
+    silent?: boolean
+  } = {}) => {
+    if (!familyId) return []
+
+    const targetFamilyId = familyId
+    const inFlight = familyMembersRequestsRef.current.get(targetFamilyId)
+    if (inFlight) {
+      if (!silent) {
+        setFamilyMembersState((prev) => (
+          prev.familyId === targetFamilyId
+            ? { ...prev, status: 'loading' }
+            : prev
+        ))
+      }
+      try {
+        return await inFlight
+      } catch (error) {
+        if (!silent) {
+          setFamilyMembersState((prev) => (
+            prev.familyId === targetFamilyId
+              ? { ...prev, status: 'error' }
+              : prev
+          ))
+        }
+        throw error
+      }
+    }
+
+    if (!force) {
+      const cachedMembers = familyMembersCacheRef.current.get(targetFamilyId)
+      if (cachedMembers) {
+        setFamilyMembersState({
+          familyId: targetFamilyId,
+          members: cachedMembers,
+          status: 'ready',
+        })
+        return cachedMembers
+      }
+    }
+
+    if (!silent) {
+      setFamilyMembersState((prev) => (
+        prev.familyId === targetFamilyId
+          ? { ...prev, status: 'loading' }
+          : { familyId: targetFamilyId, members: [], status: 'loading' }
+      ))
+    }
+
+    const request = getFamilyMembers(targetFamilyId)
+      .then((members) => {
+        familyMembersRequestsRef.current.delete(targetFamilyId)
+        familyMembersCacheRef.current.set(targetFamilyId, members)
+        setFamilyMembersState((prev) => (
+          prev.familyId === targetFamilyId
+            ? { familyId: targetFamilyId, members, status: 'ready' }
+            : prev
+        ))
+        return members
+      })
+      .catch((error) => {
+        familyMembersRequestsRef.current.delete(targetFamilyId)
+        console.error('[CalendarTab] getFamilyMembers failed:', error)
+        if (!silent) {
+          setFamilyMembersState((prev) => (
+            prev.familyId === targetFamilyId
+              ? { ...prev, status: 'error' }
+              : prev
+          ))
+        }
+        throw error
+      })
+
+    familyMembersRequestsRef.current.set(targetFamilyId, request)
+    return request
+  }, [familyId])
+
+  const familyMembers = familyMembersState.familyId === familyId
+    ? familyMembersState.members
+    : []
+  const familyMembersReady = !familyId ||
+    (familyMembersState.familyId === familyId && familyMembersState.status === 'ready')
 
   const storeMonthEvents = useCallback((key: string, nextEvents: CalendarEvent[]) => {
     const cache = monthEventsCacheRef.current
@@ -344,6 +537,15 @@ export function CalendarTab({
     })
   }, [familyId, year, month, loadMonthEvents])
 
+  useEffect(() => {
+    if (!familyId) return
+
+    return scheduleIdleWork(() => {
+      void Promise.allSettled(calendarOverlayLoaders.map((loadOverlay) => loadOverlay()))
+      void loadFamilyMembers({ silent: true }).catch(() => {})
+    })
+  }, [familyId, loadFamilyMembers])
+
   const mergedEvents = useMemo(() => {
     if (adjacentMonthEvents.length === 0) return events
     const seen = new Set(events.map((e) => e.id))
@@ -385,8 +587,11 @@ export function CalendarTab({
   }, [familyId, year, month, loadMonthEvents])
 
   const reloadCalendarContext = useCallback(async () => {
-    await Promise.allSettled([reloadCalendars(), reloadFamilyMembers()])
-  }, [reloadCalendars, reloadFamilyMembers])
+    await Promise.allSettled([
+      reloadCalendars(),
+      loadFamilyMembers({ force: true, silent: true }),
+    ])
+  }, [reloadCalendars, loadFamilyMembers])
 
   const channelName = familyId ? `family_events_${familyId}` : null
   const broadcast = useRealtimeSync(channelName, refreshEvents)
@@ -441,22 +646,55 @@ export function CalendarTab({
     })
   }
 
-  const openCalendarForm = async (calendar?: Calendar) => {
+  const openCalendarList = async () => {
+    if (!familyId) return
+    const requestFamilyId = familyId
+    const requestSeq = ++calendarOpenRequestSeqRef.current
     setMutationError(null)
+    setShowCalendarList(true)
 
-    if (calendar) {
-      try {
-        const members = await getCalendarMembers(calendar.id)
-        setCalendarMemberIds(members.map((m) => m.user_id))
-      } catch (e) {
-        console.error('[CalendarTab] getCalendarMembers failed:', e)
+    try {
+      await loadFamilyMembers()
+    } catch {
+      if (!isCurrentCalendarOpenRequest(requestFamilyId, requestSeq)) return
+      setShowCalendarList(false)
+      setMutationError('가족 멤버를 불러오지 못했어요')
+    }
+  }
+
+  const openCalendarForm = async (calendar?: Calendar) => {
+    if (!familyId) return
+    const requestFamilyId = familyId
+    const requestSeq = ++calendarOpenRequestSeqRef.current
+    setMutationError(null)
+    setPreparingCalendarForm(true)
+
+    try {
+      const [familyMembersResult, calendarMembersResult] = await Promise.allSettled([
+        loadFamilyMembers(),
+        calendar ? getCalendarMembers(calendar.id) : Promise.resolve([]),
+      ])
+
+      if (!isCurrentCalendarOpenRequest(requestFamilyId, requestSeq)) return
+
+      if (familyMembersResult.status === 'rejected') {
+        setMutationError('가족 멤버를 불러오지 못했어요')
+        return
+      }
+
+      if (calendarMembersResult.status === 'rejected') {
+        console.error('[CalendarTab] getCalendarMembers failed:', calendarMembersResult.reason)
         setMutationError('캘린더 멤버를 불러오지 못했어요')
         return
       }
-    } else {
-      setCalendarMemberIds([])
+
+      setCalendarMemberIds(calendarMembersResult.value.map((m) => m.user_id))
+      setCalendarForm(calendar ? { calendar } : {})
+    } finally {
+      if (isCurrentCalendarOpenRequest(requestFamilyId, requestSeq)) {
+        setPreparingCalendarForm(false)
+      }
     }
-    setCalendarForm(calendar ? { calendar } : {})
   }
 
   const handleCalendarSave = async (name: string, color: string, memberUserIds: string[]) => {
@@ -713,7 +951,11 @@ export function CalendarTab({
   const fetchError = calendarsError
 
   const handleRetry = async () => {
-    await Promise.all([reloadCalendars(), reloadFamilyMembers(), reloadEvents()])
+    await Promise.allSettled([
+      reloadCalendars(),
+      loadFamilyMembers({ force: true, silent: true }),
+      reloadEvents(),
+    ])
   }
 
   if (fetchError) {
@@ -793,7 +1035,7 @@ export function CalendarTab({
             />
           </div>
           <button
-            onClick={() => setShowCalendarList(true)}
+            onClick={() => void openCalendarList()}
             className="shrink-0 p-1.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
             aria-label="캘린더 리스트"
           >
@@ -907,7 +1149,11 @@ export function CalendarTab({
         />
       )}
 
-      {showCalendarList && user && (
+      {(showCalendarList && user && !familyMembersReady) || preparingCalendarForm ? (
+        <CalendarOverlayFallback />
+      ) : null}
+
+      {showCalendarList && user && familyMembersReady && (
         <CalendarListSheet
           calendars={calendars}
           familyMembers={familyMembers}
@@ -919,7 +1165,7 @@ export function CalendarTab({
         />
       )}
 
-      {calendarForm !== null && user && (
+      {calendarForm !== null && user && familyMembersReady && (
         <CalendarFormModal
           initial={calendarForm.calendar}
           initialMemberIds={calendarForm.calendar ? calendarMemberIds : undefined}
