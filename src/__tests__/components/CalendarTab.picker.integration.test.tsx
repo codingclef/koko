@@ -3,7 +3,7 @@
  * YearMonthPickerSheet를 실제 컴포넌트로 렌더해서
  * "헤더 클릭 → 실제 dialog 렌더 → Escape → dialog 사라짐" 흐름을 검증한다.
  */
-import { render, act, fireEvent, screen } from '@testing-library/react'
+import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 
@@ -83,7 +83,7 @@ describe('CalendarTab + YearMonthPickerSheet 통합', () => {
     const today = new Date()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
 
-    expect(screen.getByRole('dialog', { name: '연월 선택' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: '연월 선택' })).toBeInTheDocument()
   })
 
   it('dialog가 열린 상태에서 Escape 키 입력 시 dialog가 닫힌다', async () => {
@@ -92,11 +92,13 @@ describe('CalendarTab + YearMonthPickerSheet 통합', () => {
 
     const today = new Date()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${today.getFullYear()}년`) }))
-    expect(screen.getByRole('dialog', { name: '연월 선택' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: '연월 선택' })).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(screen.queryByRole('dialog', { name: '연월 선택' })).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '연월 선택' })).not.toBeInTheDocument()
+    })
   })
 
   it('dialog 내 취소 버튼 클릭 시 dialog가 닫힌다', async () => {
