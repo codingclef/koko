@@ -6,6 +6,7 @@ import {
   addReminderItem,
   checkReminderItem,
   deleteReminderItem,
+  clearReminderItems,
   getReminderItems,
   getReminderList,
   renameReminderItem,
@@ -31,6 +32,7 @@ jest.mock('@/lib/reminder-lists', () => ({
   addReminderItem: jest.fn(),
   checkReminderItem: jest.fn(),
   deleteReminderItem: jest.fn(),
+  clearReminderItems: jest.fn(),
   renameReminderItem: jest.fn(),
   reorderReminderItems: jest.fn(),
   updateReminderListGroup: jest.fn(),
@@ -67,6 +69,7 @@ const mockGetReminderItems = getReminderItems as jest.MockedFunction<typeof getR
 const mockAddReminderItem = addReminderItem as jest.MockedFunction<typeof addReminderItem>
 const mockCheckReminderItem = checkReminderItem as jest.MockedFunction<typeof checkReminderItem>
 const mockDeleteReminderItem = deleteReminderItem as jest.MockedFunction<typeof deleteReminderItem>
+const mockClearReminderItems = clearReminderItems as jest.MockedFunction<typeof clearReminderItems>
 const mockRenameReminderItem = renameReminderItem as jest.MockedFunction<typeof renameReminderItem>
 const mockReorderReminderItems = reorderReminderItems as jest.MockedFunction<typeof reorderReminderItems>
 const mockUpdateReminderListGroup = updateReminderListGroup as jest.MockedFunction<typeof updateReminderListGroup>
@@ -103,6 +106,7 @@ describe('ReminderDetailView', () => {
     mockRenameReminderItem.mockResolvedValue(undefined as never)
     mockCheckReminderItem.mockResolvedValue(undefined as never)
     mockDeleteReminderItem.mockResolvedValue(undefined as never)
+    mockClearReminderItems.mockResolvedValue(undefined as never)
     mockReorderReminderItems.mockResolvedValue(undefined as never)
     mockUpdateReminderListGroup.mockResolvedValue({
       id: 'list-1',
@@ -526,6 +530,93 @@ describe('ReminderDetailView', () => {
 
     await user.click(screen.getByLabelText('삭제 확인'))
     expect(mockDeleteReminderItem).toHaveBeenCalledWith('item-1')
+  })
+
+  it('아이템 비우기 확인 후 현재 리마인더 아이템을 모두 삭제한다', async () => {
+    const user = userEvent.setup()
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'item-2',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '달걀',
+        is_checked: true,
+        checked_by: 'user-1',
+        checked_at: '2026-01-01T00:00:00Z',
+        sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByLabelText('아이템 비우기'))
+
+    expect(screen.getByRole('dialog', { name: '아이템 비우기' })).toBeInTheDocument()
+    expect(screen.getByText('이 리마인더의 아이템 2개를 모두 삭제할까요?')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('아이템 비우기 확인'))
+
+    expect(mockClearReminderItems).toHaveBeenCalledWith('list-1')
+    await waitFor(() => {
+      expect(screen.queryByText('우유')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('아직 아이템이 없어요')).toBeInTheDocument()
+    expect(onPreviewItemsChange).toHaveBeenCalledWith('list-1', [])
+    expect(mockBroadcast).toHaveBeenCalled()
+  })
+
+  it('아이템 비우기에 실패하면 이전 아이템을 복원한다', async () => {
+    const user = userEvent.setup()
+    mockClearReminderItems.mockRejectedValueOnce(new Error('clear failed'))
+    mockGetReminderItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '우유',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ] as never)
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByLabelText('아이템 비우기'))
+    await user.click(screen.getByLabelText('아이템 비우기 확인'))
+
+    await waitFor(() => {
+      expect(screen.getByText('아이템을 비우지 못했어요')).toBeInTheDocument()
+    })
+    expect(screen.getByText('우유')).toBeInTheDocument()
   })
 
   it('인라인 입력 기준 아이템을 완료 처리하면 인라인 입력창을 닫는다', async () => {

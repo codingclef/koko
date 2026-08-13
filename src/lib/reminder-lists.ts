@@ -261,6 +261,11 @@ export async function deleteReminderItem(itemId: string): Promise<void> {
   if (error) throw error
 }
 
+export async function clearReminderItems(listId: string): Promise<void> {
+  const { error } = await supabase.from('shopping_items').delete().eq('list_id', listId)
+  if (error) throw error
+}
+
 export async function renameReminderList(listId: string, name: string): Promise<void> {
   const { error } = await supabase
     .from('shopping_lists')

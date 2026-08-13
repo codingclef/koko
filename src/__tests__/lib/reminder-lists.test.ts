@@ -14,6 +14,7 @@ import {
   addReminderItem,
   checkReminderItem,
   deleteReminderItem,
+  clearReminderItems,
   renameReminderList,
   updateReminderListGroup,
   renameReminderItem,
@@ -431,6 +432,24 @@ describe('deleteReminderItem', () => {
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
     await expect(deleteReminderItem('item-1')).rejects.toEqual({ message: 'delete error' })
+  })
+})
+
+describe('clearReminderItems', () => {
+  it('list_id 기준으로 아이템을 모두 삭제한다', async () => {
+    const chain = makeChain({ data: null, error: null })
+    mockFrom.mockReturnValue(chain)
+
+    await expect(clearReminderItems('list-1')).resolves.toBeUndefined()
+
+    expect(mockFrom).toHaveBeenCalledWith('shopping_items')
+    expect(chain.delete).toHaveBeenCalled()
+    expect(chain.eq).toHaveBeenCalledWith('list_id', 'list-1')
+  })
+
+  it('error가 있으면 throw한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'clear error' } }))
+    await expect(clearReminderItems('list-1')).rejects.toEqual({ message: 'clear error' })
   })
 })
 
