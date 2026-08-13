@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ListChecks, Plus } from 'lucide-react'
+import { ArrowLeft, ListChecks, Plus, Trash2 } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -17,6 +17,7 @@ import {
   addReminderItem,
   checkReminderItem,
   deleteReminderItem,
+  clearReminderItems,
   renameReminderItem,
   reorderReminderItems,
   updateReminderListGroup,
@@ -81,6 +82,8 @@ export function ReminderDetailView({
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [addSession, setAddSession] = useState<AddSession>(null)
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<ReminderItemType | null>(null)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [clearingItems, setClearingItems] = useState(false)
   const addInputRef = useRef<HTMLInputElement>(null)
   const shellRef = useRef<HTMLDivElement>(null)
 
@@ -364,6 +367,33 @@ export function ReminderDetailView({
     }
   }
 
+  const handleClearItems = async () => {
+    if (items.length === 0 || clearingItems) {
+      setClearConfirmOpen(false)
+      return
+    }
+
+    setMutationError(null)
+    setClearConfirmOpen(false)
+    setDeleteConfirmItem(null)
+    setEditingItemId(null)
+    setAddSession(null)
+    setClearingItems(true)
+    const previousItems = items
+    setItemsWithPreview([])
+
+    try {
+      await clearReminderItems(listId)
+      broadcast()
+    } catch (e) {
+      console.error('[ReminderDetailView] clearReminderItems failed:', e)
+      setItemsWithPreview(previousItems)
+      setMutationError('아이템을 비우지 못했어요')
+    } finally {
+      setClearingItems(false)
+    }
+  }
+
   const handleRename = async (itemId: string, name: string): Promise<boolean> => {
     setMutationError(null)
     const previousItems = items
@@ -485,6 +515,16 @@ export function ReminderDetailView({
     if (!deleteConfirmItem) return
     void handleDelete(deleteConfirmItem.id)
   }
+  const handleOpenClearConfirm = () => {
+    setAddSession(null)
+    setEditingItemId(null)
+    setDeleteConfirmItem(null)
+    setClearConfirmOpen(true)
+  }
+  const handleCancelClear = () => setClearConfirmOpen(false)
+  const handleConfirmClear = () => {
+    void handleClearItems()
+  }
 
   return (
     <div
@@ -525,7 +565,7 @@ export function ReminderDetailView({
             >
               <ArrowLeft size={20} />
             </button>
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">
                 {list?.name ?? '리마인더'}
               </h2>
@@ -537,6 +577,17 @@ export function ReminderDetailView({
                   : '아이템을 추가해보세요'}
               </p>
             </div>
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={handleOpenClearConfirm}
+                disabled={clearingItems}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:text-stone-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                aria-label="아이템 비우기"
+              >
+                <Trash2 size={17} />
+              </button>
+            )}
           </div>
 
           {list && groups.length > 0 && (
@@ -714,6 +765,42 @@ export function ReminderDetailView({
                     aria-label="삭제 확인"
                   >
                     삭제
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {clearConfirmOpen && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reminder-items-clear-title"
+              className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center"
+            >
+              <div className="absolute inset-0 bg-black/40" onClick={handleCancelClear} />
+              <div className="relative w-full rounded-2xl bg-stone-50 p-6 shadow-xl dark:bg-stone-900 sm:max-w-xs">
+                <p id="reminder-items-clear-title" className="mb-1 font-semibold text-stone-800 dark:text-stone-100">
+                  아이템 비우기
+                </p>
+                <p className="mb-6 text-sm text-stone-500 dark:text-stone-400">
+                  이 리마인더의 아이템 {items.length}개를 모두 삭제할까요?
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelClear}
+                    className="flex-1 rounded-xl bg-stone-100 py-2.5 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+                    aria-label="취소"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleConfirmClear}
+                    disabled={clearingItems}
+                    className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                    aria-label="아이템 비우기 확인"
+                  >
+                    비우기
                   </button>
                 </div>
               </div>
