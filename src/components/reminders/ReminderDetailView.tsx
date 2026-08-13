@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ListChecks, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ListChecks, Plus } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -582,10 +582,10 @@ export function ReminderDetailView({
                 type="button"
                 onClick={handleOpenClearConfirm}
                 disabled={clearingItems}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:text-stone-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                className="h-10 shrink-0 rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:hover:bg-red-950/30"
                 aria-label="아이템 비우기"
               >
-                <Trash2 size={17} />
+                비우기
               </button>
             )}
           </div>

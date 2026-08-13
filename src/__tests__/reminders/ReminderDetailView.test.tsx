@@ -568,7 +568,10 @@ describe('ReminderDetailView', () => {
       />
     )
 
-    await user.click(await screen.findByLabelText('아이템 비우기'))
+    const clearButton = await screen.findByLabelText('아이템 비우기')
+    expect(clearButton).toHaveTextContent('비우기')
+
+    await user.click(clearButton)
 
     expect(screen.getByRole('dialog', { name: '아이템 비우기' })).toBeInTheDocument()
     expect(screen.getByText('이 리마인더의 아이템 2개를 모두 삭제할까요?')).toBeInTheDocument()
