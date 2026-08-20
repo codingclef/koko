@@ -167,12 +167,13 @@ setItems((prev) =>
 ### 해결
 
 - `/calendar`를 단일 live entry로 고정했다.
-- `TabsShell`이 세 탭을 모두 마운트한 상태로 유지하고 `display`만 전환한다.
+- `TabsShell`이 활성 탭을 즉시 마운트하고, 보조 탭은 idle 시점에 마운트한 뒤 `display`만 전환한다.
 - 리마인더 상세도 메인 흐름에서는 search param 기반으로 유지한다.
 
 ### 남은 규칙
 
 - 탭을 다시 개별 route page로 쪼개지 않는다.
+- 첫 마운트 전에는 보조 탭 내부 effect가 실행되지 않으므로 선행 초기화가 필요한 작업은 공유 idle warmup에 명시한다.
 - 독립 route가 필요하면 bridge 또는 외부 링크 호환 목적이 분명해야 한다.
 
 ---

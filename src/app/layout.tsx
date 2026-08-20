@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import { ThemeProvider } from 'next-themes'
-import { cookies } from 'next/headers'
-import { THEME_STORAGE_KEY } from '@/lib/preferences'
 import { PreHydrationSplash } from '@/components/PreHydrationSplash'
 import './globals.css'
 
@@ -29,22 +27,18 @@ export const viewport: Viewport = {
 
 // Applies accent theme and dark class before first paint to prevent FOUC.
 // next-themes stores dark/light preference under 'theme' key in localStorage.
-const HEAD_SCRIPT = `(function(){var de=document.documentElement;var k='koko_theme';var ls=localStorage.getItem(k);if(ls){de.setAttribute('data-theme',ls);}else{var m=document.cookie.match('(?:^|;)\\s*'+k+'=([^;]+)');if(m)de.setAttribute('data-theme',m[1]);}var t=localStorage.getItem('theme');var dark=(t==='dark')||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)de.classList.add('dark');})();`
+const HEAD_SCRIPT = `(function(){var de=document.documentElement;var k='koko_theme';var ls=null;try{ls=localStorage.getItem(k);}catch(e){}if(ls){de.setAttribute('data-theme',ls);}else{var m=document.cookie.match('(?:^|;)\\s*'+k+'=([^;]+)');if(m)de.setAttribute('data-theme',m[1]);}var t=null;try{t=localStorage.getItem('theme');}catch(e){}var dark=(t==='dark')||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)de.classList.add('dark');})();`
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const cookieStore = await cookies()
-  const theme = cookieStore.get(THEME_STORAGE_KEY)?.value
-
   return (
     <html
       lang="ko"
       className="h-full antialiased"
       suppressHydrationWarning
-      data-theme={theme || undefined}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: HEAD_SCRIPT }} />

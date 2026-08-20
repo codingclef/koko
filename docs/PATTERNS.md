@@ -23,7 +23,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - `/calendar`가 가족 앱의 단일 live entry point다.
 - `/reminders`, `/settings`는 독립 화면이 아니라 `/calendar` 탭 셸로 리다이렉트한다.
 - 실제 탭 상태는 route path가 아니라 `/calendar?tab=reminders` 같은 search param으로 제어한다.
-- `TabsShell`은 `CalendarTab`, `ReminderTab`, `SettingsTab`를 항상 마운트하고 `display`만 바꾼다.
+- `TabsShell`은 활성 탭을 즉시 마운트하고, 리마인더와 설정은 `scheduleIdleWork()`로 순서대로 준비한 뒤 keep-alive한다.
 - 탭 상태 유지가 목적이므로 탭별 개별 route로 다시 분리하지 않는다.
 - 리마인더 상세도 메인 흐름에서는 `/calendar?tab=reminders&list=<id>` search param으로 연다.
 - `src/app/reminders/[id]/page.tsx`는 리마인더 상세 링크용 bridge route다.
@@ -102,10 +102,16 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 사용자 설정은 `user_preferences` 한 테이블로 모은다.
 - 테마는 DB와 클라이언트 저장소를 함께 사용한다.
 - `persistTheme()`는 `localStorage`와 cookie를 같이 갱신해야 한다.
-- SSR 첫 페인트 전 테마 적용은 `src/app/layout.tsx`의 inline head script가 담당한다.
-- 클라이언트에서만 테마를 바꾸고 SSR fallback을 빼면 FOUC가 다시 생긴다.
+- 첫 페인트 전 테마 적용은 `src/app/layout.tsx`의 inline head script가 localStorage와 cookie fallback을 읽어 담당한다.
+- layout에서 동적 cookie API를 다시 사용하지 않는다. head script의 cookie fallback을 빼면 FOUC가 다시 생길 수 있다.
 
-## 9. Push And Notification Pattern
+## 9. Background Warmup
+
+- 사용자 입력과 무관한 chunk/data warmup은 `src/lib/idle-work.ts`의 공유 queue를 사용한다.
+- 한 idle slot에서는 한 작업만 실행하고, 사용자 접근 가능성이 높은 작업부터 `high`, `normal`, `low` 우선순위를 부여한다.
+- 예약된 작업은 컴포넌트 cleanup에서 취소하며, 사용자 진입 경로는 idle warmup 완료를 전제로 하지 않는다.
+
+## 10. Push And Notification Pattern
 
 - push subscription 등록은 API route를 통해 저장한다.
 - reminder 발송과 이벤트 변경 알림은 서로 다른 목적이다.
@@ -114,7 +120,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - actor 본인에게는 이벤트 변경 push를 보내지 않는다.
 - 404/410으로 만료된 구독은 발송 시점에 정리한다.
 
-## 10. Modal And Mobile Layout Rules
+## 11. Modal And Mobile Layout Rules
 
 - 하단 네비게이션이 있는 일반 모달 컨테이너에는 `pb-16 sm:pb-0`를 넣는다.
 - 이 패딩이 없으면 PWA 모바일에서 CTA가 하단 탭 바 뒤로 가려질 수 있다.
@@ -127,7 +133,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 | 삭제 확인 다이얼로그 | `z-[60]` |
 | 최상위 모달 또는 중첩 시트 | `z-[70]` |
 
-## 11. Testing Expectations
+## 12. Testing Expectations
 
 - 코드 변경 시 관련 테스트를 같이 갱신한다.
 - 우선 위치는 `src/__tests__/lib`, `src/__tests__/hooks`, `src/__tests__/api`, `src/__tests__/components`, `src/__tests__/reminders`, `src/__tests__/settings`다.
@@ -135,7 +141,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 회귀 위험이 큰 변경은 "lib 테스트 + 화면/훅 테스트"를 함께 추가하는 쪽을 우선한다.
 - 코드 작업 마무리 전 `npx tsc --noEmit`를 실행한다.
 
-## 12. Forbidden Patterns
+## 13. Forbidden Patterns
 
 | Forbidden | Why |
 | --- | --- |
@@ -150,7 +156,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 | 탭을 다시 개별 route page로 분리 | 탭 전환 시 상태 손실과 스피너 회귀 |
 | 수동 테마 저장 시 cookie 갱신 생략 | SSR 초기 렌더와 hydration 사이 FOUC 재발 |
 
-## 13. When To Read Challenges
+## 14. When To Read Challenges
 
 - realtime 흐름을 수정할 때
 - RLS 정책이나 migration을 수정할 때

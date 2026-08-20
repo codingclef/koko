@@ -490,7 +490,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     await act(async () => {})
 
     act(() => {
-      jest.advanceTimersByTime(700)
+      jest.advanceTimersByTime(1800)
     })
     expect(mockGetFamilyMembers).toHaveBeenCalledTimes(1)
 

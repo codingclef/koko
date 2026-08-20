@@ -11,11 +11,9 @@ import { useCalendars } from '@/hooks/useCalendars'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { type Tab, TABS } from '@/types/tabs'
 import { AppSplash } from '@/components/AppSplash'
+import { scheduleIdleWork } from '@/lib/idle-work'
 
 const IDLE_PRELOAD_TABS: Tab[] = ['reminders', 'settings']
-
-type RequestIdleCallback = (callback: () => void, options?: { timeout?: number }) => number
-type CancelIdleCallback = (handle: number) => void
 
 const ReminderTab = dynamic(
   () => import('@/components/tabs/ReminderTab').then((mod) => mod.ReminderTab),
@@ -33,23 +31,6 @@ function TabChunkFallback() {
       <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
     </div>
   )
-}
-
-function scheduleIdlePreload(callback: () => void) {
-  if (typeof window === 'undefined') return () => {}
-
-  const idleWindow = window as Window & {
-    requestIdleCallback?: RequestIdleCallback
-    cancelIdleCallback?: CancelIdleCallback
-  }
-
-  if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
-    const handle = idleWindow.requestIdleCallback(callback, { timeout: 2000 })
-    return () => idleWindow.cancelIdleCallback?.(handle)
-  }
-
-  const handle = window.setTimeout(callback, 1200)
-  return () => window.clearTimeout(handle)
 }
 
 export function TabsShell() {
@@ -114,15 +95,17 @@ export function TabsShell() {
   useEffect(() => {
     if (isInitializing || startupError || !user || needsFamilyOnboarding) return
 
-    // Let the calendar paint first, then hidden-mount secondary tabs to warm their data.
-    return scheduleIdlePreload(() => {
+    // Let the calendar paint first, then hidden-mount one secondary tab per idle slot.
+    const cancelPreloads = IDLE_PRELOAD_TABS.map((tab) => scheduleIdleWork(() => {
       setMountedTabs((prev) => {
-        if (IDLE_PRELOAD_TABS.every((tab) => prev.has(tab))) return prev
+        if (prev.has(tab)) return prev
         const next = new Set(prev)
-        IDLE_PRELOAD_TABS.forEach((tab) => next.add(tab))
+        next.add(tab)
         return next
       })
-    })
+    }, 'low'))
+
+    return () => cancelPreloads.forEach((cancel) => cancel())
   }, [isInitializing, needsFamilyOnboarding, startupError, user])
 
   const handleStartupRetry = async () => {
