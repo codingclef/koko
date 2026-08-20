@@ -125,6 +125,7 @@ const defaultProps = {
   familyId: 'fam-1',
   isInitializing: false,
   calendars: [],
+  calendarsLoading: false,
   calendarsError: null,
   reloadCalendars: jest.fn().mockResolvedValue(undefined),
 }

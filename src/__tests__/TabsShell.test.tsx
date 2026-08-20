@@ -59,7 +59,16 @@ jest.mock('@/components/AppSplash', () => ({
 }))
 
 jest.mock('@/components/tabs/CalendarTab', () => ({
-  CalendarTab: () => <div data-testid="calendar-tab" />,
+  CalendarTab: ({ calendarsLoading, calendarsError }: {
+    calendarsLoading: boolean
+    calendarsError: unknown
+  }) => (
+    <div
+      data-testid="calendar-tab"
+      data-calendars-loading={String(calendarsLoading)}
+      data-calendars-error={String(Boolean(calendarsError))}
+    />
+  ),
 }))
 
 jest.mock('@/components/tabs/ReminderTab', () => ({
@@ -105,11 +114,12 @@ describe('TabsShell', () => {
     expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
   })
 
-  it('캘린더 데이터 로딩 중에도 AppSplash를 표시한다', () => {
+  it('캘린더 데이터 로딩 중에는 splash를 닫고 캘린더 셸을 표시한다', () => {
     mockCalendarsLoading = true
     render(<TabsShell />)
-    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
-    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('app-splash')).not.toBeInTheDocument()
+    expect(screen.getByTestId('calendar-tab')).toHaveAttribute('data-calendars-loading', 'true')
+    expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
   })
 
   it('미인증 상태에서는 탭을 렌더링하지 않는다', () => {
@@ -162,8 +172,8 @@ describe('TabsShell', () => {
     expect(registerPushSubscription).not.toHaveBeenCalled()
   })
 
-  it('초기 로딩 실패 시 splash 위 에러 다이얼로그를 표시한다', () => {
-    mockCalendarsError = new Error('calendar failed')
+  it('가족 초기 로딩 실패 시 splash 위 에러 다이얼로그를 표시한다', () => {
+    mockFamilyError = new Error('family failed')
     render(<TabsShell />)
 
     expect(screen.getByTestId('app-splash')).toBeInTheDocument()
@@ -171,8 +181,8 @@ describe('TabsShell', () => {
     expect(screen.getByText('앱을 시작하지 못했어요')).toBeInTheDocument()
   })
 
-  it('다시 시도 버튼 클릭 시 가족과 캘린더 로드를 모두 재시도한다', async () => {
-    mockCalendarsError = new Error('calendar failed')
+  it('가족 초기 로딩 다시 시도 시 가족과 캘린더 로드를 모두 재시도한다', async () => {
+    mockFamilyError = new Error('family failed')
     const user = userEvent.setup()
 
     render(<TabsShell />)
@@ -180,5 +190,23 @@ describe('TabsShell', () => {
 
     expect(mockReloadFamily).toHaveBeenCalled()
     expect(mockReloadCalendars).toHaveBeenCalled()
+  })
+
+  it('캘린더 로드 실패는 앱 전체를 막지 않고 캘린더 탭에 전달한다', () => {
+    mockCalendarsError = new Error('calendar failed')
+    render(<TabsShell />)
+
+    expect(screen.queryByTestId('app-splash')).not.toBeInTheDocument()
+    expect(screen.getByTestId('calendar-tab')).toHaveAttribute('data-calendars-error', 'true')
+    expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
+  })
+
+  it('캘린더 로드 실패 중에도 URL로 선택한 리마인더 탭을 연다', async () => {
+    mockTabParam = 'reminders'
+    mockCalendarsError = new Error('calendar failed')
+    render(<TabsShell />)
+
+    expect((await screen.findByTestId('reminder-tab')).parentElement).not.toHaveClass('hidden')
+    expect(screen.queryByTestId('app-splash')).not.toBeInTheDocument()
   })
 })
