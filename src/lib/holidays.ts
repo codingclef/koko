@@ -1,10 +1,7 @@
 import Holidays from 'date-holidays'
+import type { Holiday } from '@/types/holidays'
 
-export interface Holiday {
-  date: string
-  localName: string
-  countryCode: string
-}
+export type { Holiday } from '@/types/holidays'
 
 const COUNTRY_LANGUAGE: Record<string, string> = {
   KR: 'ko',
