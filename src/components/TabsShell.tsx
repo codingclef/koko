@@ -64,9 +64,8 @@ export function TabsShell() {
     reload: reloadCalendars,
   } = useCalendars(familyId)
   const { preferences, updatePreferences } = useUserPreferences(user)
-  const shouldLoadCalendars = Boolean(familyId) && !familyError
-  const isInitializing = authLoading || familyLoading || (shouldLoadCalendars && calendarsLoading)
-  const startupError = !isInitializing ? (familyError || calendarsError) : null
+  const isInitializing = authLoading || familyLoading
+  const startupError = !isInitializing ? familyError : null
 
   // 인증됨 + 앱 접근권 있음 + 아직 가족 없음 → 온보딩 필요
   // familyError가 있으면 DB 장애로 판단, 온보딩으로 잘못 보내지 않는다
@@ -189,6 +188,7 @@ export function TabsShell() {
             familyId={familyId}
             isInitializing={isInitializing}
             calendars={calendars}
+            calendarsLoading={calendarsLoading}
             calendarsError={calendarsError}
             reloadCalendars={reloadCalendars}
           />

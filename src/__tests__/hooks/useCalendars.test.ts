@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { useCalendars } from '@/hooks/useCalendars'
 import * as calendarLib from '@/lib/calendar'
+import type { Calendar } from '@/lib/calendar'
 
 jest.mock('@/lib/calendar', () => ({
   getCalendars: jest.fn(),
@@ -68,5 +69,52 @@ describe('useCalendars', () => {
 
     expect(result.current.calendars).toEqual([])
     expect(result.current.loading).toBe(true)
+  })
+
+  it('가족 전환 직후에는 이전 가족 캘린더를 노출하지 않는다', async () => {
+    const firstFamilyCalendars = [{ id: 'cal-1', name: '가족 1', color: '#f97316', family_id: 'fam-1', created_by: 'user-1', created_at: '', updated_at: '' }]
+    const secondFamilyCalendars = [{ id: 'cal-2', name: '가족 2', color: '#3b82f6', family_id: 'fam-2', created_by: 'user-2', created_at: '', updated_at: '' }]
+    let resolveSecond: (value: typeof firstFamilyCalendars) => void = () => undefined
+
+    mockGetCalendars.mockImplementation((familyId) => {
+      if (familyId === 'fam-1') return Promise.resolve(firstFamilyCalendars)
+      return new Promise((resolve) => {
+        resolveSecond = resolve
+      })
+    })
+
+    const { result, rerender } = renderHook(({ familyId }) => useCalendars(familyId), {
+      initialProps: { familyId: 'fam-1' as string | null },
+    })
+    await waitFor(() => expect(result.current.calendars).toEqual(firstFamilyCalendars))
+
+    rerender({ familyId: 'fam-2' })
+    expect(result.current.calendars).toEqual([])
+    expect(result.current.loading).toBe(true)
+
+    resolveSecond(secondFamilyCalendars)
+    await waitFor(() => expect(result.current.calendars).toEqual(secondFamilyCalendars))
+  })
+
+  it('가족 전환 직후에는 이전 가족의 로드 오류를 노출하지 않는다', async () => {
+    let resolveSecond: (value: Calendar[]) => void = () => undefined
+    mockGetCalendars.mockImplementation((familyId) => {
+      if (familyId === 'fam-1') return Promise.reject(new Error('family 1 failed'))
+      return new Promise((resolve) => {
+        resolveSecond = resolve
+      })
+    })
+
+    const { result, rerender } = renderHook(({ familyId }) => useCalendars(familyId), {
+      initialProps: { familyId: 'fam-1' },
+    })
+    await waitFor(() => expect(result.current.error).toEqual(expect.any(Error)))
+
+    rerender({ familyId: 'fam-2' })
+    expect(result.current.error).toBeNull()
+    expect(result.current.loading).toBe(true)
+
+    resolveSecond([])
+    await waitFor(() => expect(result.current.loading).toBe(false))
   })
 })

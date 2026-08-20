@@ -43,9 +43,14 @@ async function getAllowedEmailRecord(email: string): Promise<{ app_role: string 
   return data
 }
 
-export async function isAppAdmin(email: string): Promise<boolean> {
+export async function getAllowedAppRole(email: string): Promise<'admin' | 'member' | null> {
   const record = await getAllowedEmailRecord(email)
-  return record?.app_role === 'admin'
+  if (!record) return null
+  return record.app_role === 'admin' ? 'admin' : 'member'
+}
+
+export async function isAppAdmin(email: string): Promise<boolean> {
+  return await getAllowedAppRole(email) === 'admin'
 }
 
 export async function getAuthenticatedSessionUser(
@@ -74,8 +79,8 @@ export async function getAuthenticatedUser(
   const user = await getAuthenticatedSessionUser(req)
   if (!user) return null
 
-  const allowedEmail = await getAllowedEmailRecord(user.email)
-  if (!allowedEmail) return null
+  const appRole = await getAllowedAppRole(user.email)
+  if (!appRole) return null
 
   return user
 }

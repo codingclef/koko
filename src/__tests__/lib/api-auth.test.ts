@@ -3,6 +3,7 @@
  */
 import { NextRequest } from 'next/server'
 import {
+  getAllowedAppRole,
   getAuthenticatedSessionUser,
   getAuthenticatedUser,
   isAppAdmin,
@@ -87,5 +88,14 @@ describe('api-auth helpers', () => {
     }))
 
     await expect(isAppAdmin('admin@example.com')).resolves.toBe(true)
+  })
+
+  it('getAllowedAppRole은 허용된 사용자의 역할을 반환한다', async () => {
+    mockFrom.mockReturnValue(makeAllowedEmailChain({
+      data: { app_role: 'admin' },
+      error: null,
+    }))
+
+    await expect(getAllowedAppRole('ADMIN@EXAMPLE.COM')).resolves.toBe('admin')
   })
 })

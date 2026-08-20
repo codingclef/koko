@@ -32,6 +32,7 @@ interface Props extends AuthState {
   preferences: UserPreferences | null
   updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
   calendars: Calendar[]
+  calendarsLoading: boolean
   calendarsError: unknown
   reloadCalendars: () => Promise<unknown>
 }
@@ -161,6 +162,7 @@ export function CalendarTab({
   user,
   familyId,
   calendars,
+  calendarsLoading,
   calendarsError,
   reloadCalendars,
 }: Props) {
@@ -169,6 +171,7 @@ export function CalendarTab({
   const [month, setMonth] = useState(today.getMonth())
 
   const holidays = useHolidays(year, month, preferences?.holiday_countries ?? [])
+  const calendarContextReady = !calendarsLoading && !calendarsError
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -1028,6 +1031,7 @@ export function CalendarTab({
           <div className="flex-1 min-w-0">
             <CalendarFilter
               calendars={calendars}
+              loading={calendarsLoading}
               activeIds={activeIds}
               onToggle={toggleCalendar}
               onAdd={() => openCalendarForm()}
@@ -1036,7 +1040,8 @@ export function CalendarTab({
           </div>
           <button
             onClick={() => void openCalendarList()}
-            className="shrink-0 p-1.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+            disabled={!calendarContextReady}
+            className="shrink-0 p-1.5 text-stone-400 hover:text-stone-600 disabled:cursor-default disabled:opacity-40 dark:hover:text-stone-300"
             aria-label="캘린더 리스트"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1079,6 +1084,7 @@ export function CalendarTab({
           holidays={holidays}
           selectedDate={selectedDate}
           onSelectDate={(date) => {
+            if (!calendarContextReady) return
             setSelectedDate((prev) =>
               prev?.toDateString() === date.toDateString() ? null : date
             )
@@ -1091,7 +1097,8 @@ export function CalendarTab({
       <button
         aria-label="일정 추가"
         onClick={() => setEditingEvent({ date: selectedDate ?? today })}
-        className="absolute right-4 bottom-4 w-11 h-11 rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-lg flex items-center justify-center transition-colors z-30"
+        disabled={!calendarContextReady}
+        className="absolute right-4 bottom-4 w-11 h-11 rounded-full bg-accent-400 hover:bg-accent-500 disabled:cursor-default disabled:bg-stone-300 disabled:shadow-none dark:disabled:bg-stone-700 text-white shadow-lg flex items-center justify-center transition-colors z-30"
       >
         <Plus size={18} />
       </button>

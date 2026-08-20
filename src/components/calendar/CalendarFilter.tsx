@@ -9,13 +9,14 @@ const LONG_PRESS_MS = 500
 
 interface Props {
   calendars: Calendar[]
+  loading?: boolean
   activeIds: Set<string>
   onToggle: (id: string) => void
   onAdd: () => void
   onEdit: (calendar: Calendar) => void
 }
 
-export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }: Props) {
+export function CalendarFilter({ calendars, loading = false, activeIds, onToggle, onAdd, onEdit }: Props) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const didLongPressRef = useRef(false)
 
@@ -34,6 +35,24 @@ export function CalendarFilter({ calendars, activeIds, onToggle, onAdd, onEdit }
   const handleClick = (cal: Calendar) => {
     if (didLongPressRef.current) return
     onToggle(cal.id)
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="flex h-8 items-center gap-2 overflow-hidden pb-1"
+        role="status"
+        aria-label="캘린더 목록을 불러오는 중"
+      >
+        {[72, 60, 84].map((width) => (
+          <span
+            key={width}
+            className="h-7 shrink-0 animate-pulse rounded-full bg-stone-100 dark:bg-stone-800"
+            style={{ width }}
+          />
+        ))}
+      </div>
+    )
   }
 
   return (

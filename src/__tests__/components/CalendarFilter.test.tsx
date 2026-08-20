@@ -28,6 +28,14 @@ describe('CalendarFilter', () => {
     expect(screen.getByText('테스트2')).toBeInTheDocument()
   })
 
+  it('로딩 중에는 캘린더 조작 대신 고정 크기 placeholder를 표시한다', () => {
+    render(<CalendarFilter {...defaultProps} loading />)
+
+    expect(screen.getByRole('status', { name: '캘린더 목록을 불러오는 중' })).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(defaultProps.onAdd).not.toHaveBeenCalled()
+  })
+
   it('짧게 누르면 onToggle이 호출된다', () => {
     render(<CalendarFilter {...defaultProps} />)
     const btn = screen.getByText('테스트1').closest('button')!

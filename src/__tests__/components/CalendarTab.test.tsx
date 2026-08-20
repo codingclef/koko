@@ -44,7 +44,8 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }))
 jest.mock('@/components/calendar/CalendarFilter', () => ({
-  CalendarFilter: ({ onEdit }: {
+  CalendarFilter: ({ onEdit, loading }: {
+    loading?: boolean
     onEdit: (calendar: {
       id: string
       family_id: string
@@ -57,6 +58,7 @@ jest.mock('@/components/calendar/CalendarFilter', () => ({
   }) => (
     <button
       data-testid="calendar-filter-edit"
+      disabled={loading}
       onClick={() => onEdit({
         id: 'cal-1',
         family_id: 'fam-1',
@@ -259,6 +261,7 @@ const defaultProps = {
   familyId: 'fam-1',
   isInitializing: false,
   calendars: mockCalendars,
+  calendarsLoading: false,
   calendarsError: null,
   reloadCalendars: mockReloadCalendars,
 }
@@ -284,6 +287,17 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     mockGetRecurrenceRule.mockResolvedValue({ freq: 'weekly', interval: 1, daysOfWeek: [5] })
     mockDeleteWithAuth.mockResolvedValue(undefined)
     mockPatchJsonWithAuth.mockResolvedValue(undefined)
+  })
+
+  it('캘린더 목록 로딩 중에는 목록 의존 진입점을 비활성화한다', () => {
+    render(<CalendarTab {...defaultProps} calendars={[]} calendarsLoading />)
+
+    expect(screen.getByTestId('calendar-filter-edit')).toBeDisabled()
+    expect(screen.getByRole('button', { name: '캘린더 리스트' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '일정 추가' })).toBeDisabled()
+
+    fireEvent.click(screen.getByTestId('select-date'))
+    expect(screen.queryByTestId('day-events-sheet')).not.toBeInTheDocument()
   })
 
   it('가족 단위 채널명을 사용하고 연/월을 포함하지 않는다', async () => {
