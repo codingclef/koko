@@ -35,13 +35,13 @@ Koko는 가족 단위로 일정을 공유하고 리마인더와 설정을 함께
 ### Top-Level Runtime Shape
 
 - `src/app/layout.tsx`
-  - 글로벌 메타데이터, 폰트, SSR-safe theme bootstrap
+  - 글로벌 메타데이터, 외부 subset 폰트, 정적 head theme bootstrap
 - `src/app/page.tsx`
   - `/calendar`로 리다이렉트
 - `src/app/calendar/page.tsx`
   - 가족 앱의 단일 live entry point
 - `src/components/TabsShell.tsx`
-  - auth/family/preferences/calendars 초기화 후 탭을 keep-alive 상태로 렌더링
+  - auth/family 확인 후 캘린더를 즉시 렌더링하고 보조 탭은 idle 시점에 keep-alive로 준비
 
 ### Auxiliary Routes
 
@@ -328,8 +328,8 @@ Important notes:
 
 1. `useAuth()`가 현재 세션을 확인한다.
 2. `useFamily()`가 `/api/family/me`를 호출해 `familyId`와 `appRole`을 가져온다.
-3. `useCalendars()`가 가족 캘린더를 읽는다.
-4. `TabsShell`이 세 탭을 keep-alive 상태로 렌더링한다.
+3. `TabsShell`이 캘린더 셸을 렌더링하고 `useCalendars()`와 일정 조회가 병렬로 진행된다.
+4. 리마인더와 설정 탭은 공유 idle queue에서 순서대로 마운트되어 keep-alive 상태가 된다.
 5. 가족이 없으면 `/onboarding`으로 리다이렉트한다.
 
 ### Login And Access Decision

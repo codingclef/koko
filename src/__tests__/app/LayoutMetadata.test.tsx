@@ -1,16 +1,8 @@
-jest.mock('next/headers', () => ({
-  cookies: jest.fn(),
-}))
-
 jest.mock('next-themes', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-jest.mock('@/lib/preferences', () => ({
-  THEME_STORAGE_KEY: 'koko_theme',
-}))
-
-import { metadata, viewport } from '@/app/layout'
+import RootLayout, { metadata, viewport } from '@/app/layout'
 
 describe('RootLayout metadata', () => {
   it('상단 시스템 바 색을 라이트/다크 배경색으로 분리한다', () => {
@@ -32,5 +24,24 @@ describe('RootLayout metadata', () => {
     expect(metadata.other).toEqual({
       'mobile-web-app-capable': 'yes',
     })
+  })
+
+  it('루트 layout은 동적 cookie 조회 없이 동기적으로 렌더링된다', () => {
+    const layout = RootLayout({ children: null })
+
+    expect(layout).not.toBeInstanceOf(Promise)
+    expect(layout.props['data-theme']).toBeUndefined()
+  })
+
+  it('첫 paint 전 theme script가 localStorage와 cookie fallback을 유지한다', () => {
+    const layout = RootLayout({ children: null })
+    const head = layout.props.children[0]
+    const script = head.props.children[0]
+    const scriptBody = script.props.dangerouslySetInnerHTML.__html as string
+
+    expect(scriptBody).toContain("var k='koko_theme'")
+    expect(scriptBody).toContain('localStorage.getItem(k)')
+    expect(scriptBody).toContain('try{ls=localStorage.getItem(k);}catch(e){}')
+    expect(scriptBody).toContain('document.cookie.match')
   })
 })

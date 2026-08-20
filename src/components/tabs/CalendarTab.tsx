@@ -28,6 +28,7 @@ import type { RecurrenceRule, RecurrenceScope } from '@/types/recurrence'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { postJsonWithAuth, patchJsonWithAuth, deleteWithAuth } from '@/lib/api-client'
 import type { Calendar } from '@/lib/calendar'
+import { scheduleIdleWork } from '@/lib/idle-work'
 
 interface Props extends AuthState {
   preferences: UserPreferences | null
@@ -99,24 +100,6 @@ const calendarOverlayLoaders = [
   loadYearMonthPickerSheet,
   loadRecurrenceScopeSheet,
 ]
-
-type WindowWithIdleCallback = Window & typeof globalThis & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
-  cancelIdleCallback?: (handle: number) => void
-}
-
-function scheduleIdleWork(callback: () => void) {
-  if (typeof window === 'undefined') return () => {}
-
-  const idleWindow = window as WindowWithIdleCallback
-  if (idleWindow.requestIdleCallback) {
-    const handle = idleWindow.requestIdleCallback(callback, { timeout: 2500 })
-    return () => idleWindow.cancelIdleCallback?.(handle)
-  }
-
-  const timeoutId = window.setTimeout(callback, 700)
-  return () => window.clearTimeout(timeoutId)
-}
 
 function getVisibleEventRange(familyId: string, year: number, month: number) {
   const { start, endExclusive } = getCalendarGridRange(year, month)
@@ -529,10 +512,17 @@ export function CalendarTab({
   useEffect(() => {
     if (!familyId) return
 
-    return scheduleIdleWork(() => {
+    const cancelOverlayPreload = scheduleIdleWork(() => {
       void Promise.allSettled(calendarOverlayLoaders.map((loadOverlay) => loadOverlay()))
+    }, 'high')
+    const cancelMemberPreload = scheduleIdleWork(() => {
       void loadFamilyMembers({ silent: true }).catch(() => {})
     })
+
+    return () => {
+      cancelOverlayPreload()
+      cancelMemberPreload()
+    }
   }, [familyId, loadFamilyMembers])
 
   const filteredEvents = useMemo(

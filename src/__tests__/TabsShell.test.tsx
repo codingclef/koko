@@ -158,12 +158,20 @@ describe('TabsShell', () => {
     expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument()
 
     await act(async () => {
-      jest.advanceTimersByTime(1200)
+      jest.advanceTimersByTime(1300)
       await Promise.resolve()
       await Promise.resolve()
     })
 
     expect(screen.getByTestId('reminder-tab').parentElement).toHaveClass('hidden')
+    expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument()
+
+    await act(async () => {
+      jest.advanceTimersByTime(1300)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
     expect(screen.getByTestId('settings-tab').parentElement).toHaveClass('hidden')
   })
 
