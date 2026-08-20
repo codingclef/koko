@@ -142,7 +142,8 @@ Current behavior:
 - 월 이벤트 캐시는 최대 12개월까지 유지된다.
 - 가족 전체 일정과 캘린더 전용 일정을 함께 지원한다.
 - 캘린더 생성/수정/삭제와 멤버 관리가 가능하다.
-- 이벤트 생성/수정은 API route 뒤의 `create_event_with_reminders`, `update_event_with_reminders` RPC로 원자 저장한다.
+- 이벤트 생성/수정은 API route 뒤의 authorized RPC로 이벤트와 reminder를 원자 저장한다.
+- 오늘 이후의 단일 날짜 일반 일정은 기존 event ID를 유지한 채 반복 일정으로 전환할 수 있다. 과거/여러 날 일정 전환과 반복 해제는 아직 지원하지 않는다.
 - 이벤트 삭제는 API route에서 권한 검증 후 수행한다.
 - 이벤트 생성/수정/삭제 시 관련 멤버에게 push notification을 보낼 수 있다.
 - holiday overlay, lunar display, year-month picker, swipe month navigation을 제공한다.

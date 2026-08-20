@@ -672,6 +672,140 @@ describe('EventFormModal', () => {
     )
   })
 
+  it('일반 일정 편집에서 반복 규칙을 선택하면 확인 후 전환 저장한다', async () => {
+    jest.setSystemTime(new Date('2026-08-20T00:00:00Z'))
+    const onSave = jest.fn().mockResolvedValue(undefined)
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-regular-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '일반 일정',
+      description: '메모',
+      start_at: '2026-09-02T01:00:00.000Z',
+      end_at: '2026-09-02T02:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: null,
+      series_occurrence_date: null,
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} onSave={onSave} />)
+
+    fireEvent.click(screen.getByText('안 함'))
+    fireEvent.click(screen.getByText('매주'))
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'))
+    })
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByTestId('recurrence-conversion-confirm')).toBeInTheDocument()
+    expect(screen.getByText('반복 해제는 아직 지원하지 않아요.', { exact: false })).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('반복으로 전환'))
+    })
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '일반 일정',
+        localStartDate: '2026-09-02',
+        localEndDate: '2026-09-02',
+        recurrence: { freq: 'weekly', interval: 1 },
+      })
+    )
+  })
+
+  it('일반 일정의 반복 전환 확인을 취소하면 저장하지 않는다', async () => {
+    jest.setSystemTime(new Date('2026-08-20T00:00:00Z'))
+    const onSave = jest.fn().mockResolvedValue(undefined)
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-regular-1',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '일반 일정',
+      description: null,
+      start_at: '2026-09-02T01:00:00.000Z',
+      end_at: '2026-09-02T02:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: null,
+      series_occurrence_date: null,
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} onSave={onSave} />)
+    fireEvent.click(screen.getByText('안 함'))
+    fireEvent.click(screen.getByText('매일'))
+    fireEvent.click(screen.getByText('저장'))
+    fireEvent.click(screen.getByText('취소'))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('recurrence-conversion-confirm')).not.toBeInTheDocument()
+  })
+
+  it('과거 일반 일정은 반복 일정으로 전환할 수 없다', () => {
+    jest.setSystemTime(new Date('2026-08-20T00:00:00Z'))
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-past',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '과거 일정',
+      description: null,
+      start_at: '2026-08-18T01:00:00.000Z',
+      end_at: '2026-08-18T02:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: null,
+      series_occurrence_date: null,
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} />)
+    fireEvent.click(screen.getByText('안 함'))
+    fireEvent.click(screen.getByText('매일'))
+
+    expect(screen.getByText('과거 일정은 반복 일정으로 전환할 수 없어요.')).toBeInTheDocument()
+    expect(screen.getByText('저장')).toBeDisabled()
+  })
+
+  it('여러 날에 걸친 일반 일정은 반복 일정으로 전환할 수 없다', () => {
+    jest.setSystemTime(new Date('2026-08-20T00:00:00Z'))
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-multi-day',
+      family_id: 'fam-1',
+      calendar_id: 'cal-1',
+      created_by: 'user-1',
+      title: '여러 날 일정',
+      description: null,
+      start_at: '2026-09-02T01:00:00.000Z',
+      end_at: '2026-09-03T02:00:00.000Z',
+      is_all_day: false,
+      is_cancelled: false,
+      label_color: null,
+      series_id: null,
+      series_occurrence_date: null,
+      created_at: '',
+      updated_at: '',
+    }
+
+    render(<EventFormModal {...defaultProps} initial={initial} />)
+    fireEvent.click(screen.getByText('안 함'))
+    fireEvent.click(screen.getByText('매일'))
+
+    expect(screen.getByText('여러 날에 걸친 일정은 아직 반복 일정으로 전환할 수 없어요.')).toBeInTheDocument()
+    expect(screen.getByText('저장')).toBeDisabled()
+  })
+
   it('following 반복 일정은 기존 반복 규칙을 표시하고 변경된 규칙을 저장한다', async () => {
     const initial: import('@/lib/calendar').CalendarEvent = {
       id: 'evt-1',

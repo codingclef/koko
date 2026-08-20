@@ -910,6 +910,29 @@ export type Database = {
         }
         Returns: { series_id: string; event_count: number }[]
       }
+      convert_event_to_recurring_series_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_event_id: string
+          p_calendar_id: string | null
+          p_title: string
+          p_description: string | null
+          p_start_at: string
+          p_end_at: string
+          p_local_start_date: string
+          p_local_end_date: string
+          p_is_all_day: boolean
+          p_reminder_minutes: number[]
+          p_freq: string
+          p_interval: number
+          p_days_of_week: number[]
+          p_day_of_month: number | null
+          p_end_date: string | null
+          p_label_color: string | null
+          p_today: string
+        }
+        Returns: Json
+      }
       delete_series_authorized: {
         Args: {
           p_actor_user_id: string
