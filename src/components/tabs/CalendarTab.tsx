@@ -8,7 +8,7 @@ import { useHolidays } from '@/hooks/useHolidays'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState } from '@/types/tabs'
 import {
-  getEventsByMonth,
+  getEventsByRange,
   createCalendar,
   updateCalendar,
   deleteCalendar,
@@ -21,6 +21,7 @@ import {
   type FamilyMember,
   type SaveResult,
 } from '@/lib/calendar'
+import { getCalendarGridRange } from '@/lib/calendar-grid'
 import { CalendarFilter } from '@/components/calendar/CalendarFilter'
 import { CalendarGrid } from '@/components/calendar/CalendarGrid'
 import type { RecurrenceRule, RecurrenceScope } from '@/types/recurrence'
@@ -37,7 +38,7 @@ interface Props extends AuthState {
   reloadCalendars: () => Promise<unknown>
 }
 
-const MAX_MONTH_EVENT_CACHE = 12
+const MAX_EVENT_RANGE_CACHE = 12
 
 type FamilyMembersStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -45,6 +46,11 @@ interface FamilyMembersState {
   familyId: string | null
   members: FamilyMember[]
   status: FamilyMembersStatus
+}
+
+interface EventRangeRequest {
+  promise: Promise<CalendarEvent[]>
+  isCurrent: () => boolean
 }
 
 // Keep dynamic render loaders and idle preload loaders identical so first-open chunks are actually warmed.
@@ -112,8 +118,13 @@ function scheduleIdleWork(callback: () => void) {
   return () => window.clearTimeout(timeoutId)
 }
 
-function getMonthEventsKey(familyId: string, year: number, month: number) {
-  return `${familyId}:${year}:${month}`
+function getVisibleEventRange(familyId: string, year: number, month: number) {
+  const { start, endExclusive } = getCalendarGridRange(year, month)
+  return {
+    key: `${familyId}:${start.toISOString()}:${endExclusive.toISOString()}`,
+    start,
+    endExclusive,
+  }
 }
 
 function calendarFilterKey(familyId: string) {
@@ -136,18 +147,6 @@ function saveStoredFilter(familyId: string, ids: Set<string>) {
   try {
     localStorage.setItem(calendarFilterKey(familyId), JSON.stringify([...ids]))
   } catch {}
-}
-
-function getAdjacentMonth(year: number, month: number, delta: -1 | 1) {
-  if (delta === -1) {
-    return month === 0
-      ? { year: year - 1, month: 11 }
-      : { year, month: month - 1 }
-  }
-
-  return month === 11
-    ? { year: year + 1, month: 0 }
-    : { year, month: month + 1 }
 }
 
 function getLocalTimePart(isoString: string): string {
@@ -211,15 +210,18 @@ export function CalendarTab({
   }))
 
   const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [adjacentMonthEvents, setAdjacentMonthEvents] = useState<CalendarEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [eventsError, setEventsError] = useState<unknown>(null)
-  const monthEventsCacheRef = useRef(new Map<string, CalendarEvent[]>())
-  const monthEventsRequestsRef = useRef(new Map<string, Promise<CalendarEvent[]>>())
+  const eventRangeCacheRef = useRef(new Map<string, CalendarEvent[]>())
+  const eventRangeRequestsRef = useRef(new Map<string, EventRangeRequest>())
+  const eventRangeRequestSeqRef = useRef(new Map<string, number>())
+  const familyEventGenerationRef = useRef(new Map<string, number>())
   const currentFamilyIdRef = useRef<string | null>(familyId ?? null)
   const calendarOpenRequestSeqRef = useRef(0)
   const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
-  const visibleMonthKeyRef = useRef<string | null>(familyId ? getMonthEventsKey(familyId, year, month) : null)
+  const visibleEventRangeKeyRef = useRef<string | null>(
+    familyId ? getVisibleEventRange(familyId, year, month).key : null
+  )
   currentFamilyIdRef.current = familyId ?? null
 
   useEffect(() => {
@@ -341,91 +343,79 @@ export function CalendarTab({
   const familyMembersReady = !familyId ||
     (familyMembersState.familyId === familyId && familyMembersState.status === 'ready')
 
-  const storeMonthEvents = useCallback((key: string, nextEvents: CalendarEvent[]) => {
-    const cache = monthEventsCacheRef.current
+  const storeEventRange = useCallback((key: string, nextEvents: CalendarEvent[]) => {
+    const cache = eventRangeCacheRef.current
     if (cache.has(key)) cache.delete(key)
     cache.set(key, nextEvents)
 
-    while (cache.size > MAX_MONTH_EVENT_CACHE) {
+    while (cache.size > MAX_EVENT_RANGE_CACHE) {
       const oldestKey = cache.keys().next().value
       if (!oldestKey) break
       cache.delete(oldestKey)
     }
   }, [])
 
-  const clearFamilyMonthEventsCache = useCallback((targetFamilyId: string) => {
+  const clearFamilyEventRangeCache = useCallback((targetFamilyId: string) => {
     const prefix = `${targetFamilyId}:`
+    familyEventGenerationRef.current.set(
+      targetFamilyId,
+      (familyEventGenerationRef.current.get(targetFamilyId) ?? 0) + 1
+    )
 
-    for (const key of monthEventsCacheRef.current.keys()) {
-      if (key.startsWith(prefix)) monthEventsCacheRef.current.delete(key)
+    for (const key of eventRangeCacheRef.current.keys()) {
+      if (key.startsWith(prefix)) eventRangeCacheRef.current.delete(key)
     }
 
-    for (const key of monthEventsRequestsRef.current.keys()) {
-      if (key.startsWith(prefix)) monthEventsRequestsRef.current.delete(key)
+    for (const key of eventRangeRequestsRef.current.keys()) {
+      if (key.startsWith(prefix)) eventRangeRequestsRef.current.delete(key)
     }
   }, [])
 
-  const fetchMonthEvents = useCallback(async (
+  const getEventRangeRequest = useCallback((
     targetFamilyId: string,
     targetYear: number,
     targetMonth: number,
     options: { force?: boolean } = {}
-  ) => {
-    const key = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
+  ): EventRangeRequest => {
+    const { key, start, endExclusive } = getVisibleEventRange(
+      targetFamilyId,
+      targetYear,
+      targetMonth
+    )
 
     if (!options.force) {
-      const cached = monthEventsCacheRef.current.get(key)
-      if (cached) return cached
-
-      const inFlight = monthEventsRequestsRef.current.get(key)
+      const inFlight = eventRangeRequestsRef.current.get(key)
       if (inFlight) return inFlight
     }
 
-    const request = getEventsByMonth(targetFamilyId, targetYear, targetMonth)
+    const familyGeneration = familyEventGenerationRef.current.get(targetFamilyId) ?? 0
+    const requestSeq = (eventRangeRequestSeqRef.current.get(key) ?? 0) + 1
+    eventRangeRequestSeqRef.current.set(key, requestSeq)
+
+    const request: EventRangeRequest = {
+      promise: Promise.resolve([]),
+      isCurrent: () => (
+        (familyEventGenerationRef.current.get(targetFamilyId) ?? 0) === familyGeneration &&
+        eventRangeRequestSeqRef.current.get(key) === requestSeq
+      ),
+    }
+
+    request.promise = getEventsByRange(targetFamilyId, start, endExclusive)
       .then((nextEvents) => {
-        storeMonthEvents(key, nextEvents)
-        monthEventsRequestsRef.current.delete(key)
+        if (request.isCurrent()) storeEventRange(key, nextEvents)
         return nextEvents
       })
-      .catch((error) => {
-        monthEventsRequestsRef.current.delete(key)
-        throw error
+      .finally(() => {
+        if (eventRangeRequestsRef.current.get(key) === request) {
+          eventRangeRequestsRef.current.delete(key)
+        }
       })
 
-    monthEventsRequestsRef.current.set(key, request)
+    eventRangeRequestsRef.current.set(key, request)
     return request
-  }, [storeMonthEvents])
+  }, [storeEventRange])
 
-  const syncAdjacentFromCache = useCallback((
-    targetFamilyId: string, targetYear: number, targetMonth: number
-  ) => {
-    const expectedKey = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
-    if (visibleMonthKeyRef.current !== expectedKey) return
-
-    const prev = getAdjacentMonth(targetYear, targetMonth, -1)
-    const next = getAdjacentMonth(targetYear, targetMonth, 1)
-    const prevEvents = monthEventsCacheRef.current.get(
-      getMonthEventsKey(targetFamilyId, prev.year, prev.month)
-    ) ?? []
-    const nextEvents = monthEventsCacheRef.current.get(
-      getMonthEventsKey(targetFamilyId, next.year, next.month)
-    ) ?? []
-    setAdjacentMonthEvents([...prevEvents, ...nextEvents])
-  }, [])
-
-  const prefetchAdjacentMonths = useCallback((targetFamilyId: string, targetYear: number, targetMonth: number) => {
-    const prev = getAdjacentMonth(targetYear, targetMonth, -1)
-    const next = getAdjacentMonth(targetYear, targetMonth, 1)
-
-    void Promise.all([
-      fetchMonthEvents(targetFamilyId, prev.year, prev.month).catch(() => {}),
-      fetchMonthEvents(targetFamilyId, next.year, next.month).catch(() => {}),
-    ]).then(() => {
-      syncAdjacentFromCache(targetFamilyId, targetYear, targetMonth)
-    })
-  }, [fetchMonthEvents, syncAdjacentFromCache])
-
-  const loadMonthEvents = useCallback(async ({
+  const loadVisibleEvents = useCallback(async ({
     targetFamilyId,
     targetYear,
     targetMonth,
@@ -440,48 +430,44 @@ export function CalendarTab({
     silent?: boolean
     throwOnError?: boolean
   }) => {
-    const key = getMonthEventsKey(targetFamilyId, targetYear, targetMonth)
-    const cached = !force ? monthEventsCacheRef.current.get(key) : undefined
-    const isVisibleMonth = () => visibleMonthKeyRef.current === key
-    const applyMonthState = (nextEvents: CalendarEvent[], nextError: unknown = null) => {
-      if (!isVisibleMonth()) return
+    const { key } = getVisibleEventRange(targetFamilyId, targetYear, targetMonth)
+    const cached = !force ? eventRangeCacheRef.current.get(key) : undefined
+    const isVisibleRange = () => visibleEventRangeKeyRef.current === key
+    const applyRangeState = (nextEvents: CalendarEvent[], nextError: unknown = null) => {
+      if (!isVisibleRange()) return
       setEvents(nextEvents)
       setEventsError(nextError)
       setEventsLoading(false)
     }
 
     if (cached) {
-      applyMonthState(cached)
-      syncAdjacentFromCache(targetFamilyId, targetYear, targetMonth)
-      prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
+      applyRangeState(cached)
       return cached
     }
 
-    if (!silent && isVisibleMonth()) {
+    if (!silent && isVisibleRange()) {
       setEvents([])
-      setAdjacentMonthEvents([])
       setEventsLoading(true)
     }
-    if (isVisibleMonth()) setEventsError(null)
+    if (isVisibleRange()) setEventsError(null)
+
+    const request = getEventRangeRequest(targetFamilyId, targetYear, targetMonth, { force })
 
     try {
-      const nextEvents = await fetchMonthEvents(targetFamilyId, targetYear, targetMonth, { force })
-      applyMonthState(nextEvents)
-      syncAdjacentFromCache(targetFamilyId, targetYear, targetMonth)
-      prefetchAdjacentMonths(targetFamilyId, targetYear, targetMonth)
+      const nextEvents = await request.promise
+      if (request.isCurrent()) applyRangeState(nextEvents)
       return nextEvents
     } catch (error) {
       console.error('[CalendarTab] loadEvents failed:', error)
-      if (isVisibleMonth()) {
+      if (request.isCurrent() && isVisibleRange()) {
         setEvents([])
-        setAdjacentMonthEvents([])
         setEventsError(error)
         setEventsLoading(false)
       }
       if (throwOnError) throw error
       return []
     }
-  }, [fetchMonthEvents, prefetchAdjacentMonths, syncAdjacentFromCache])
+  }, [getEventRangeRequest])
 
   useEffect(() => {
     if (!familyId || calendars.length === 0) return
@@ -506,12 +492,13 @@ export function CalendarTab({
   }, [familyId, activeIds])
 
   useEffect(() => {
-    visibleMonthKeyRef.current = familyId ? getMonthEventsKey(familyId, year, month) : null
+    visibleEventRangeKeyRef.current = familyId
+      ? getVisibleEventRange(familyId, year, month).key
+      : null
 
     if (!familyId) {
       queueMicrotask(() => {
         setEvents([])
-        setAdjacentMonthEvents([])
         setEventsError(null)
         setEventsLoading(false)
       })
@@ -525,20 +512,19 @@ export function CalendarTab({
     if (familyChanged) {
       queueMicrotask(() => {
         setEvents([])
-        setAdjacentMonthEvents([])
         setEventsError(null)
         setEventsLoading(true)
       })
     }
 
     queueMicrotask(() => {
-      void loadMonthEvents({
+      void loadVisibleEvents({
         targetFamilyId: familyId,
         targetYear: year,
         targetMonth: month,
       })
     })
-  }, [familyId, year, month, loadMonthEvents])
+  }, [familyId, year, month, loadVisibleEvents])
 
   useEffect(() => {
     if (!familyId) return
@@ -549,45 +535,33 @@ export function CalendarTab({
     })
   }, [familyId, loadFamilyMembers])
 
-  const mergedEvents = useMemo(() => {
-    if (adjacentMonthEvents.length === 0) return events
-    const seen = new Set(events.map((e) => e.id))
-    return [...events, ...adjacentMonthEvents.filter((e) => !seen.has(e.id))]
-  }, [events, adjacentMonthEvents])
-
   const filteredEvents = useMemo(
-    () => mergedEvents.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)),
-    [mergedEvents, activeIds]
+    () => events.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)),
+    [events, activeIds]
   )
 
   const reloadEvents = useCallback(async () => {
     if (!familyId) return
-    await loadMonthEvents({
+    await loadVisibleEvents({
       targetFamilyId: familyId,
       targetYear: year,
       targetMonth: month,
       force: true,
       throwOnError: true,
     })
-  }, [familyId, year, month, loadMonthEvents])
+  }, [familyId, year, month, loadVisibleEvents])
 
   const refreshEvents = useCallback(async () => {
     if (!familyId) return
-    const prefix = `${familyId}:`
-    for (const key of monthEventsCacheRef.current.keys()) {
-      if (key.startsWith(prefix)) monthEventsCacheRef.current.delete(key)
-    }
-    for (const key of monthEventsRequestsRef.current.keys()) {
-      if (key.startsWith(prefix)) monthEventsRequestsRef.current.delete(key)
-    }
-    await loadMonthEvents({
+    clearFamilyEventRangeCache(familyId)
+    await loadVisibleEvents({
       targetFamilyId: familyId,
       targetYear: year,
       targetMonth: month,
       force: true,
       silent: true,
     })
-  }, [familyId, year, month, loadMonthEvents])
+  }, [clearFamilyEventRangeCache, familyId, year, month, loadVisibleEvents])
 
   const reloadCalendarContext = useCallback(async () => {
     await Promise.allSettled([
@@ -727,7 +701,7 @@ export function CalendarTab({
     setMutationError(null)
 
     try {
-      clearFamilyMonthEventsCache(familyId)
+      clearFamilyEventRangeCache(familyId)
       await deleteCalendar(calendarForm.calendar.id)
       setActiveIds((prev) => {
         const next = new Set(prev)
@@ -784,7 +758,7 @@ export function CalendarTab({
     setMutationError(null)
 
     try {
-      clearFamilyMonthEventsCache(familyId)
+      clearFamilyEventRangeCache(familyId)
       await deleteCalendar(calendarId)
       setActiveIds((prev) => {
         const next = new Set(prev)
@@ -818,7 +792,7 @@ export function CalendarTab({
     setMutationError(null)
 
     try {
-      clearFamilyMonthEventsCache(familyId)
+      clearFamilyEventRangeCache(familyId)
 
       const saveLastLabelColor = (color: string | null, prev: string | null = null) => {
         if (color !== null && color !== prev) {
@@ -905,7 +879,7 @@ export function CalendarTab({
     }
 
     try {
-      clearFamilyMonthEventsCache(familyId)
+      clearFamilyEventRangeCache(familyId)
 
       const url = targetEvent.series_id && scope
         ? `/api/events/${targetEvent.id}?scope=${scope}&anchorOccurrenceDate=${targetEvent.series_occurrence_date ?? ''}`
@@ -1078,7 +1052,7 @@ export function CalendarTab({
         <CalendarGrid
           year={year}
           month={month}
-          events={mergedEvents}
+          events={events}
           calendars={calendars}
           activeIds={activeIds}
           holidays={holidays}

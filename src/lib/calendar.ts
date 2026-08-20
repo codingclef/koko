@@ -173,21 +173,21 @@ export async function setCalendarMembers(
 
 // ── Events ─────────────────────────────────────────────────
 
-export async function getEventsByMonth(
+export async function getEventsByRange(
   familyId: string,
-  year: number,
-  month: number // 0-indexed (0=January)
+  start: Date,
+  endExclusive: Date
 ): Promise<CalendarEvent[]> {
-  const start = new Date(year, month, 1).toISOString()
-  const end = new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString()
+  const startIso = start.toISOString()
+  const endExclusiveIso = endExclusive.toISOString()
 
   const { data, error } = await supabase
     .from('events')
     .select('*')
     .eq('family_id', familyId)
     .eq('is_cancelled', false)
-    .gte('start_at', start)
-    .lte('start_at', end)
+    .lt('start_at', endExclusiveIso)
+    .or(`start_at.gte.${startIso},and(is_all_day.eq.true,end_at.gte.${startIso})`)
     .order('start_at', { ascending: true })
 
   if (error) throw error

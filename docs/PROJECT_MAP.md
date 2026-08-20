@@ -138,7 +138,7 @@ Current behavior:
   - `src/components/calendar/YearMonthPickerSheet.tsx`
 
 Current behavior:
-- 월 단위로 이벤트를 로드하고 인접 월을 prefetch한다.
+- 캘린더 그리드에 표시되는 전체 날짜 범위의 이벤트를 한 번에 로드한다.
 - 월 이벤트 캐시는 최대 12개월까지 유지된다.
 - 가족 전체 일정과 캘린더 전용 일정을 함께 지원한다.
 - 캘린더 생성/수정/삭제와 멤버 관리가 가능하다.

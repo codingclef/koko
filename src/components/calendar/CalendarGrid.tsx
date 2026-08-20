@@ -3,6 +3,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
+import { buildCalendarGrid, type CalendarDayCell as DayCell } from '@/lib/calendar-grid'
 import { toDisplayColor } from '@/lib/label-colors'
 import type { Holiday } from '@/types/holidays'
 
@@ -16,32 +17,7 @@ const CHIP_HEIGHT = 17        // text-[10px] leading-tight + py-0.5
 const CHIP_GAP = 2            // space-y-0.5
 const HOLIDAY_EVENT_GAP = 2
 
-interface DayCell {
-  date: Date
-  isCurrentMonth: boolean
-}
-
-export function buildGrid(year: number, month: number): DayCell[] {
-  const firstDay = new Date(year, month, 1)
-  const startDow = firstDay.getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const prevMonthLastDay = new Date(year, month, 0).getDate()
-  const rows = Math.ceil((startDow + daysInMonth) / 7)
-  const totalCells = rows * 7
-  const cells: DayCell[] = []
-
-  for (let i = startDow - 1; i >= 0; i--) {
-    cells.push({ date: new Date(year, month - 1, prevMonthLastDay - i), isCurrentMonth: false })
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ date: new Date(year, month, d), isCurrentMonth: true })
-  }
-  const trailingDays = totalCells - cells.length
-  for (let d = 1; d <= trailingDays; d++) {
-    cells.push({ date: new Date(year, month + 1, d), isCurrentMonth: false })
-  }
-  return cells
-}
+export const buildGrid = buildCalendarGrid
 
 function isSameDay(a: Date, b: Date) {
   return (
@@ -331,7 +307,7 @@ export function CalendarGrid({
     height: 0,
     weekdayHeaderHeight: WEEKDAY_HEADER_HEIGHT,
   })
-  const cells = useMemo(() => buildGrid(year, month), [year, month])
+  const cells = useMemo(() => buildCalendarGrid(year, month), [year, month])
   const today = useMemo(() => new Date(), [])
   const calendarMap = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
 

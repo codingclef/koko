@@ -74,8 +74,8 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 
 ## 6. Calendar Patterns
 
-- 월 이벤트 조회는 `getEventsByMonth(familyId, year, month)`처럼 month window 단위로 제한한다.
-- 현재 월 외에도 인접 월 prefetch를 허용하지만, cache는 유한 크기로 유지한다.
+- 이벤트 조회는 `getEventsByRange(familyId, start, endExclusive)`로 현재 캘린더 그리드에 보이는 날짜 범위만 요청한다.
+- 표시 범위 cache는 유한 크기로 유지하고, 강제 갱신 시 이전 in-flight 결과가 최신 상태를 덮어쓰지 않게 한다.
 - `events.calendar_id = null`은 가족 전체 일정이다.
 - 캘린더 생성 시 owner 멤버를 먼저 insert하고 일반 멤버를 그 다음에 넣는다.
 - 캘린더 멤버 수정은 "owner 유지 + 나머지 전체 교체" 패턴으로 다룬다.

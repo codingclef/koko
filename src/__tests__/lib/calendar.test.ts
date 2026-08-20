@@ -7,14 +7,14 @@ import {
   getCalendarMembersForCalendars,
   setCalendarMembers,
   getFamilyMembers,
-  getEventsByMonth,
+  getEventsByRange,
   getReminders,
 } from '@/lib/calendar'
 
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
   const chain: Record<string, unknown> = {}
-  ;['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'gte', 'lte', 'order'].forEach((m) => {
+  ;['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'gte', 'lte', 'lt', 'or', 'order'].forEach((m) => {
     chain[m] = jest.fn().mockReturnValue(chain)
   })
   chain.single = jest.fn().mockReturnValue(p)
@@ -217,25 +217,35 @@ describe('deleteCalendar', () => {
   })
 })
 
-// ── getEventsByMonth ──────────────────────────────────────
+// ── getEventsByRange ──────────────────────────────────────
 
-describe('getEventsByMonth', () => {
-  it('이벤트 목록을 반환한다', async () => {
+describe('getEventsByRange', () => {
+  const start = new Date(2026, 2, 29)
+  const endExclusive = new Date(2026, 4, 3)
+
+  it('표시 범위 이벤트 목록을 한 번의 overlap 쿼리로 반환한다', async () => {
     const mockData = [{ id: 'evt-1', title: '생일', start_at: '2026-03-15T00:00:00Z' }]
-    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
-    const result = await getEventsByMonth('fam-1', 2026, 2)
+    const chain = makeChain({ data: mockData, error: null })
+    mockFrom.mockReturnValue(chain)
+
+    const result = await getEventsByRange('fam-1', start, endExclusive)
+
     expect(result).toEqual(mockData)
     expect(mockFrom).toHaveBeenCalledWith('events')
+    expect(chain.lt).toHaveBeenCalledWith('start_at', endExclusive.toISOString())
+    expect(chain.or).toHaveBeenCalledWith(
+      `start_at.gte.${start.toISOString()},and(is_all_day.eq.true,end_at.gte.${start.toISOString()})`
+    )
   })
 
   it('data가 null이면 빈 배열을 반환한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    expect(await getEventsByMonth('fam-1', 2026, 2)).toEqual([])
+    expect(await getEventsByRange('fam-1', start, endExclusive)).toEqual([])
   })
 
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
-    await expect(getEventsByMonth('fam-1', 2026, 2)).rejects.toEqual({ message: 'fetch error' })
+    await expect(getEventsByRange('fam-1', start, endExclusive)).rejects.toEqual({ message: 'fetch error' })
   })
 })
 
@@ -255,4 +265,3 @@ describe('getReminders', () => {
     expect(await getReminders('evt-1')).toEqual([])
   })
 })
-

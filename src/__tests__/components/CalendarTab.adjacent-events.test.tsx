@@ -1,7 +1,7 @@
 import { render, act, waitFor, fireEvent } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { getEventsByMonth } from '@/lib/calendar'
+import { getEventsByRange } from '@/lib/calendar'
 
 const FIXED_NOW = new Date('2026-04-18T12:00:00Z')
 const RealDate = Date
@@ -18,6 +18,26 @@ class MockDate extends Date {
     }
     if (args.length === 1) {
       super(args[0])
+      return
+    }
+    if (args.length === 2) {
+      super(args[0], args[1])
+      return
+    }
+    if (args.length === 3) {
+      super(args[0], args[1], args[2])
+      return
+    }
+    if (args.length === 4) {
+      super(args[0], args[1], args[2], args[3])
+      return
+    }
+    if (args.length === 5) {
+      super(args[0], args[1], args[2], args[3], args[4])
+      return
+    }
+    if (args.length === 6) {
+      super(args[0], args[1], args[2], args[3], args[4], args[5])
       return
     }
     super(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
@@ -59,9 +79,15 @@ jest.mock('@/lib/supabase', () => ({
 }))
 
 let capturedRefresh: (() => Promise<void>) | null = null
+let capturedRealtimeOptions: { refreshOnSubscribed?: boolean } | undefined
 jest.mock('@/hooks/useRealtimeSync', () => ({
-  useRealtimeSync: (_channel: unknown, refresh: () => Promise<void>) => {
+  useRealtimeSync: (
+    _channel: unknown,
+    refresh: () => Promise<void>,
+    options?: { refreshOnSubscribed?: boolean }
+  ) => {
     capturedRefresh = refresh
+    capturedRealtimeOptions = options
     return jest.fn()
   },
 }))
@@ -79,7 +105,7 @@ jest.mock('@/lib/api-client', () => ({
   deleteWithAuth: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock('@/lib/calendar', () => ({
-  getEventsByMonth: jest.fn().mockResolvedValue([]),
+  getEventsByRange: jest.fn().mockResolvedValue([]),
   createCalendar: jest.fn(),
   updateCalendar: jest.fn(),
   deleteCalendar: jest.fn(),
@@ -96,7 +122,7 @@ jest.mock('@/lib/calendar', () => ({
   REMINDER_OPTIONS: [],
 }))
 
-const mockGetEventsByMonth = getEventsByMonth as jest.MockedFunction<typeof getEventsByMonth>
+const mockGetEventsByRange = getEventsByRange as jest.MockedFunction<typeof getEventsByRange>
 
 function makeEvent(id: string, startAt: string) {
   return {
@@ -134,6 +160,7 @@ beforeEach(() => {
   global.Date = MockDate as DateConstructor
   jest.clearAllMocks()
   capturedRefresh = null
+  capturedRealtimeOptions = undefined
   jest.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -142,20 +169,14 @@ afterEach(() => {
   jest.restoreAllMocks()
 })
 
-// today = 2026-04-18, so current month = April (month index 3)
-// prev = March (2), next = May (4)
-describe('CalendarTab — 인접 월 이벤트 표시', () => {
-  it('현재 월 이벤트와 전월/다음월 이벤트가 모두 CalendarGrid 에 전달된다', async () => {
+// today = 2026-04-18, so April grid spans March 29 through May 2.
+describe('CalendarTab — 표시 범위 이벤트 조회', () => {
+  it('현재 월과 전월/다음월 셀 이벤트를 한 번의 범위 조회로 표시한다', async () => {
     const currentEvent = makeEvent('curr-1', '2026-04-15T09:00:00Z') // April
     const prevEvent    = makeEvent('prev-1', '2026-03-29T09:00:00Z') // March
     const nextEvent    = makeEvent('next-1', '2026-05-01T09:00:00Z') // May
 
-    mockGetEventsByMonth.mockImplementation((_fid, _year, month) => {
-      if (month === 3) return Promise.resolve([currentEvent]) // April
-      if (month === 2) return Promise.resolve([prevEvent])    // March
-      if (month === 4) return Promise.resolve([nextEvent])    // May
-      return Promise.resolve([])
-    })
+    mockGetEventsByRange.mockResolvedValue([currentEvent, prevEvent, nextEvent])
 
     const { getByTestId } = render(<CalendarTab {...defaultProps} />)
 
@@ -165,96 +186,67 @@ describe('CalendarTab — 인접 월 이벤트 표시', () => {
       expect(ids).toContain('prev-1')
       expect(ids).toContain('next-1')
     }, { timeout: 3000 })
+    expect(mockGetEventsByRange).toHaveBeenCalledTimes(1)
+
+    const [, start, endExclusive] = mockGetEventsByRange.mock.calls[0]
+    expect([start.getFullYear(), start.getMonth(), start.getDate()]).toEqual([2026, 2, 29])
+    expect([endExclusive.getFullYear(), endExclusive.getMonth(), endExclusive.getDate()]).toEqual([2026, 4, 3])
   })
 
-  it('같은 id 이벤트는 mergedEvents 에서 중복 없이 한 번만 포함된다', async () => {
-    const event = makeEvent('dup-1', '2026-04-15T09:00:00Z')
-    mockGetEventsByMonth.mockResolvedValue([event])
-
-    const { getByTestId } = render(<CalendarTab {...defaultProps} />)
-
-    await waitFor(() => {
-      const ids = (getByTestId('calendar-grid').getAttribute('data-event-ids') ?? '')
-        .split(',').filter(Boolean)
-      expect(ids.filter((id) => id === 'dup-1')).toHaveLength(1)
-    }, { timeout: 3000 })
-  })
-
-  it('다음 달로 이동 후 이전 달의 stale adjacentMonthEvents 가 현재 뷰를 덮어쓰지 않는다', async () => {
-    // April 뷰에서 March fetch 가 지연되는 상황
+  it('다음 달로 이동한 뒤 이전 표시 범위의 늦은 응답을 무시한다', async () => {
     const aprilEvent = makeEvent('apr-1', '2026-04-15T09:00:00Z')
-    const marchEvent = makeEvent('mar-1', '2026-03-29T09:00:00Z') // April 기준 전월
     const mayEvent   = makeEvent('may-1', '2026-05-10T09:00:00Z')
-    const juneEvent  = makeEvent('jun-1', '2026-06-01T09:00:00Z') // May 기준 다음월
 
-    let resolveMarch!: (v: ReturnType<typeof makeEvent>[]) => void
-    const marchPromise = new Promise<ReturnType<typeof makeEvent>[]>((res) => { resolveMarch = res })
-
-    mockGetEventsByMonth.mockImplementation((_fid, _year, month) => {
-      if (month === 3) return Promise.resolve([aprilEvent])
-      if (month === 2) return marchPromise              // March 지연 (April 의 인접 월)
-      if (month === 4) return Promise.resolve([mayEvent])
-      if (month === 5) return Promise.resolve([juneEvent])
-      return Promise.resolve([])
+    let resolveApril!: (value: ReturnType<typeof makeEvent>[]) => void
+    const aprilPromise = new Promise<ReturnType<typeof makeEvent>[]>((resolve) => {
+      resolveApril = resolve
     })
 
+    mockGetEventsByRange
+      .mockReturnValueOnce(aprilPromise)
+      .mockResolvedValueOnce([mayEvent])
+
     const { getByTestId, getByRole } = render(<CalendarTab {...defaultProps} />)
-    await act(async () => {})
+    await waitFor(() => expect(mockGetEventsByRange).toHaveBeenCalledTimes(1))
 
-    // 다음 달(May)로 이동
     fireEvent.click(getByRole('button', { name: '다음 달' }))
-    await act(async () => {})
+    await waitFor(() => {
+      expect(getByTestId('calendar-grid')).toHaveAttribute('data-event-ids', 'may-1')
+    })
 
-    // April 기준 March fetch 완료 (이미 May 뷰 상태)
-    await act(async () => { resolveMarch([marchEvent]) })
-    await act(async () => {})
-
-    // race guard 가 동작해 March 이벤트가 May 뷰에 표시되면 안 됨
-    const ids = getByTestId('calendar-grid').getAttribute('data-event-ids') ?? ''
-    expect(ids).not.toContain('mar-1')
-    expect(ids).toContain('may-1')
+    await act(async () => { resolveApril([aprilEvent]) })
+    expect(getByTestId('calendar-grid')).toHaveAttribute('data-event-ids', 'may-1')
   })
 })
 
-describe('CalendarTab — refreshEvents 인접 월 invalidation', () => {
-  it('broadcast refresh 시 in-flight 상태의 인접 월 요청을 무효화하고 새로 fetch한다', async () => {
-    // today = April (month=3). prev = March (2), next = May (4)
-    const aprilEvent = makeEvent('apr-1', '2026-04-15T09:00:00Z')
-    const marchFresh = makeEvent('mar-fresh', '2026-03-28T09:00:00Z')
+describe('CalendarTab — Realtime 강제 갱신', () => {
+  it('구독 성립 시 gap 보정 갱신을 비활성화하지 않는다', () => {
+    render(<CalendarTab {...defaultProps} />)
 
-    let marchCallCount = 0
-    mockGetEventsByMonth.mockImplementation((_fid, _year, month) => {
-      if (month === 3) return Promise.resolve([aprilEvent])
-      if (month === 2) {
-        marchCallCount++
-        if (marchCallCount === 1) {
-          // 1st call: never resolves — stays in-flight during refresh
-          return new Promise(() => {})
-        }
-        // 2nd call (after invalidation): resolves with fresh data
-        return Promise.resolve([marchFresh])
-      }
-      return Promise.resolve([])
-    })
+    expect(capturedRealtimeOptions?.refreshOnSubscribed).not.toBe(false)
+  })
+
+  it('broadcast refresh가 기존 요청을 대체하고 기존 응답의 stale commit을 막는다', async () => {
+    const staleEvent = makeEvent('stale', '2026-04-15T09:00:00Z')
+    const freshEvent = makeEvent('fresh', '2026-04-16T09:00:00Z')
+    let resolveInitial!: (value: ReturnType<typeof makeEvent>[]) => void
+
+    mockGetEventsByRange.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveInitial = resolve
+    })).mockResolvedValueOnce([freshEvent])
 
     const { getByTestId } = render(<CalendarTab {...defaultProps} />)
-    await act(async () => {})
+    await waitFor(() => expect(mockGetEventsByRange).toHaveBeenCalledTimes(1))
 
-    // 초기 prefetch: March 1st call이 in-flight 상태 (resolve 안 됨)
-    expect(marchCallCount).toBe(1)
-
-    // broadcast refresh 트리거 — March in-flight 이 resolve되기 전에 실행
     expect(capturedRefresh).not.toBeNull()
     await act(async () => { await capturedRefresh!() })
 
-    // refreshEvents가 monthEventsRequestsRef 에서 March를 제거했으므로
-    // prefetchAdjacentMonths가 새 fetch를 시작해야 함
-    expect(marchCallCount).toBe(2)
+    expect(mockGetEventsByRange).toHaveBeenCalledTimes(2)
+    expect(getByTestId('calendar-grid')).toHaveAttribute('data-event-ids', 'fresh')
 
-    // 새 fetch의 fresh 데이터가 표시돼야 함
-    await waitFor(() => {
-      const ids = getByTestId('calendar-grid').getAttribute('data-event-ids') ?? ''
-      expect(ids).toContain('mar-fresh')
-    }, { timeout: 3000 })
+    await act(async () => {
+      resolveInitial([staleEvent])
+    })
+    expect(getByTestId('calendar-grid')).toHaveAttribute('data-event-ids', 'fresh')
   })
 })
