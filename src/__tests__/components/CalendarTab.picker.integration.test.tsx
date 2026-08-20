@@ -14,7 +14,7 @@ jest.mock('@/hooks/useHolidays', () => ({
   useHolidays: () => [],
 }))
 jest.mock('@/lib/calendar', () => ({
-  getEventsByMonth: jest.fn().mockResolvedValue([]),
+  getEventsByRange: jest.fn().mockResolvedValue([]),
   createCalendar: jest.fn(),
   updateCalendar: jest.fn(),
   deleteCalendar: jest.fn(),

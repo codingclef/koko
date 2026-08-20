@@ -1,7 +1,7 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { getCalendarMembers, getEventsByMonth, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar } from '@/lib/calendar'
+import { getCalendarMembers, getEventsByRange, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar } from '@/lib/calendar'
 import { deleteWithAuth, patchJsonWithAuth } from '@/lib/api-client'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
@@ -13,7 +13,7 @@ jest.mock('@/hooks/useHolidays', () => ({
   useHolidays: () => [],
 }))
 jest.mock('@/lib/calendar', () => ({
-  getEventsByMonth: jest.fn().mockResolvedValue([]),
+  getEventsByRange: jest.fn().mockResolvedValue([]),
   createCalendar: jest.fn(),
   updateCalendar: jest.fn(),
   deleteCalendar: jest.fn(),
@@ -235,7 +235,7 @@ jest.mock('@/components/calendar/YearMonthPickerSheet', () => ({
   ),
 }))
 
-const mockGetEventsByMonth = getEventsByMonth as jest.MockedFunction<typeof getEventsByMonth>
+const mockGetEventsByRange = getEventsByRange as jest.MockedFunction<typeof getEventsByRange>
 const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getFamilyMembers>
 const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof getCalendarMembers>
 const mockGetRecurrenceRule = getRecurrenceRule as jest.MockedFunction<typeof getRecurrenceRule>
@@ -281,7 +281,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetEventsByRange.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
     mockGetRecurrenceRule.mockResolvedValue({ freq: 'weekly', interval: 1, daysOfWeek: [5] })
@@ -316,13 +316,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     expect(header.className).not.toContain('pt-8')
   })
 
-  it('broadcast 수신 시 인접하지 않은 달의 캐시도 무효화하여 재탐색 시 새로 불러온다', async () => {
-    const today = new Date()
-    const y = today.getFullYear()
-    const m = today.getMonth()
-    let farYear = y, farMonth = m + 2
-    if (farMonth > 11) { farYear += 1; farMonth -= 12 }
-
+  it('broadcast 수신 시 다른 표시 범위의 캐시도 무효화하여 재탐색 시 새로 불러온다', async () => {
     let broadcastCb: (() => void) | undefined
     const { supabase: mockSupabase } = jest.requireMock('@/lib/supabase') as {
       supabase: { channel: jest.Mock }
@@ -352,20 +346,16 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(screen.getByRole('button', { name: '이전 달' }))
     await act(async () => {})
 
-    const callsBefore = mockGetEventsByMonth.mock.calls.filter(
-      ([, ey, em]) => ey === farYear && em === farMonth
-    ).length
+    const callsBefore = mockGetEventsByRange.mock.calls.length
 
     // broadcast 수신 → 전체 캐시 무효화
     await act(async () => { broadcastCb?.() })
 
-    // month+1로 이동 (이때 month+2 prefetch 발생)
+    // month+1로 이동
     fireEvent.click(screen.getByRole('button', { name: '다음 달' }))
     await act(async () => {})
 
-    const callsAfter = mockGetEventsByMonth.mock.calls.filter(
-      ([, ey, em]) => ey === farYear && em === farMonth
-    ).length
+    const callsAfter = mockGetEventsByRange.mock.calls.length
 
     // 캐시가 무효화됐으므로 broadcast 후 재탐색 시 새로 불러온 횟수가 증가해야 한다
     expect(callsAfter).toBeGreaterThan(callsBefore)
@@ -395,7 +385,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('초기 이벤트 로드 실패 시 전체 스피너 대신 오류 배너와 캘린더 그리드를 유지한다', async () => {
-    mockGetEventsByMonth.mockRejectedValue(new Error('load failed'))
+    mockGetEventsByRange.mockRejectedValue(new Error('load failed'))
 
     render(<CalendarTab {...defaultProps} />)
 
@@ -516,7 +506,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
   })
 
   it('재시도 버튼 클릭 시 캘린더 데이터를 다시 불러온다', async () => {
-    mockGetEventsByMonth
+    mockGetEventsByRange
       .mockRejectedValueOnce(new Error('load failed'))
       .mockResolvedValue([])
 
@@ -526,7 +516,7 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     fireEvent.click(retryButton)
 
     await waitFor(() => expect(mockReloadCalendars).toHaveBeenCalled())
-    await waitFor(() => expect(mockGetEventsByMonth).toHaveBeenCalledTimes(4))
+    await waitFor(() => expect(mockGetEventsByRange).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByTestId('calendar-grid')).toBeInTheDocument())
   })
 
@@ -598,17 +588,12 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     const initialMonth = today.getMonth()
     const nextYear = initialMonth === 11 ? initialYear + 1 : initialYear
     const nextMonth = initialMonth === 11 ? 0 : initialMonth + 1
-    const monthAfterNextYear = nextMonth === 11 ? nextYear + 1 : nextYear
-    const monthAfterNext = nextMonth === 11 ? 0 : nextMonth + 1
     let resolvePrefetch: ((value: []) => void) | null = null
-    mockGetEventsByMonth.mockImplementation(async (_familyId, year, month) => {
-      if (year === monthAfterNextYear && month === monthAfterNext) {
-        return new Promise((resolve) => {
-          resolvePrefetch = resolve as (value: []) => void
-        })
-      }
-      return []
-    })
+    mockGetEventsByRange
+      .mockResolvedValueOnce([])
+      .mockImplementation(() => new Promise((resolve) => {
+        resolvePrefetch = resolve as (value: []) => void
+      }))
 
     render(<CalendarTab {...defaultProps} />)
 
@@ -710,7 +695,7 @@ describe('CalendarTab — 캘린더 필터 localStorage 복원', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     localStorage.clear()
-    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetEventsByRange.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
   })
@@ -778,7 +763,7 @@ describe('CalendarTab — handleCalendarUpdate', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetEventsByMonth.mockResolvedValue([])
+    mockGetEventsByRange.mockResolvedValue([])
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
     mockUpdateCalendar.mockResolvedValue(undefined)
