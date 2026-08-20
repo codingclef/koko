@@ -8,6 +8,7 @@ import { TimeWheelPicker } from './TimeWheelPicker'
 import { RecurrencePickerSheet } from './RecurrencePickerSheet'
 import { RecurrenceCustomModal } from './RecurrenceCustomModal'
 import { buildRecurrenceLabel, type RecurrenceRule, type RecurrenceScope } from '@/types/recurrence'
+import { REMINDER_TIME_ZONE } from '@/lib/reminders'
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -51,6 +52,19 @@ function buildISO(date: string, time: string): string {
 
 function buildAllDayISO(date: string): string {
   return new Date(date + 'T00:00:00').toISOString()
+}
+
+function getTodayInReminderTimeZone(): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: REMINDER_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  return `${year}-${month}-${day}`
 }
 
 function isSameRecurrenceRule(a: RecurrenceRule | null, b: RecurrenceRule | null): boolean {
@@ -149,8 +163,10 @@ export function EventFormModal({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
+  const [showConversionConfirm, setShowConversionConfirm] = useState(false)
 
   const isNewEvent = !initial
+  const isRegularEventEdit = Boolean(initial && !initial.series_id)
   const followingAnchorDate = initial?.series_id && recurrenceScope === 'following'
     ? initial.series_occurrence_date
     : null
@@ -165,6 +181,17 @@ export function EventFormModal({
   const isAllSeriesEdit = Boolean(initial?.series_id && recurrenceScope === 'all')
   const canEditStartDate = !isAllSeriesEdit
   const canEditEndDate = !isAllSeriesEdit && !isFollowingSeriesEdit
+  const regularConversionError = isRegularEventEdit && recurrence
+    ? startDate < getTodayInReminderTimeZone()
+      ? '과거 일정은 반복 일정으로 전환할 수 없어요.'
+      : startDate !== endDate
+        ? '여러 날에 걸친 일정은 아직 반복 일정으로 전환할 수 없어요.'
+        : recurrence.freq === 'weekly'
+          && recurrence.daysOfWeek?.length
+          && !recurrence.daysOfWeek.includes(new Date(`${startDate}T00:00:00Z`).getUTCDay())
+          ? '반복 요일에 일정 시작 요일을 포함해주세요.'
+          : null
+    : null
 
   const titleInputRef = useRef<HTMLInputElement>(null)
   const startDateInputRef = useRef<HTMLInputElement>(null)
@@ -300,9 +327,9 @@ export function EventFormModal({
     })
   }
 
-  const handleSave = async () => {
+  const persistEvent = async () => {
     if (!title.trim() || !startDate) return
-    if (dateError) return
+    if (dateError || regularConversionError) return
     if (followingAnchorDate && startDate < followingAnchorDate) {
       setDateError('이후 일정은 선택한 일정 날짜 이후로만 이동할 수 있어요.')
       return
@@ -326,7 +353,9 @@ export function EventFormModal({
         localEndDate: endDate,
         isAllDay,
         reminderMinutes: Array.from(reminderMinutes),
-        recurrence: isNewEvent || (isFollowingSeriesEdit && !isSameRecurrenceRule(recurrence, initialRecurrence))
+        recurrence: isNewEvent
+          || isRegularEventEdit
+          || (isFollowingSeriesEdit && !isSameRecurrenceRule(recurrence, initialRecurrence))
           ? recurrence
           : null,
         labelColor,
@@ -338,6 +367,15 @@ export function EventFormModal({
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSave = async () => {
+    if (dateError || regularConversionError) return
+    if (isRegularEventEdit && recurrence) {
+      setShowConversionConfirm(true)
+      return
+    }
+    await persistEvent()
   }
 
   const timeBtnCls = (active: boolean) =>
@@ -374,7 +412,7 @@ export function EventFormModal({
         </button>
         <button
           onClick={handleSave}
-          disabled={!title.trim() || !startDate || saving || Boolean(dateError)}
+          disabled={!title.trim() || !startDate || saving || Boolean(dateError || regularConversionError)}
           className="rounded-full border border-stone-200 bg-stone-50 px-7 py-2 text-sm font-bold text-stone-800 transition-colors hover:bg-stone-100 disabled:opacity-40 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900 sm:px-8 sm:py-2.5"
         >
           저장
@@ -394,8 +432,8 @@ export function EventFormModal({
           />
         </div>
 
-        {(dateError ?? saveError) && (
-          <p className="mx-6 mb-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500 dark:bg-red-950/30 dark:text-red-300">{dateError ?? saveError}</p>
+        {(dateError ?? regularConversionError ?? saveError) && (
+          <p className="mx-6 mb-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500 dark:bg-red-950/30 dark:text-red-300">{dateError ?? regularConversionError ?? saveError}</p>
         )}
 
         <div className="border-y border-stone-200/70 dark:border-stone-900">
@@ -658,7 +696,7 @@ export function EventFormModal({
           </div>
 
           {/* 반복 */}
-          {(isNewEvent || isFollowingSeriesEdit) && (
+          {(isNewEvent || isRegularEventEdit || isFollowingSeriesEdit) && (
             <button
               type="button"
               onClick={() => setRecurrenceModal('picker')}
@@ -684,7 +722,7 @@ export function EventFormModal({
           onSelect={(rule) => { setRecurrence(rule); setRecurrenceModal(null) }}
           onCustomize={() => setRecurrenceModal('custom')}
           onClose={() => setRecurrenceModal(null)}
-          allowNone={isNewEvent}
+          allowNone={isNewEvent || isRegularEventEdit}
         />
       )}
 
@@ -695,6 +733,46 @@ export function EventFormModal({
           onSave={(rule) => { setCustomRule(rule); setRecurrence(rule); setRecurrenceModal(null) }}
           onBack={() => setRecurrenceModal('picker')}
         />
+      )}
+
+      {showConversionConfirm && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="recurrence-conversion-title"
+          data-testid="recurrence-conversion-confirm"
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl dark:bg-stone-900">
+            <h2 id="recurrence-conversion-title" className="text-lg font-bold text-stone-900 dark:text-stone-100">
+              반복 일정으로 전환할까요?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">
+              현재 일정이 반복 일정의 첫 일정이 됩니다. 반복 해제는 아직 지원하지 않아요.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowConversionConfirm(false)}
+                disabled={saving}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-stone-500 transition-colors hover:bg-stone-100 disabled:opacity-50 dark:text-stone-400 dark:hover:bg-stone-800"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConversionConfirm(false)
+                  void persistEvent()
+                }}
+                disabled={saving}
+                className="rounded-xl bg-accent-400 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-500 disabled:opacity-50"
+              >
+                반복으로 전환
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </div>
     </div>

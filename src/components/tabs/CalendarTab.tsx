@@ -805,6 +805,9 @@ export function CalendarTab({
           scope === 'following' &&
           params.recurrence
         )
+        const isRegularRecurrenceConversion = Boolean(
+          !editingEvent.event.series_id && params.recurrence
+        )
         const shouldSplitFollowingSeries = isFollowingDateChange || isFollowingRecurrenceChange
         await Promise.all([
           patchJsonWithAuth(`/api/events/${editingEvent.event.id}`, {
@@ -818,7 +821,9 @@ export function CalendarTab({
             isAllDay: params.isAllDay,
             reminderMinutes: params.reminderMinutes,
             labelColor: params.labelColor,
-            ...(isFollowingRecurrenceChange ? { recurrence: params.recurrence } : {}),
+            ...(isFollowingRecurrenceChange || isRegularRecurrenceConversion
+              ? { recurrence: params.recurrence }
+              : {}),
             ...(isScopedSeriesEdit && !params.isAllDay ? {
               startTime: getLocalTimePart(params.startAt),
               endTime: params.endAt ? getLocalTimePart(params.endAt) : null,

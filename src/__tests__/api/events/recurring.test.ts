@@ -142,6 +142,118 @@ describe('POST /api/events (recurring)', () => {
   })
 })
 
+// ── PATCH: regular event conversion ──────────────────────────
+
+describe('PATCH /api/events/[id] (regular -> recurring)', () => {
+  const conversionBody = {
+    calendarId: null,
+    title: '주간 회의',
+    description: '회의 메모',
+    startAt: '2099-04-17T09:00:00.000Z',
+    endAt: '2099-04-17T10:00:00.000Z',
+    localStartDate: '2099-04-17',
+    localEndDate: '2099-04-17',
+    isAllDay: false,
+    reminderMinutes: [10],
+    labelColor: null,
+    recurrence: { freq: 'weekly', interval: 1 },
+  }
+
+  it('scope 없는 recurrence 객체는 원자 전환 RPC를 호출한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        is_changed: true,
+        family_id: FAMILY_ID,
+        new_calendar_id: null,
+        new_title: '주간 회의',
+        new_start_at: '2099-04-17T09:00:00.000Z',
+        series_id: SERIES_ID,
+        event_count: 53,
+      },
+      error: null,
+    })
+
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, conversionBody),
+      makeParams(EVENT_ID)
+    )
+
+    expect(res.status).toBe(204)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'convert_event_to_recurring_series_authorized',
+      expect.objectContaining({
+        p_actor_user_id: ACTOR_USER_ID,
+        p_event_id: EVENT_ID,
+        p_local_start_date: '2099-04-17',
+        p_local_end_date: '2099-04-17',
+        p_freq: 'weekly',
+        p_interval: 1,
+        p_days_of_week: [],
+        p_today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      })
+    )
+    expect(mockSendEventNotification).toHaveBeenCalledTimes(1)
+    expect(mockSendEventNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'updated', eventTitle: '주간 회의' })
+    )
+  })
+
+  it('이미 반복 전환된 stale 요청은 409를 반환한다', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'already_recurring' } })
+
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, conversionBody),
+      makeParams(EVENT_ID)
+    )
+
+    expect(res.status).toBe(409)
+    expect(mockSendEventNotification).not.toHaveBeenCalled()
+  })
+
+  it('여러 날 일정 전환은 RPC 호출 전에 400을 반환한다', async () => {
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, {
+        ...conversionBody,
+        localEndDate: '2099-04-18',
+        endAt: '2099-04-18T10:00:00.000Z',
+      }),
+      makeParams(EVENT_ID)
+    )
+
+    expect(res.status).toBe(400)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('timestamp와 local date가 다르면 RPC 호출 전에 400을 반환한다', async () => {
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, {
+        ...conversionBody,
+        localStartDate: '2099-04-18',
+        localEndDate: '2099-04-18',
+      }),
+      makeParams(EVENT_ID)
+    )
+
+    expect(res.status).toBe(400)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('주간 반복 요일에 시작 요일이 없으면 400을 반환한다', async () => {
+    const startDay = new Date(`${conversionBody.localStartDate}T00:00:00Z`).getUTCDay()
+    const otherDay = (startDay + 1) % 7
+    const res = await PATCH(
+      makeRequest('PATCH', `http://localhost/api/events/${EVENT_ID}`, {
+        ...conversionBody,
+        recurrence: { freq: 'weekly', interval: 1, daysOfWeek: [otherDay] },
+      }),
+      makeParams(EVENT_ID)
+    )
+
+    expect(res.status).toBe(400)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+})
+
 // ── PATCH: series scope ───────────────────────────────────────
 
 describe('PATCH /api/events/[id] (series scope)', () => {

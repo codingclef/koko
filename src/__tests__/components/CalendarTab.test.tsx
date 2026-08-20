@@ -104,6 +104,28 @@ jest.mock('@/components/calendar/DayEventsSheet', () => ({
       >
         event
       </button>
+      <button
+        data-testid="select-regular-event"
+        onClick={() => onSelectEvent({
+          id: 'evt-regular-1',
+          family_id: 'fam-1',
+          calendar_id: 'cal-1',
+          title: '일반 일정',
+          description: null,
+          start_at: '2026-04-17T09:00:00.000Z',
+          end_at: '2026-04-17T10:00:00.000Z',
+          is_all_day: false,
+          created_by: 'user-1',
+          created_at: '',
+          updated_at: '',
+          series_id: null,
+          series_occurrence_date: null,
+          is_cancelled: false,
+          label_color: null,
+        })}
+      >
+        regular event
+      </button>
     </div>
   ),
 }))
@@ -179,6 +201,24 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
       })}
     >
       save following recurrence
+    </button>
+    <button
+      data-testid="event-form-save-convert-recurrence"
+      onClick={() => onSave({
+        calendarId: 'cal-1',
+        title: '일반 일정',
+        description: null,
+        startAt: '2026-09-02T01:00:00.000Z',
+        endAt: '2026-09-02T02:00:00.000Z',
+        localStartDate: '2026-09-02',
+        localEndDate: '2026-09-02',
+        isAllDay: false,
+        reminderMinutes: [10],
+        recurrence: { freq: 'weekly', interval: 1 },
+        labelColor: '#f97316',
+      })}
+    >
+      convert recurrence
     </button>
     </>
   ),
@@ -678,6 +718,33 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
         })
       )
     })
+  })
+
+  it('일반 일정 반복 전환은 scope 없이 recurrence와 local date를 PATCH한다', async () => {
+    render(<CalendarTab {...defaultProps} />)
+    await act(async () => {})
+
+    fireEvent.click(screen.getByTestId('select-date'))
+    fireEvent.click(await screen.findByTestId('select-regular-event'))
+    fireEvent.click(await screen.findByTestId('detail-edit'))
+    fireEvent.click(await screen.findByTestId('event-form-save-convert-recurrence'))
+
+    await waitFor(() => {
+      expect(mockPatchJsonWithAuth).toHaveBeenCalledWith(
+        '/api/events/evt-regular-1',
+        expect.objectContaining({
+          startAt: '2026-09-02T01:00:00.000Z',
+          endAt: '2026-09-02T02:00:00.000Z',
+          localStartDate: '2026-09-02',
+          localEndDate: '2026-09-02',
+          recurrence: { freq: 'weekly', interval: 1 },
+        })
+      )
+    })
+
+    const payload = mockPatchJsonWithAuth.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(payload).not.toHaveProperty('scope')
+    expect(payload).not.toHaveProperty('anchorOccurrenceDate')
   })
 })
 

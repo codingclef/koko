@@ -82,6 +82,8 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 이벤트 생성/수정은 클라이언트에서 테이블을 직접 건드리지 않고 `/api/events` 계열 route를 사용한다.
 - 이벤트 생성/수정 시 reminder도 함께 저장한다. event와 reminder를 분리 저장하지 않는다.
 - reminder 원자 저장은 `create_event_with_reminders`, `update_event_with_reminders` RPC에 맡긴다.
+- 일반 일정을 반복 일정으로 전환할 때는 `convert_event_to_recurring_series_authorized`로 rule/series/occurrence/reminder를 한 트랜잭션에서 만들고 원본 event ID를 유지한다.
+- 일반 일정의 반복 전환은 오늘 이후의 단일 날짜 일정만 허용하며, 주간 사용자 지정 반복은 원본 일정의 시작 요일을 포함해야 한다.
 - 이 RPC들은 service role route에서만 호출한다. 클라이언트 실행 권한을 다시 열지 않는다.
 - 이벤트 저장 후에는 현재 가족 월 cache를 비우고 refresh + broadcast 순서로 정합성을 맞춘다.
 - 캘린더 메인 화면은 `height: 100dvh`와 `touchAction` 제어를 사용한다.
