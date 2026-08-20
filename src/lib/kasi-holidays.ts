@@ -3,8 +3,8 @@ import {
   getAdjacentMonths,
   getFallbackHolidaysForRange,
   normalizeHolidayName,
-  type Holiday,
 } from '@/lib/holidays'
+import type { Holiday } from '@/types/holidays'
 
 const KASI_ENDPOINT =
   'https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo'
