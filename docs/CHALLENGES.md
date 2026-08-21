@@ -244,13 +244,14 @@ JS `preventDefault()` 대신 CSS `touch-action: none`을 사용했다.
 
 ### 해결
 
-- `TabsShell`은 viewport 단위 높이 대신 `position: fixed; inset: 0`으로 화면을 점유한다.
+- `position: fixed; inset: 0`은 일부 iOS PWA에서 작은 containing viewport에 고정되어 하단 빈 공간을 만들므로 사용하지 않는다.
+- `TabsShell`은 동적 viewport가 순간적으로 작아져도 화면 비율을 유지하도록 `height: 100lvh`로 화면을 점유한다.
 - 탭 내부 로딩/빈/오류 화면은 `100vh`를 계산하지 않고 부모 셸의 높이를 사용한다.
 - 전체 화면 리마인더 상세 오버레이가 상단과 하단 safe area를 직접 적용한다.
 
 ### 남은 규칙
 
-- 탭 셸 또는 전체 화면 오버레이에 `100vh`/`100dvh`를 높이의 유일한 기준으로 다시 도입하지 않는다.
+- 탭 셸에 `position: fixed; inset: 0`이나 `100dvh`를 높이의 유일한 기준으로 다시 도입하지 않는다.
 - fixed 전체 화면 오버레이는 셸의 safe area를 상속한다고 가정하지 않는다.
 
 ---

@@ -122,12 +122,13 @@ describe('TabsShell', () => {
     expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
   })
 
-  it('viewport 단위 높이 없이 fixed app shell로 화면을 점유한다', () => {
+  it('fixed containing viewport 대신 안정적인 large viewport 높이를 사용한다', () => {
     render(<TabsShell />)
 
     const shell = screen.getByTestId('tabs-shell')
-    expect(shell).toHaveClass('fixed', 'inset-0', 'overflow-hidden')
-    expect(shell.style.height).toBe('')
+    expect(shell).toHaveClass('overflow-hidden')
+    expect(shell).not.toHaveClass('fixed', 'inset-0')
+    expect(shell).toHaveStyle({ height: '100lvh' })
     expect(shell).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
   })
 
