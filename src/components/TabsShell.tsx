@@ -163,8 +163,12 @@ export function TabsShell() {
   return (
     <div
       data-testid="tabs-shell"
-      className="fixed inset-0 flex flex-col overflow-hidden"
-      style={{ boxSizing: 'border-box', paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      className="flex flex-col overflow-hidden"
+      style={{
+        height: '100lvh',
+        boxSizing: 'border-box',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}
     >
       <div className="flex-1 min-h-0 relative">
         <div className={`absolute inset-0 flex flex-col min-h-0 overflow-hidden${activeTab !== 'calendar' ? ' hidden' : ''}`}>
