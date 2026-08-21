@@ -86,7 +86,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 - 일반 일정의 반복 전환은 오늘 이후의 단일 날짜 일정만 허용하며, 주간 사용자 지정 반복은 원본 일정의 시작 요일을 포함해야 한다.
 - 이 RPC들은 service role route에서만 호출한다. 클라이언트 실행 권한을 다시 열지 않는다.
 - 이벤트 저장 후에는 현재 가족 월 cache를 비우고 refresh + broadcast 순서로 정합성을 맞춘다.
-- 앱 탭 셸은 iOS PWA의 작은 fixed containing viewport나 동적 viewport 재계산에 의존하지 않도록 `height: 100lvh`로 화면을 점유한다.
+- 앱 탭 셸은 캘린더 메타데이터 로딩이 끝나 viewport가 안정된 뒤 마운트하며, `height: 100dvh`와 `border-box`로 화면을 점유한다.
 - 탭 콘텐츠는 `100vh`/`100dvh` 대신 셸이 제공하는 `h-full`/`min-h-full` 높이를 사용하고, 전체 화면 오버레이는 자체적으로 safe area를 적용한다.
 - 캘린더 메인 화면은 셸이 제공한 높이 안에서 `touchAction` 제어를 사용한다.
 - 세로 스크롤 차단이 필요하면 JS `preventDefault()`보다 CSS `touch-action`을 우선한다.

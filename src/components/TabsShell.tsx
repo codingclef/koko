@@ -45,7 +45,8 @@ export function TabsShell() {
     reload: reloadCalendars,
   } = useCalendars(familyId)
   const { preferences, updatePreferences } = useUserPreferences(user)
-  const isInitializing = authLoading || familyLoading
+  const shouldLoadCalendars = Boolean(familyId) && !familyError
+  const isInitializing = authLoading || familyLoading || (shouldLoadCalendars && calendarsLoading)
   const startupError = !isInitializing ? familyError : null
 
   // 인증됨 + 앱 접근권 있음 + 아직 가족 없음 → 온보딩 필요
@@ -165,7 +166,7 @@ export function TabsShell() {
       data-testid="tabs-shell"
       className="flex flex-col overflow-hidden"
       style={{
-        height: '100lvh',
+        height: '100dvh',
         boxSizing: 'border-box',
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
