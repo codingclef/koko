@@ -52,7 +52,7 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-jp.min.css"
         />
         <link rel="preload" href="/logo.webp" as="image" />
-        <style dangerouslySetInnerHTML={{ __html: `#koko-pre-splash{background:#fafaf9}@media(prefers-color-scheme:dark){#koko-pre-splash{background:#0f0e0d}}.dark #koko-pre-splash{background:#0f0e0d}#koko-pre-splash-logo{background:rgba(245,245,244,0.8)}@media(prefers-color-scheme:dark){#koko-pre-splash-logo{background:rgba(255,255,255,0.1)}}.dark #koko-pre-splash-logo{background:rgba(255,255,255,0.1)}` }} />
+        <style dangerouslySetInnerHTML={{ __html: `#koko-pre-splash{background:#fafaf9}@media(prefers-color-scheme:dark){#koko-pre-splash{background:#0f0e0d}}.dark #koko-pre-splash{background:#0f0e0d}` }} />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <PreHydrationSplash />
