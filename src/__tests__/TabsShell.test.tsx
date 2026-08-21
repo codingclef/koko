@@ -134,13 +134,13 @@ describe('TabsShell', () => {
     expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
   })
 
-  it('viewport가 안정된 뒤 기존 dynamic viewport 셸을 마운트한다', () => {
+  it('브라우저 모드에 맞는 viewport CSS 변수로 셸을 채운다', () => {
     render(<TabsShell />)
 
     const shell = screen.getByTestId('tabs-shell')
     expect(shell).toHaveClass('overflow-hidden')
     expect(shell).not.toHaveClass('fixed', 'inset-0')
-    expect(shell).toHaveStyle({ height: '100dvh' })
+    expect(shell).toHaveStyle({ height: 'var(--app-viewport-height)' })
     expect(shell).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
   })
 

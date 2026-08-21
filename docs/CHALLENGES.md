@@ -245,13 +245,15 @@ JS `preventDefault()` 대신 CSS `touch-action: none`을 사용했다.
 ### 해결
 
 - 캘린더 메타데이터가 준비될 때까지 splash를 유지하고, 로딩 완료 또는 실패가 확정된 뒤 `TabsShell`을 마운트한다.
-- 기존에 안정적으로 동작하던 `height: 100dvh` 셸을 유지하고, 작은 containing viewport를 잡는 `position: fixed; inset: 0`은 사용하지 않는다.
+- 일반 브라우저에서는 `100dvh`를 유지하되, 설치형 PWA에서는 브라우저 UI용 작은 viewport를 피하도록 `100vh` fallback과 `100lvh`를 사용한다.
+- 작은 containing viewport를 잡는 `position: fixed; inset: 0`은 사용하지 않는다.
 - 탭 내부 로딩/빈/오류 화면은 `100vh`를 계산하지 않고 부모 셸의 높이를 사용한다.
 - 전체 화면 리마인더 상세 오버레이가 상단과 하단 safe area를 직접 적용한다.
 
 ### 남은 규칙
 
 - 캘린더 메타데이터 로딩 중 `TabsShell`을 다시 조기 마운트하지 않는다.
+- 설치형 PWA 셸을 `100dvh`만으로 채우지 않는다.
 - 탭 셸에 `position: fixed; inset: 0`을 사용하지 않는다.
 - fixed 전체 화면 오버레이는 셸의 safe area를 상속한다고 가정하지 않는다.
 
