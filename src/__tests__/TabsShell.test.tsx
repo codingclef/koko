@@ -114,21 +114,33 @@ describe('TabsShell', () => {
     expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
   })
 
-  it('캘린더 데이터 로딩 중에는 splash를 닫고 캘린더 셸을 표시한다', () => {
+  it('캘린더 데이터 로딩 중에는 viewport가 안정될 때까지 splash를 유지한다', () => {
     mockCalendarsLoading = true
     render(<TabsShell />)
+    expect(screen.getByTestId('app-splash')).toBeInTheDocument()
+    expect(screen.queryByTestId('calendar-tab')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
+  })
+
+  it('캘린더 데이터 로딩이 끝나면 splash를 닫고 셸을 마운트한다', () => {
+    mockCalendarsLoading = true
+    const { rerender } = render(<TabsShell />)
+
+    mockCalendarsLoading = false
+    rerender(<TabsShell />)
+
     expect(screen.queryByTestId('app-splash')).not.toBeInTheDocument()
-    expect(screen.getByTestId('calendar-tab')).toHaveAttribute('data-calendars-loading', 'true')
+    expect(screen.getByTestId('calendar-tab')).toBeInTheDocument()
     expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
   })
 
-  it('fixed containing viewport 대신 안정적인 large viewport 높이를 사용한다', () => {
+  it('viewport가 안정된 뒤 기존 dynamic viewport 셸을 마운트한다', () => {
     render(<TabsShell />)
 
     const shell = screen.getByTestId('tabs-shell')
     expect(shell).toHaveClass('overflow-hidden')
     expect(shell).not.toHaveClass('fixed', 'inset-0')
-    expect(shell).toHaveStyle({ height: '100lvh' })
+    expect(shell).toHaveStyle({ height: '100dvh' })
     expect(shell).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
   })
 
