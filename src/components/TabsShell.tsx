@@ -166,7 +166,7 @@ export function TabsShell() {
       data-testid="tabs-shell"
       className="flex flex-col overflow-hidden"
       style={{
-        height: '100dvh',
+        height: 'var(--app-viewport-height)',
         boxSizing: 'border-box',
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}

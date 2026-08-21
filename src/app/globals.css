@@ -7,6 +7,7 @@
   --foreground: #1c1917;
   --surface-overlay: rgba(245, 245, 244, 0.8);
   --surface-ring: rgba(0, 0, 0, 0.05);
+  --app-viewport-height: 100dvh;
 
   /* Default theme: tangerine (orange) */
   --accent-50: #fff7ed;
@@ -18,6 +19,18 @@
   --accent-600: #ea580c;
   --accent-700: #c2410c;
   --accent-950: #431407;
+}
+
+@media (display-mode: standalone) {
+  :root {
+    --app-viewport-height: 100vh;
+  }
+
+  @supports (height: 100lvh) {
+    :root {
+      --app-viewport-height: 100lvh;
+    }
+  }
 }
 
 .dark {
