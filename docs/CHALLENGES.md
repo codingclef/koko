@@ -247,6 +247,7 @@ JS `preventDefault()` 대신 CSS `touch-action: none`을 사용했다.
 - 캘린더 메타데이터가 준비될 때까지 splash를 유지하고, 로딩 완료 또는 실패가 확정된 뒤 `TabsShell`을 마운트한다.
 - 일반 브라우저에서는 `100dvh`를 유지하되, 설치형 PWA에서는 브라우저 UI용 작은 viewport를 피하도록 `100vh` fallback과 `100lvh`를 사용한다.
 - 작은 containing viewport를 잡는 `position: fixed; inset: 0`은 사용하지 않는다.
+- 하단 내비게이션의 별도 safe-area 패딩은 제거해 6주 달력의 각 행에 일정 3개를 표시할 높이를 돌려준다.
 - 탭 내부 로딩/빈/오류 화면은 `100vh`를 계산하지 않고 부모 셸의 높이를 사용한다.
 - 전체 화면 리마인더 상세 오버레이가 상단과 하단 safe area를 직접 적용한다.
 
