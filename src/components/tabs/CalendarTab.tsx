@@ -932,7 +932,7 @@ export function CalendarTab({
 
   if (fetchError) {
     return (
-      <div className="w-full min-h-screen flex flex-col bg-white dark:bg-stone-950">
+      <div data-testid="calendar-tab-error" className="flex h-full min-h-0 w-full flex-col bg-white dark:bg-stone-950">
         <div className="px-4 pt-2 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-2">
             <button onClick={prevMonth} className="p-2 text-stone-400 hover:text-stone-600">

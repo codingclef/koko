@@ -315,6 +315,14 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     consoleErrorSpy.mockRestore()
   })
 
+  it('오류 화면도 app shell이 제공한 높이를 사용한다', async () => {
+    render(<CalendarTab {...defaultProps} calendarsError={new Error('calendar failed')} />)
+    await act(async () => {})
+
+    expect(screen.getByTestId('calendar-tab-error')).toHaveClass('h-full', 'min-h-0')
+    expect(screen.getByTestId('calendar-tab-error')).not.toHaveClass('min-h-screen')
+  })
+
   afterEach(() => {
     jest.useRealTimers()
   })
