@@ -182,6 +182,8 @@ describe('ReminderTab', () => {
     await act(async () => {})
     const container = screen.getByTestId('reminder-tab-container')
     expect(container.className).toContain('pt-2')
+    expect(container.className).toContain('min-h-full')
+    expect(container.className).not.toContain('min-h-screen')
     expect(container.className).not.toContain('py-8')
   })
 

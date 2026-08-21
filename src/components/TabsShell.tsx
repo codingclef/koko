@@ -27,7 +27,7 @@ const SettingsTab = dynamic(
 
 function TabChunkFallback() {
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
+    <div className="flex h-full min-h-0 items-center justify-center">
       <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
     </div>
   )
@@ -161,7 +161,11 @@ export function TabsShell() {
   }
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ height: '100dvh', boxSizing: 'border-box', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+    <div
+      data-testid="tabs-shell"
+      className="fixed inset-0 flex flex-col overflow-hidden"
+      style={{ boxSizing: 'border-box', paddingTop: 'env(safe-area-inset-top, 0px)' }}
+    >
       <div className="flex-1 min-h-0 relative">
         <div className={`absolute inset-0 flex flex-col min-h-0 overflow-hidden${activeTab !== 'calendar' ? ' hidden' : ''}`}>
           <CalendarTab

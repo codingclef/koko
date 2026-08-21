@@ -236,7 +236,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
 
   if (isInitializing) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex h-full min-h-0 items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
       </div>
     )
@@ -245,7 +245,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 계정 ────────────────────────────────────────────────────
   if (view === 'account') {
     return (
-      <div data-testid="settings-subview-container" className="px-4 sm:px-6 pt-2 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
         <SubHeader title="계정" onBack={() => setView('main')} />
 
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
@@ -337,7 +337,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 가족 ────────────────────────────────────────────────────
   if (view === 'family') {
     return (
-      <div data-testid="settings-subview-container" className="px-4 sm:px-6 pt-2 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
         <SubHeader title="가족" onBack={() => setView('main')} />
 
         {/* 가족 이름 */}
@@ -490,7 +490,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 캘린더 ──────────────────────────────────────────────────
   if (view === 'calendar') {
     return (
-      <div data-testid="settings-subview-container" className="px-4 sm:px-6 pt-2 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
         <SubHeader title="캘린더" onBack={() => setView('main')} />
 
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
@@ -554,7 +554,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   // ── 앱 ──────────────────────────────────────────────────────
   if (view === 'app') {
     return (
-      <div data-testid="settings-subview-container" className="px-4 sm:px-6 pt-2 pb-24 min-h-screen">
+      <div data-testid="settings-subview-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
         <SubHeader title="앱" onBack={() => setView('main')} />
 
         {notifPermission !== 'unsupported' && (
@@ -630,7 +630,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   ]
 
   return (
-    <div data-testid="settings-main-container" className="px-4 sm:px-6 pt-2 pb-24 min-h-screen">
+    <div data-testid="settings-main-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
       <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-6">설정</h1>
 
       <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 overflow-hidden">

@@ -348,14 +348,14 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]">
+      <div className="flex h-full min-h-0 items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div data-testid="reminder-tab-container" className="px-4 pt-2 pb-24 min-h-screen">
+    <div data-testid="reminder-tab-container" className="min-h-full px-4 pt-2 pb-24">
       <ReminderListView
         lists={lists}
         visibleLists={visibleLists}

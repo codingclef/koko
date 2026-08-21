@@ -1367,13 +1367,19 @@ describe('ReminderDetailView', () => {
     )
 
     expect(await screen.findByText('아이템 40')).toBeInTheDocument()
-    expect(screen.getByTestId('reminder-detail-overlay')).toHaveClass('overflow-hidden')
+    const overlay = screen.getByTestId('reminder-detail-overlay')
+    expect(overlay).toHaveClass('overflow-hidden')
+    expect(overlay).toHaveStyle({
+      paddingTop: 'env(safe-area-inset-top, 0px)',
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    })
     expect(screen.getByTestId('reminder-detail-shell')).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col')
     const scroll = screen.getByTestId('reminder-detail-scroll')
     expect(scroll).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto', 'pt-2')
-    expect(scroll).toHaveStyle({ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)' })
+    expect(scroll).toHaveStyle({ paddingBottom: '6rem' })
 
     expect(screen.queryByTestId('reminder-detail-footer')).not.toBeInTheDocument()
     expect(screen.getByTestId('floating-add-item-button')).toHaveClass('absolute')
+    expect(screen.getByRole('button', { name: '목록으로 돌아가기' })).toHaveClass('h-11', 'w-11')
   })
 })

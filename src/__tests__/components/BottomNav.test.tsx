@@ -9,6 +9,15 @@ import { usePathname } from 'next/navigation'
 const mockUsePathname = usePathname as jest.Mock
 
 describe('BottomNav', () => {
+  it('하단 safe area를 실제 CSS 환경값으로 확보한다', () => {
+    mockUsePathname.mockReturnValue('/')
+    const { container } = render(<BottomNav />)
+
+    expect(container.querySelector('nav')).toHaveStyle({
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    })
+  })
+
   it('리마인더와 설정 탭이 렌더링된다', () => {
     mockUsePathname.mockReturnValue('/')
     render(<BottomNav />)

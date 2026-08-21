@@ -530,6 +530,11 @@ export function ReminderDetailView({
     <div
       data-testid="reminder-detail-overlay"
       className="fixed inset-0 z-[55] overflow-hidden bg-white dark:bg-stone-950"
+      style={{
+        boxSizing: 'border-box',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
     >
       {status === 'loading' ? (
         <div className="flex h-full items-center justify-center">
@@ -560,7 +565,7 @@ export function ReminderDetailView({
           <div className="flex items-center gap-3 px-4 py-5 border-b border-stone-100 dark:border-stone-800">
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-200"
               aria-label="목록으로 돌아가기"
             >
               <ArrowLeft size={20} />
@@ -622,7 +627,7 @@ export function ReminderDetailView({
           <div
             data-testid="reminder-detail-scroll"
             className="flex-1 min-h-0 overflow-y-auto pt-2"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)' }}
+            style={{ paddingBottom: '6rem' }}
           >
             {mutationError && (
               <div className="px-4 pt-2">

@@ -80,6 +80,8 @@ describe('SettingsTab 메인 화면', () => {
     await act(async () => { render(<SettingsTab {...defaultProps} />) })
     const container = screen.getByTestId('settings-main-container')
     expect(container.className).toContain('pt-2')
+    expect(container.className).toContain('min-h-full')
+    expect(container.className).not.toContain('min-h-screen')
     expect(container.className).not.toContain('py-8')
   })
 

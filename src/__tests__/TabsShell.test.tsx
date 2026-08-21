@@ -122,6 +122,15 @@ describe('TabsShell', () => {
     expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
   })
 
+  it('viewport 단위 높이 없이 fixed app shell로 화면을 점유한다', () => {
+    render(<TabsShell />)
+
+    const shell = screen.getByTestId('tabs-shell')
+    expect(shell).toHaveClass('fixed', 'inset-0', 'overflow-hidden')
+    expect(shell.style.height).toBe('')
+    expect(shell).toHaveStyle({ paddingTop: 'env(safe-area-inset-top, 0px)' })
+  })
+
   it('미인증 상태에서는 탭을 렌더링하지 않는다', () => {
     mockAuthUser = null
     render(<TabsShell />)
