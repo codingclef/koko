@@ -466,6 +466,14 @@ describe('getSingleEventDisplayBudget', () => {
     })).toEqual({ visibleCount: 2, showOverflow: true })
   })
 
+  it('하단 내비게이션 여백을 회수한 6주 셀에서는 일정 3개를 모두 표시한다', () => {
+    expect(getSingleEventDisplayBudget({
+      ...base,
+      rowHeight: 93,
+      singleEventCount: 3,
+    })).toEqual({ visibleCount: 3, showOverflow: false })
+  })
+
   it('단일 일정 영역이 0줄이면 +N도 표시하지 않는다', () => {
     expect(getSingleEventDisplayBudget({
       rowHeight: 60,

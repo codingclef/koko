@@ -21,10 +21,7 @@ export function BottomNav({ activeTab, onTabChange }: Props) {
   const tabMode = !!onTabChange
 
   return (
-    <nav
-      className="shrink-0 bg-white dark:bg-stone-950 border-t border-stone-100 dark:border-stone-800"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
+    <nav className="shrink-0 bg-white dark:bg-stone-950 border-t border-stone-100 dark:border-stone-800">
       <div className="max-w-lg mx-auto flex">
         {navItems.map(({ href, icon: Icon, label }) => {
           const tabId = href.slice(1) // '/calendar' → 'calendar'
