@@ -9,7 +9,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getFamilyInfo, getMyFamilyMember, updateMyDisplayName, updateFamilyName } from '@/lib/family'
+import {
+  getFamilyInfo,
+  getFamilyMembers,
+  getMyFamilyMember,
+  updateMyDisplayName,
+  updateFamilyName,
+  type FamilyMember,
+} from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import { ApiClientError, postJsonWithAuth } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
@@ -17,6 +24,13 @@ import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState, Tab } from '@/types/tabs'
 
 type SettingsView = 'main' | 'account' | 'family' | 'calendar' | 'app'
+type FamilyMembersStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+interface FamilyMembersState {
+  familyId: string | null
+  members: FamilyMember[]
+  status: FamilyMembersStatus
+}
 
 const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'KR', label: '🇰🇷 한국' },
@@ -63,6 +77,12 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [familyName, setFamilyName] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [familyMembersReloadKey, setFamilyMembersReloadKey] = useState(0)
+  const [familyMembersState, setFamilyMembersState] = useState<FamilyMembersState>({
+    familyId: null,
+    members: [],
+    status: 'idle',
+  })
 
   // 가족 이름 편집
   const [editingFamilyName, setEditingFamilyName] = useState(false)
@@ -110,6 +130,29 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
       })
       .catch((e) => console.error('[SettingsTab] getFamilyInfo failed:', e))
   }, [familyId])
+
+  useEffect(() => {
+    if (!familyId) return
+
+    const requestFamilyId = familyId
+    let cancelled = false
+    setFamilyMembersState({ familyId: requestFamilyId, members: [], status: 'loading' })
+
+    getFamilyMembers(requestFamilyId)
+      .then((members) => {
+        if (cancelled) return
+        setFamilyMembersState({ familyId: requestFamilyId, members, status: 'ready' })
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error('[SettingsTab] getFamilyMembers failed:', error)
+        setFamilyMembersState({ familyId: requestFamilyId, members: [], status: 'error' })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [familyId, familyMembersReloadKey])
 
   useEffect(() => {
     if (!user) return
@@ -345,6 +388,10 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
 
   // ── 가족 ────────────────────────────────────────────────────
   if (view === 'family') {
+    const currentFamilyMembersState = familyMembersState.familyId === familyId
+      ? familyMembersState
+      : { familyId, members: [], status: 'loading' as const }
+
     return (
       <div data-testid="settings-subview-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
         <SubHeader title="가족" onBack={() => setView('main')} />
@@ -388,6 +435,93 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
             </div>
           )}
         </div>
+
+        {/* 가족 구성원 */}
+        <section
+          aria-labelledby="family-members-title"
+          data-testid="family-members-section"
+          className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 mb-4 overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div className="flex items-center gap-2">
+              <Users size={16} className="text-accent-500 dark:text-accent-300" aria-hidden="true" />
+              <h2 id="family-members-title" className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+                가족 구성원
+              </h2>
+            </div>
+            {currentFamilyMembersState.status === 'ready' && (
+              <span className="text-xs font-medium text-stone-400 dark:text-stone-500">
+                {currentFamilyMembersState.members.length}명
+              </span>
+            )}
+          </div>
+
+          {currentFamilyMembersState.status === 'loading' && (
+            <div role="status" aria-label="가족 구성원을 불러오는 중" className="border-t border-stone-100 px-4 py-4 dark:border-stone-800">
+              <div className="flex items-center gap-3">
+                <span className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-stone-100 dark:bg-stone-800" />
+                <span className="h-4 w-24 animate-pulse rounded bg-stone-100 dark:bg-stone-800" />
+              </div>
+            </div>
+          )}
+
+          {currentFamilyMembersState.status === 'error' && (
+            <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3.5 dark:border-stone-800">
+              <p className="text-sm text-stone-500 dark:text-stone-400">구성원을 불러오지 못했어요</p>
+              <button
+                type="button"
+                onClick={() => setFamilyMembersReloadKey((key) => key + 1)}
+                className="shrink-0 text-sm font-semibold text-accent-500 hover:text-accent-600 dark:text-accent-300 dark:hover:text-accent-200"
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
+
+          {currentFamilyMembersState.status === 'ready' && currentFamilyMembersState.members.length === 0 && (
+            <p className="border-t border-stone-100 px-4 py-4 text-sm text-stone-500 dark:border-stone-800 dark:text-stone-400">
+              표시할 구성원이 없어요
+            </p>
+          )}
+
+          {currentFamilyMembersState.status === 'ready' && currentFamilyMembersState.members.length > 0 && (
+            <ul className="border-t border-stone-100 dark:border-stone-800">
+              {currentFamilyMembersState.members.map((member, index) => {
+                const displayName = member.display_name.trim() || '이름 없음'
+                const isCurrentUser = member.user_id === user?.id
+                const initial = Array.from(displayName)[0]?.toUpperCase() ?? '?'
+
+                return (
+                  <li
+                    key={member.id}
+                    className={`flex min-h-[64px] items-center gap-3 px-4 py-2.5 ${
+                      index < currentFamilyMembersState.members.length - 1
+                        ? 'border-b border-stone-100 dark:border-stone-800'
+                        : ''
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        isCurrentUser
+                          ? 'bg-accent-100 text-accent-600 dark:bg-accent-950/50 dark:text-accent-300'
+                          : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400'
+                      }`}
+                    >
+                      {initial}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-stone-800 dark:text-stone-100">
+                      {displayName}
+                    </span>
+                    {isCurrentUser && (
+                      <span className="shrink-0 text-xs font-semibold text-accent-500 dark:text-accent-300">나</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
 
         {/* 가족 초대 코드 */}
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">

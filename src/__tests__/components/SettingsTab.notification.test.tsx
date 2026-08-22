@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
-import { getFamilyInfo } from '@/lib/family'
+import { getFamilyInfo, getFamilyMembers } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_THEME } from '@/lib/preferences'
@@ -13,6 +13,7 @@ jest.mock('@/lib/supabase', () => ({
 }))
 jest.mock('@/lib/family', () => ({
   getFamilyInfo: jest.fn().mockResolvedValue({ name: '우리 가족', invite_code: 'ABC123' }),
+  getFamilyMembers: jest.fn().mockResolvedValue([]),
   getMyFamilyMember: jest.fn().mockResolvedValue({ display_name: '테스트' }),
   updateMyDisplayName: jest.fn(),
 }))
@@ -43,6 +44,11 @@ async function navigateToApp() {
 async function navigateToAccount() {
   await act(async () => { render(<SettingsTab {...defaultProps} />) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /계정/ })) })
+}
+
+async function navigateToFamily() {
+  await act(async () => { render(<SettingsTab {...defaultProps} />) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /가족/ })) })
 }
 
 describe('SettingsTab 메인 화면', () => {
@@ -171,6 +177,111 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     delete (window as any).Notification
     await navigateToApp()
     expect(screen.queryByText('알림')).not.toBeInTheDocument()
+  })
+})
+
+describe('SettingsTab 가족 서브뷰 — 구성원', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    ;(getFamilyInfo as jest.Mock).mockResolvedValue({ name: '우리 가족', invite_code: 'ABC123' })
+    ;(getFamilyMembers as jest.Mock).mockResolvedValue([
+      {
+        id: 'member-1',
+        family_id: 'family-1',
+        user_id: 'user-1',
+        display_name: 'Jay',
+        role: 'member',
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'member-2',
+        family_id: 'family-1',
+        user_id: 'user-2',
+        display_name: 'JGBB',
+        role: 'member',
+        created_at: '2026-01-02T00:00:00Z',
+      },
+    ])
+  })
+
+  it('현재 가족의 구성원 수와 이름을 읽기 전용으로 표시한다', async () => {
+    await navigateToFamily()
+
+    const section = screen.getByTestId('family-members-section')
+    expect(await within(section).findByText('Jay')).toBeInTheDocument()
+    expect(within(section).getByText('JGBB')).toBeInTheDocument()
+    expect(within(section).getByText('2명')).toBeInTheDocument()
+    expect(within(section).getByText('나')).toBeInTheDocument()
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('구성원 조회 실패 시 가족 화면을 유지하고 해당 영역만 다시 시도한다', async () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {})
+    ;(getFamilyMembers as jest.Mock)
+      .mockRejectedValueOnce(new Error('failed'))
+      .mockResolvedValueOnce([
+        {
+          id: 'member-1',
+          family_id: 'family-1',
+          user_id: 'user-1',
+          display_name: 'Jay',
+          role: 'member',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ])
+
+    await navigateToFamily()
+
+    expect(await screen.findByText('구성원을 불러오지 못했어요')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '가족' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    expect(await screen.findByText('Jay')).toBeInTheDocument()
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('가족 전환 중 이전 가족의 늦은 응답을 표시하지 않는다', async () => {
+    let resolveFirst: ((members: unknown[]) => void) | undefined
+    const firstRequest = new Promise<unknown[]>((resolve) => {
+      resolveFirst = resolve
+    })
+    ;(getFamilyMembers as jest.Mock)
+      .mockReturnValueOnce(firstRequest)
+      .mockResolvedValueOnce([
+        {
+          id: 'member-2',
+          family_id: 'family-2',
+          user_id: 'user-2',
+          display_name: '새 가족',
+          role: 'member',
+          created_at: '2026-01-02T00:00:00Z',
+        },
+      ])
+
+    let renderResult: ReturnType<typeof render>
+    await act(async () => {
+      renderResult = render(<SettingsTab {...defaultProps} />)
+    })
+    fireEvent.click(screen.getByRole('button', { name: /가족/ }))
+    renderResult!.rerender(<SettingsTab {...defaultProps} familyId="family-2" />)
+
+    expect(await screen.findByText('새 가족')).toBeInTheDocument()
+
+    await act(async () => {
+      resolveFirst?.([
+        {
+          id: 'member-1',
+          family_id: 'family-1',
+          user_id: 'user-1',
+          display_name: '이전 가족',
+          role: 'member',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ])
+      await firstRequest
+    })
+
+    expect(screen.queryByText('이전 가족')).not.toBeInTheDocument()
+    expect(screen.getByText('새 가족')).toBeInTheDocument()
   })
 })
 

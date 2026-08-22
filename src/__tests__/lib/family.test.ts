@@ -1,9 +1,9 @@
-import { getFamilyInfo, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
+import { getFamilyInfo, getFamilyMembers, getMyFamilyMember, updateMyDisplayName } from '@/lib/family'
 
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
   const chain: Record<string, unknown> = {}
-  ;['select', 'update', 'eq'].forEach((m) => {
+  ;['select', 'update', 'eq', 'order'].forEach((m) => {
     chain[m] = jest.fn().mockReturnValue(chain)
   })
   chain.single = jest.fn().mockReturnValue(p)
@@ -45,6 +45,26 @@ describe('getMyFamilyMember', () => {
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
     await expect(getMyFamilyMember('user-1')).rejects.toEqual({ message: 'fetch error' })
+  })
+})
+
+describe('getFamilyMembers', () => {
+  it('가족 구성원을 가입 순서로 반환한다', async () => {
+    const mockData = [
+      { id: 'fm-1', family_id: 'family-1', user_id: 'user-1', display_name: '나' },
+      { id: 'fm-2', family_id: 'family-1', user_id: 'user-2', display_name: '가족' },
+    ]
+    const chain = makeChain({ data: mockData, error: null })
+    mockFrom.mockReturnValue(chain)
+
+    await expect(getFamilyMembers('family-1')).resolves.toEqual(mockData)
+    expect(chain.eq).toHaveBeenCalledWith('family_id', 'family-1')
+    expect(chain.order).toHaveBeenCalledWith('created_at', { ascending: true })
+  })
+
+  it('조회 오류를 전달한다', async () => {
+    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
+    await expect(getFamilyMembers('family-1')).rejects.toEqual({ message: 'fetch error' })
   })
 })
 

@@ -25,6 +25,16 @@ export async function getMyFamilyMember(userId: string): Promise<FamilyMember | 
   return data
 }
 
+export async function getFamilyMembers(familyId: string): Promise<FamilyMember[]> {
+  const { data, error } = await supabase
+    .from('family_members')
+    .select('*')
+    .eq('family_id', familyId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 export async function updateMyDisplayName(userId: string, displayName: string): Promise<void> {
   const { error } = await supabase
     .from('family_members')
