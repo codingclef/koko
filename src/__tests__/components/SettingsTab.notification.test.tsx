@@ -3,6 +3,7 @@ import { SettingsTab } from '@/components/tabs/SettingsTab'
 import { getFamilyInfo } from '@/lib/family'
 import { registerPushSubscription } from '@/lib/push'
 import { supabase } from '@/lib/supabase'
+import { DEFAULT_THEME } from '@/lib/preferences'
 import type { User } from '@supabase/supabase-js'
 
 jest.mock('@/lib/supabase', () => ({
@@ -58,7 +59,7 @@ describe('SettingsTab 메인 화면', () => {
     expect(screen.getByText('앱')).toBeInTheDocument()
   })
 
-  it('계정 메뉴에 이메일 서브타이틀이 표시된다', async () => {
+  it('상단 사용자 요약에 이메일이 표시된다', async () => {
     await act(async () => { render(<SettingsTab {...defaultProps} />) })
     expect(screen.getByText('test@example.com')).toBeInTheDocument()
   })
@@ -67,6 +68,37 @@ describe('SettingsTab 메인 화면', () => {
     await act(async () => { render(<SettingsTab {...defaultProps} />) })
     await act(async () => {})
     expect(screen.getByText('우리 가족')).toBeInTheDocument()
+  })
+
+  it('계정과 환경 설정 메뉴를 명확한 그룹과 아이콘으로 구분한다', async () => {
+    await act(async () => { render(<SettingsTab {...defaultProps} />) })
+
+    expect(screen.getByRole('heading', { name: '나와 가족' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '화면 및 알림' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /계정/ }).querySelector('svg')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /캘린더/ }).querySelector('svg')).toBeInTheDocument()
+  })
+
+  it('캘린더와 앱 메뉴에 현재 설정 요약을 표시한다', async () => {
+    await act(async () => {
+      render(
+        <SettingsTab
+          {...defaultProps}
+          preferences={{
+            user_id: 'user-1',
+            holiday_countries: ['KR', 'JP'],
+            show_lunar: true,
+            app_theme: DEFAULT_THEME,
+            last_label_color: null,
+            created_at: '',
+            updated_at: '',
+          }}
+        />
+      )
+    })
+
+    expect(screen.getByText('휴일 2개 국가 · 음력 표시')).toBeInTheDocument()
+    expect(screen.getByText('알림 및 테마 · 탠저린')).toBeInTheDocument()
   })
 
   it('메인 뷰는 max-w 제약 없이 풀 너비 컨테이너를 사용한다', async () => {
