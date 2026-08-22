@@ -158,7 +158,8 @@ export function TabsShell() {
   if (needsFamilyOnboarding) return null
 
   const handleTabChange = (tab: Tab) => {
-    router.replace(tab === 'calendar' ? '/calendar' : `/calendar?tab=${tab}`)
+    const href = tab === 'calendar' ? '/calendar' : `/calendar?tab=${tab}`
+    window.history.replaceState(null, '', href)
   }
 
   return (

@@ -173,6 +173,7 @@ setItems((prev) =>
 ### 남은 규칙
 
 - 탭을 다시 개별 route page로 쪼개지 않는다.
+- 셸 내부 탭 변경에는 `router.replace()`를 사용하지 않는다. search param은 History API로 갱신해 `TabsShell` 재마운트와 시작 splash 재노출을 막는다.
 - 첫 마운트 전에는 보조 탭 내부 effect가 실행되지 않으므로 선행 초기화가 필요한 작업은 공유 idle warmup에 명시한다.
 - 독립 route가 필요하면 bridge 또는 외부 링크 호환 목적이 분명해야 한다.
 

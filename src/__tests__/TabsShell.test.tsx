@@ -80,11 +80,20 @@ jest.mock('@/components/tabs/SettingsTab', () => ({
 }))
 
 jest.mock('@/components/BottomNav', () => ({
-  BottomNav: () => <div data-testid="bottom-nav" />,
+  BottomNav: ({ onTabChange }: {
+    onTabChange: (tab: 'calendar' | 'reminders' | 'settings') => void
+  }) => (
+    <div data-testid="bottom-nav">
+      <button onClick={() => onTabChange('calendar')}>캘린더 탭</button>
+      <button onClick={() => onTabChange('reminders')}>리마인더 탭</button>
+      <button onClick={() => onTabChange('settings')}>설정 탭</button>
+    </div>
+  ),
 }))
 
 describe('TabsShell', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/calendar')
     mockReplace.mockClear()
     mockReloadFamily.mockClear()
     mockReloadCalendars.mockClear()
@@ -96,6 +105,10 @@ describe('TabsShell', () => {
     mockCalendarsError = null
     mockAuthUser = { id: 'user-1' }
     jest.useRealTimers()
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
   })
 
   it('인증 로딩 중에는 AppSplash를 표시한다', () => {
@@ -168,6 +181,29 @@ describe('TabsShell', () => {
     render(<TabsShell />)
     expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
     expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
+  })
+
+  it('탭 전환은 셸을 다시 탐색하지 않고 URL만 교체한다', async () => {
+    const replaceState = jest.spyOn(window.history, 'replaceState')
+    const user = userEvent.setup()
+
+    render(<TabsShell />)
+    await user.click(screen.getByRole('button', { name: '리마인더 탭' }))
+
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/calendar?tab=reminders')
+    expect(mockReplace).not.toHaveBeenCalled()
+    replaceState.mockRestore()
+  })
+
+  it('다른 탭으로 전환하면 리마인더 상세 파라미터를 제거한다', async () => {
+    window.history.replaceState(null, '', '/calendar?tab=reminders&list=list-1')
+    const user = userEvent.setup()
+
+    render(<TabsShell />)
+    await user.click(screen.getByRole('button', { name: '설정 탭' }))
+
+    expect(window.location.pathname).toBe('/calendar')
+    expect(window.location.search).toBe('?tab=settings')
   })
 
   it('캘린더 진입 후 idle 시점에 리마인더와 설정 탭을 hidden 상태로 예열한다', async () => {
