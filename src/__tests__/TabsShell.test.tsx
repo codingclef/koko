@@ -13,6 +13,8 @@ let mockFamilyError: Error | null = null
 let mockCalendarsError: Error | null = null
 const mockReloadFamily = jest.fn().mockResolvedValue(undefined)
 const mockReloadCalendars = jest.fn().mockResolvedValue(undefined)
+const mockLoadReminderTab = jest.fn()
+const mockLoadSettingsTab = jest.fn()
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
@@ -52,6 +54,11 @@ jest.mock('@/lib/supabase', () => ({
 
 jest.mock('@/lib/push', () => ({
   registerPushSubscription: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock('@/components/tab-loaders', () => ({
+  loadReminderTab: () => mockLoadReminderTab(),
+  loadSettingsTab: () => mockLoadSettingsTab(),
 }))
 
 jest.mock('@/components/AppSplash', () => ({
@@ -104,6 +111,10 @@ describe('TabsShell', () => {
     mockFamilyError = null
     mockCalendarsError = null
     mockAuthUser = { id: 'user-1' }
+    mockLoadReminderTab.mockReset()
+    mockLoadReminderTab.mockResolvedValue(() => <div data-testid="reminder-tab" />)
+    mockLoadSettingsTab.mockReset()
+    mockLoadSettingsTab.mockResolvedValue(() => <div data-testid="settings-tab" />)
     jest.useRealTimers()
   })
 
@@ -231,6 +242,31 @@ describe('TabsShell', () => {
     })
 
     expect(screen.getByTestId('settings-tab').parentElement).toHaveClass('hidden')
+  })
+
+  it('셸 준비 직후 리마인더 코드는 예열하지만 탭 데이터 effect는 idle 전까지 시작하지 않는다', () => {
+    render(<TabsShell />)
+
+    expect(mockLoadReminderTab).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
+  })
+
+  it('리마인더 코드 예열 실패가 캘린더 셸을 다시 splash로 돌리지 않는다', async () => {
+    const preloadError = new Error('chunk failed')
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    mockLoadReminderTab.mockRejectedValueOnce(preloadError)
+
+    render(<TabsShell />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByTestId('app-splash')).not.toBeInTheDocument()
+    expect(screen.getByTestId('calendar-tab')).toBeInTheDocument()
+    expect(warn).toHaveBeenCalledWith(
+      '[TabsShell] reminder tab chunk preload failed:',
+      preloadError
+    )
   })
 
   it('초기 진입 시 자동으로 푸시 구독을 요청하지 않는다', () => {

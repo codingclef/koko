@@ -114,6 +114,7 @@ DB migration -> src/types/database.ts -> src/lib/* -> src/hooks/* -> src/app/* -
 ## 9. Background Warmup
 
 - 사용자 입력과 무관한 chunk/data warmup은 `src/lib/idle-work.ts`의 공유 queue를 사용한다.
+- 첫 탭 전환에 필요한 리마인더 코드 청크는 셸 준비 직후 요청하되, 실제 탭 마운트와 데이터 effect는 idle queue에서 시작한다.
 - 한 idle slot에서는 한 작업만 실행하고, 사용자 접근 가능성이 높은 작업부터 `high`, `normal`, `low` 우선순위를 부여한다.
 - 예약된 작업은 컴포넌트 cleanup에서 취소하며, 사용자 진입 경로는 idle warmup 완료를 전제로 하지 않는다.
 
