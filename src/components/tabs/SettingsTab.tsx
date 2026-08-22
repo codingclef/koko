@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import {
   LogOut, Share2, Check, Users, Pencil, X,
   Bell, BellOff, ChevronLeft, ChevronRight, UserPlus,
+  UserRound, CalendarDays, Smartphone,
+  type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getFamilyInfo, getMyFamilyMember, updateMyDisplayName, updateFamilyName } from '@/lib/family'
@@ -27,6 +29,13 @@ interface Props extends AuthState {
   preferences: UserPreferences | null
   updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
   appRole: 'admin' | 'member'
+}
+
+interface SettingsMenuItem {
+  view: SettingsView
+  label: string
+  subtitle: string
+  icon: LucideIcon
 }
 
 
@@ -622,34 +631,86 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
   }
 
   // ── 메인 ────────────────────────────────────────────────────
-  const menuItems: { view: SettingsView; label: string; subtitle?: string }[] = [
-    { view: 'account', label: '계정', subtitle: user?.email },
-    { view: 'family', label: '가족', subtitle: familyName ?? undefined },
-    { view: 'calendar', label: '캘린더' },
-    { view: 'app', label: '앱' },
+  const profileName = myDisplayName?.trim() || user?.email?.split('@')[0] || 'Koko 사용자'
+  const profileInitial = Array.from(profileName)[0]?.toUpperCase() ?? 'K'
+  const holidayCountryCount = preferences?.holiday_countries?.length ?? 0
+  const currentThemeLabel = APP_THEMES.find(
+    ({ key }) => key === (preferences?.app_theme ?? DEFAULT_THEME)
+  )?.label ?? '기본'
+
+  const menuSections: { id: string; label: string; items: SettingsMenuItem[] }[] = [
+    {
+      id: 'people',
+      label: '나와 가족',
+      items: [
+        { view: 'account', label: '계정', subtitle: '이름 및 로그인 정보', icon: UserRound },
+        { view: 'family', label: '가족', subtitle: familyName ?? '가족 정보와 초대', icon: Users },
+      ],
+    },
+    {
+      id: 'preferences',
+      label: '화면 및 알림',
+      items: [
+        {
+          view: 'calendar',
+          label: '캘린더',
+          subtitle: `휴일 ${holidayCountryCount ? `${holidayCountryCount}개 국가` : '표시 안 함'} · 음력 ${(preferences?.show_lunar ?? false) ? '표시' : '숨김'}`,
+          icon: CalendarDays,
+        },
+        { view: 'app', label: '앱', subtitle: `알림 및 테마 · ${currentThemeLabel}`, icon: Smartphone },
+      ],
+    },
   ]
 
   return (
     <div data-testid="settings-main-container" className="min-h-full px-4 pt-2 pb-24 sm:px-6">
-      <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-6">설정</h1>
+      <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">설정</h1>
 
-      <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 overflow-hidden">
-        {menuItems.map(({ view: target, label, subtitle }, i) => (
-          <button
-            key={target}
-            onClick={() => setView(target)}
-            className={`w-full flex items-center justify-between px-4 py-4 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-colors text-left ${
-              i < menuItems.length - 1 ? 'border-b border-stone-100 dark:border-stone-800' : ''
-            }`}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-stone-800 dark:text-stone-100">{label}</p>
-              {subtitle && (
-                <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5 truncate">{subtitle}</p>
-              )}
+      <div className="mt-5 flex items-center gap-3 border-b border-stone-200 pb-5 dark:border-stone-800">
+        <div
+          aria-hidden="true"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-100 text-lg font-bold text-accent-600 dark:bg-accent-950/50 dark:text-accent-300"
+        >
+          {profileInitial}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-stone-800 dark:text-stone-100">{profileName}</p>
+          {user?.email && (
+            <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-stone-400">{user.email}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-6">
+        {menuSections.map((section) => (
+          <section key={section.id} aria-labelledby={`settings-${section.id}`}>
+            <h2
+              id={`settings-${section.id}`}
+              className="mb-2 px-1 text-xs font-semibold text-stone-500 dark:text-stone-400"
+            >
+              {section.label}
+            </h2>
+            <div className="overflow-hidden rounded-lg border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+              {section.items.map(({ view: target, label, subtitle, icon: Icon }, index) => (
+                <button
+                  key={target}
+                  onClick={() => setView(target)}
+                  className={`flex min-h-[72px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-stone-50 active:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-300 dark:hover:bg-stone-800/70 dark:active:bg-stone-800 ${
+                    index < section.items.length - 1 ? 'border-b border-stone-100 dark:border-stone-800' : ''
+                  }`}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-500 dark:bg-accent-950/40 dark:text-accent-300">
+                    <Icon size={19} strokeWidth={1.9} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-stone-800 dark:text-stone-100">{label}</span>
+                    <span className="mt-0.5 block truncate text-xs leading-5 text-stone-500 dark:text-stone-400">{subtitle}</span>
+                  </span>
+                  <ChevronRight size={18} strokeWidth={1.8} className="shrink-0 text-stone-400 dark:text-stone-500" aria-hidden="true" />
+                </button>
+              ))}
             </div>
-            <ChevronRight size={16} className="text-stone-400 dark:text-stone-500 shrink-0" />
-          </button>
+          </section>
         ))}
       </div>
     </div>
