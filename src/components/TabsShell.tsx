@@ -12,16 +12,17 @@ import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { type Tab, TABS } from '@/types/tabs'
 import { AppSplash } from '@/components/AppSplash'
 import { scheduleIdleWork } from '@/lib/idle-work'
+import { loadReminderTab, loadSettingsTab } from '@/components/tab-loaders'
 
 const IDLE_PRELOAD_TABS: Tab[] = ['reminders', 'settings']
 
 const ReminderTab = dynamic(
-  () => import('@/components/tabs/ReminderTab').then((mod) => mod.ReminderTab),
+  loadReminderTab,
   { loading: () => <TabChunkFallback /> }
 )
 
 const SettingsTab = dynamic(
-  () => import('@/components/tabs/SettingsTab').then((mod) => mod.SettingsTab),
+  loadSettingsTab,
   { loading: () => <TabChunkFallback /> }
 )
 
@@ -95,6 +96,11 @@ export function TabsShell() {
 
   useEffect(() => {
     if (isInitializing || startupError || !user || needsFamilyOnboarding) return
+
+    // Warm the first likely tab transition without mounting it or starting its data effects.
+    void loadReminderTab().catch((error) => {
+      console.warn('[TabsShell] reminder tab chunk preload failed:', error)
+    })
 
     // Let the calendar paint first, then hidden-mount one secondary tab per idle slot.
     const cancelPreloads = IDLE_PRELOAD_TABS.map((tab) => scheduleIdleWork(() => {
