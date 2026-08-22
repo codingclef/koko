@@ -1,12 +1,12 @@
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 import type { RecurrenceRule } from '@/types/recurrence'
+export { getFamilyMembers, type FamilyMember } from '@/lib/family'
 
 export type Calendar = Database['public']['Tables']['calendars']['Row']
 export type CalendarMember = Database['public']['Tables']['calendar_members']['Row']
 export type CalendarEvent = Database['public']['Tables']['events']['Row']
 export type EventReminder = Database['public']['Tables']['event_reminders']['Row']
-export type FamilyMember = Database['public']['Tables']['family_members']['Row']
 type RecurrenceRuleRow = Database['public']['Tables']['recurrence_rules']['Row']
 type RecurrenceSeriesRow = Database['public']['Tables']['recurrence_series']['Row']
 
@@ -46,18 +46,6 @@ export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [
   { label: '2일 전', minutes: 2880 },
   { label: '1주 전', minutes: 10080 },
 ]
-
-// ── Family Members ─────────────────────────────────────────
-
-export async function getFamilyMembers(familyId: string): Promise<FamilyMember[]> {
-  const { data, error } = await supabase
-    .from('family_members')
-    .select('*')
-    .eq('family_id', familyId)
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  return data ?? []
-}
 
 // ── Calendars ──────────────────────────────────────────────
 
