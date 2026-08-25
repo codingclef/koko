@@ -241,4 +241,69 @@ describe('repairPushSubscription', () => {
     expect(mockSubscribe).not.toHaveBeenCalled()
     expect(mockPostJsonWithAuth).not.toHaveBeenCalled()
   })
+
+  it('새 구독 생성이 일시적으로 실패하면 한 번 다시 생성한다', async () => {
+    const existing = {
+      endpoint: mockSubscriptionJSON.endpoint,
+      toJSON: () => mockSubscriptionJSON,
+      unsubscribe: mockUnsubscribe,
+    }
+    const replacementJSON = {
+      endpoint: 'https://push.example.com/replacement',
+      keys: { p256dh: 'new-p256dh', auth: 'new-auth' },
+    }
+    mockGetSubscription
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce(existing)
+    mockSubscribe
+      .mockRejectedValueOnce(new Error('temporary subscribe failure'))
+      .mockResolvedValueOnce({ toJSON: () => replacementJSON })
+
+    await expect(repairPushSubscription()).resolves.toBe('connected')
+    expect(mockSubscribe).toHaveBeenCalledTimes(2)
+    expect(mockPostJsonWithAuth).toHaveBeenCalledTimes(1)
+  })
+
+  it('새 구독 저장이 일시적으로 실패하면 생성된 구독의 저장만 재시도한다', async () => {
+    const existing = {
+      endpoint: mockSubscriptionJSON.endpoint,
+      toJSON: () => mockSubscriptionJSON,
+      unsubscribe: mockUnsubscribe,
+    }
+    const replacementJSON = {
+      endpoint: 'https://push.example.com/replacement',
+      keys: { p256dh: 'new-p256dh', auth: 'new-auth' },
+    }
+    const replacement = {
+      endpoint: replacementJSON.endpoint,
+      toJSON: () => replacementJSON,
+    }
+    mockGetSubscription
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce(replacement)
+    mockSubscribe.mockResolvedValueOnce(replacement)
+    mockPostJsonWithAuth
+      .mockRejectedValueOnce(new Error('temporary persistence failure'))
+      .mockResolvedValueOnce(undefined)
+
+    await expect(repairPushSubscription()).resolves.toBe('connected')
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
+    expect(mockPostJsonWithAuth).toHaveBeenCalledTimes(2)
+  })
+
+  it('복구 재시도도 실패하면 오류를 반환하고 추가 반복은 하지 않는다', async () => {
+    const existing = {
+      endpoint: mockSubscriptionJSON.endpoint,
+      toJSON: () => mockSubscriptionJSON,
+      unsubscribe: mockUnsubscribe,
+    }
+    mockGetSubscription
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce(null)
+    mockSubscribe.mockRejectedValue(new Error('subscribe unavailable'))
+
+    await expect(repairPushSubscription()).rejects.toThrow('subscribe unavailable')
+    expect(mockSubscribe).toHaveBeenCalledTimes(2)
+    expect(mockPostJsonWithAuth).not.toHaveBeenCalled()
+  })
 })

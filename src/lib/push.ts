@@ -75,6 +75,23 @@ async function ensurePushSubscription(): Promise<PushConnectionStatus> {
   return 'connected'
 }
 
+async function createAndPersistReplacement(
+  registration: ServiceWorkerRegistration,
+  previousEndpoint?: string
+): Promise<void> {
+  try {
+    const subscription = await createPushSubscription(registration)
+    await persistPushSubscription(subscription, previousEndpoint)
+  } catch {
+    // subscribe() may have succeeded before persistence failed; reuse it when possible.
+    const current = await registration.pushManager.getSubscription()
+    const retrySubscription = current && current.endpoint !== previousEndpoint
+      ? current
+      : await createPushSubscription(registration)
+    await persistPushSubscription(retrySubscription, previousEndpoint)
+  }
+}
+
 function ensurePushSubscriptionShared(): Promise<PushConnectionStatus> {
   if (syncInFlight) return syncInFlight
 
@@ -135,7 +152,6 @@ export async function repairPushSubscription(): Promise<PushConnectionStatus> {
     }
   }
 
-  const subscription = await createPushSubscription(registration)
-  await persistPushSubscription(subscription, previousEndpoint)
+  await createAndPersistReplacement(registration, previousEndpoint)
   return 'connected'
 }
