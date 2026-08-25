@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   LogOut, Share2, Check, Users, Pencil, X,
   Bell, BellOff, ChevronLeft, ChevronRight, UserPlus,
-  UserRound, CalendarDays, Smartphone,
+  UserRound, CalendarDays, Smartphone, RefreshCw,
   type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -17,7 +17,12 @@ import {
   updateFamilyName,
   type FamilyMember,
 } from '@/lib/family'
-import { registerPushSubscription } from '@/lib/push'
+import {
+  registerPushSubscription,
+  repairPushSubscription,
+  syncPushSubscriptionIfGranted,
+  type PushConnectionStatus,
+} from '@/lib/push'
 import { ApiClientError, postJsonWithAuth } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
@@ -25,6 +30,7 @@ import type { AuthState, Tab } from '@/types/tabs'
 
 type SettingsView = 'main' | 'account' | 'family' | 'calendar' | 'app'
 type FamilyMembersStatus = 'idle' | 'loading' | 'ready' | 'error'
+type NotificationConnectionState = PushConnectionStatus | 'checking' | 'error'
 
 interface FamilyMembersState {
   familyId: string | null
@@ -120,6 +126,30 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     () => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported')
   )
   const [enablingNotif, setEnablingNotif] = useState(false)
+  const [repairingNotif, setRepairingNotif] = useState(false)
+  const [notifConnection, setNotifConnection] = useState<NotificationConnectionState>(
+    notifPermission === 'unsupported' ? 'unsupported' : 'checking'
+  )
+
+  useEffect(() => {
+    if (view !== 'app' || notifPermission !== 'granted') return
+
+    let cancelled = false
+    setNotifConnection('checking')
+    syncPushSubscriptionIfGranted()
+      .then((status) => {
+        if (!cancelled) setNotifConnection(status)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error('[SettingsTab] push subscription sync failed:', error)
+        setNotifConnection('error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [notifPermission, view])
 
   useEffect(() => {
     if (!familyId) return
@@ -165,10 +195,28 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     if (!user) return
     setEnablingNotif(true)
     try {
-      await registerPushSubscription()
+      const status = await registerPushSubscription()
       setNotifPermission(Notification.permission)
+      setNotifConnection(status)
+    } catch (error) {
+      console.error('[SettingsTab] registerPushSubscription failed:', error)
+      setNotifConnection('error')
     } finally {
       setEnablingNotif(false)
+    }
+  }
+
+  const handleRepairNotifications = async () => {
+    setRepairingNotif(true)
+    setNotifConnection('checking')
+    try {
+      const status = await repairPushSubscription()
+      setNotifConnection(status)
+    } catch (error) {
+      console.error('[SettingsTab] repairPushSubscription failed:', error)
+      setNotifConnection('error')
+    } finally {
+      setRepairingNotif(false)
     }
   }
 
@@ -704,9 +752,27 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
           <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
             <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">알림</p>
             {notifPermission === 'granted' && (
-              <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
-                <Bell size={15} className="text-accent-400" />
-                알림이 허용되어 있습니다
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
+                  {notifConnection === 'connected' ? (
+                    <Bell size={15} className="text-accent-400" />
+                  ) : (
+                    <BellOff size={15} />
+                  )}
+                  {notifConnection === 'checking' && '알림 연결을 확인하고 있습니다'}
+                  {notifConnection === 'connected' && '알림이 연결되어 있습니다'}
+                  {notifConnection === 'error' && '알림 연결을 확인하지 못했습니다'}
+                  {['permission-required', 'blocked', 'unsupported'].includes(notifConnection) &&
+                    '알림 연결이 필요합니다'}
+                </div>
+                <button
+                  onClick={() => void handleRepairNotifications()}
+                  disabled={repairingNotif || notifConnection === 'checking'}
+                  className="flex min-h-[44px] items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-800"
+                >
+                  <RefreshCw size={15} className={repairingNotif ? 'animate-spin' : undefined} />
+                  {repairingNotif ? '다시 연결 중...' : '알림 다시 연결'}
+                </button>
               </div>
             )}
             {notifPermission === 'denied' && (

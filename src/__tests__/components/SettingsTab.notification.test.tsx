@@ -1,7 +1,11 @@
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import { SettingsTab } from '@/components/tabs/SettingsTab'
 import { getFamilyInfo, getFamilyMembers } from '@/lib/family'
-import { registerPushSubscription } from '@/lib/push'
+import {
+  registerPushSubscription,
+  repairPushSubscription,
+  syncPushSubscriptionIfGranted,
+} from '@/lib/push'
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_THEME } from '@/lib/preferences'
 import type { User } from '@supabase/supabase-js'
@@ -18,7 +22,9 @@ jest.mock('@/lib/family', () => ({
   updateMyDisplayName: jest.fn(),
 }))
 jest.mock('@/lib/push', () => ({
-  registerPushSubscription: jest.fn().mockResolvedValue(undefined),
+  registerPushSubscription: jest.fn().mockResolvedValue('connected'),
+  repairPushSubscription: jest.fn().mockResolvedValue('connected'),
+  syncPushSubscriptionIfGranted: jest.fn().mockResolvedValue('connected'),
 }))
 jest.mock('next/navigation', () => ({ useRouter: () => ({ replace: jest.fn() }) }))
 
@@ -55,6 +61,9 @@ describe('SettingsTab 메인 화면', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(getFamilyInfo as jest.Mock).mockResolvedValue({ name: '우리 가족', invite_code: 'ABC123' })
+    ;(registerPushSubscription as jest.Mock).mockResolvedValue('connected')
+    ;(repairPushSubscription as jest.Mock).mockResolvedValue('connected')
+    ;(syncPushSubscriptionIfGranted as jest.Mock).mockResolvedValue('connected')
   })
 
   it('4개 카테고리 메뉴가 표시된다', async () => {
@@ -129,6 +138,9 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(getFamilyInfo as jest.Mock).mockResolvedValue({ name: '우리 가족', invite_code: 'ABC123' })
+    ;(registerPushSubscription as jest.Mock).mockResolvedValue('connected')
+    ;(repairPushSubscription as jest.Mock).mockResolvedValue('connected')
+    ;(syncPushSubscriptionIfGranted as jest.Mock).mockResolvedValue('connected')
   })
 
   it('권한이 default일 때 "알림 허용하기" 버튼이 표시된다', async () => {
@@ -144,13 +156,15 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     expect(container.className).not.toContain('py-8')
   })
 
-  it('권한이 granted일 때 허용 상태 메시지가 표시된다', async () => {
+  it('권한이 granted일 때 실제 구독을 동기화하고 연결 상태를 표시한다', async () => {
     Object.defineProperty(window, 'Notification', {
       value: { permission: 'granted' },
       configurable: true,
     })
     await navigateToApp()
-    expect(screen.getByText('알림이 허용되어 있습니다')).toBeInTheDocument()
+    expect(await screen.findByText('알림이 연결되어 있습니다')).toBeInTheDocument()
+    expect(syncPushSubscriptionIfGranted).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: '알림 다시 연결' })).toBeInTheDocument()
   })
 
   it('권한이 denied일 때 차단 안내 메시지가 표시된다', async () => {
@@ -170,6 +184,40 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     await navigateToApp()
     await act(async () => { fireEvent.click(screen.getByText('알림 허용하기')) })
     expect(registerPushSubscription).toHaveBeenCalled()
+  })
+
+  it('"알림 다시 연결" 클릭 시 기존 구독 복구를 실행한다', async () => {
+    Object.defineProperty(window, 'Notification', {
+      value: { permission: 'granted' },
+      configurable: true,
+    })
+    await navigateToApp()
+    await screen.findByText('알림이 연결되어 있습니다')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '알림 다시 연결' }))
+    })
+
+    expect(repairPushSubscription).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('알림이 연결되어 있습니다')).toBeInTheDocument()
+  })
+
+  it('구독 복구 실패 시 연결 오류 상태를 유지한다', async () => {
+    Object.defineProperty(window, 'Notification', {
+      value: { permission: 'granted' },
+      configurable: true,
+    })
+    ;(repairPushSubscription as jest.Mock).mockRejectedValueOnce(new Error('repair failed'))
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {})
+    await navigateToApp()
+    await screen.findByText('알림이 연결되어 있습니다')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '알림 다시 연결' }))
+    })
+
+    expect(screen.getByText('알림 연결을 확인하지 못했습니다')).toBeInTheDocument()
+    expect(error).toHaveBeenCalled()
   })
 
   it('Notification 미지원 환경에서는 알림 섹션이 표시되지 않는다', async () => {

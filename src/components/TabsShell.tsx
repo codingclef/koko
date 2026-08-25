@@ -13,6 +13,7 @@ import { type Tab, TABS } from '@/types/tabs'
 import { AppSplash } from '@/components/AppSplash'
 import { scheduleIdleWork } from '@/lib/idle-work'
 import { loadReminderTab, loadSettingsTab } from '@/components/tab-loaders'
+import { syncPushSubscriptionIfGranted } from '@/lib/push'
 
 const IDLE_PRELOAD_TABS: Tab[] = ['reminders', 'settings']
 
@@ -102,6 +103,13 @@ export function TabsShell() {
       console.warn('[TabsShell] reminder tab chunk preload failed:', error)
     })
 
+    // Existing notification permission needs no prompt; refresh and rebind after first paint.
+    const cancelPushSync = scheduleIdleWork(() => {
+      void syncPushSubscriptionIfGranted().catch((error) => {
+        console.warn('[TabsShell] push subscription sync failed:', error)
+      })
+    }, 'normal')
+
     // Let the calendar paint first, then hidden-mount one secondary tab per idle slot.
     const cancelPreloads = IDLE_PRELOAD_TABS.map((tab) => scheduleIdleWork(() => {
       setMountedTabs((prev) => {
@@ -112,7 +120,10 @@ export function TabsShell() {
       })
     }, 'low'))
 
-    return () => cancelPreloads.forEach((cancel) => cancel())
+    return () => {
+      cancelPushSync()
+      cancelPreloads.forEach((cancel) => cancel())
+    }
   }, [isInitializing, needsFamilyOnboarding, startupError, user])
 
   const handleStartupRetry = async () => {
