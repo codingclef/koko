@@ -1,13 +1,26 @@
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting())
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim())
+})
+
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? {}
+  const options = {
+    body: data.body ?? '',
+    icon: '/icons/icon-192.png?v=2',
+    badge: '/icons/icon-192.png?v=2',
+    data: { url: data.url ?? '/' },
+  }
+
+  if (typeof data.tag === 'string' && data.tag) {
+    options.tag = data.tag
+  }
+
   event.waitUntil(
-    self.registration.showNotification(data.title ?? 'Koko', {
-      body: data.body ?? '',
-      icon: '/icons/icon-192.png?v=2',
-      badge: '/icons/icon-192.png?v=2',
-      tag: data.tag ?? 'koko-reminder',
-      data: { url: data.url ?? '/' },
-    })
+    self.registration.showNotification(data.title ?? 'Koko', options)
   )
 })
 

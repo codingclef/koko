@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TabsShell } from '@/components/TabsShell'
-import { registerPushSubscription } from '@/lib/push'
+import { registerPushSubscription, syncPushSubscriptionIfGranted } from '@/lib/push'
 
 const mockReplace = jest.fn()
 let mockTabParam: string | null = null
@@ -54,6 +54,7 @@ jest.mock('@/lib/supabase', () => ({
 
 jest.mock('@/lib/push', () => ({
   registerPushSubscription: jest.fn().mockResolvedValue(undefined),
+  syncPushSubscriptionIfGranted: jest.fn().mockResolvedValue('connected'),
 }))
 
 jest.mock('@/components/tab-loaders', () => ({
@@ -104,6 +105,8 @@ describe('TabsShell', () => {
     mockReplace.mockClear()
     mockReloadFamily.mockClear()
     mockReloadCalendars.mockClear()
+    ;(registerPushSubscription as jest.Mock).mockClear()
+    ;(syncPushSubscriptionIfGranted as jest.Mock).mockClear()
     mockTabParam = null
     mockAuthLoading = false
     mockFamilyLoading = false
@@ -223,6 +226,16 @@ describe('TabsShell', () => {
     render(<TabsShell />)
 
     expect(screen.getByTestId('calendar-tab').parentElement).not.toHaveClass('hidden')
+    expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument()
+
+    await act(async () => {
+      jest.advanceTimersByTime(1300)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(syncPushSubscriptionIfGranted).toHaveBeenCalledTimes(1)
     expect(screen.queryByTestId('reminder-tab')).not.toBeInTheDocument()
     expect(screen.queryByTestId('settings-tab')).not.toBeInTheDocument()
 
