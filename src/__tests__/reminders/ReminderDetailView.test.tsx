@@ -812,6 +812,120 @@ describe('ReminderDetailView', () => {
     )
   })
 
+  it('floating 추가는 저장 응답 전에 낙관적 항목을 표시하고 입력값을 비운다', async () => {
+    let resolveAdd: ((item: Awaited<ReturnType<typeof addReminderItem>>) => void) | null = null
+    const addPromise = new Promise<Awaited<ReturnType<typeof addReminderItem>>>((resolve) => {
+      resolveAdd = resolve
+    })
+    mockAddReminderItem.mockReturnValueOnce(addPromise)
+    const user = userEvent.setup()
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const input = within(await screen.findByTestId('bottom-add-item-input'))
+      .getByPlaceholderText('아이템 추가...')
+    await user.type(input, '버터')
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByText('버터')).toBeInTheDocument()
+    expect(input).toHaveValue('')
+    expect(input).toHaveAttribute('readonly')
+    expect(mockBroadcast).not.toHaveBeenCalled()
+
+    await user.click(screen.getByTestId('reminder-detail-scroll'))
+    expect(screen.getByTestId('bottom-add-item-input')).toBeInTheDocument()
+
+    await act(async () => {
+      resolveAdd?.({
+        id: 'item-new',
+        list_id: 'list-1',
+        created_by: 'user-1',
+        name: '버터',
+        is_checked: false,
+        checked_by: null,
+        checked_at: null,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:01Z',
+      })
+      await addPromise
+    })
+
+    expect(screen.getByText('버터')).toBeInTheDocument()
+    expect(input).not.toHaveAttribute('readonly')
+    expect(mockBroadcast).toHaveBeenCalled()
+  })
+
+  it('추가 실패 롤백은 저장 중 수신한 다른 항목을 보존하고 입력 원문을 복원한다', async () => {
+    const existingItem = {
+      id: 'item-1',
+      list_id: 'list-1',
+      created_by: 'user-1',
+      name: '우유',
+      is_checked: false,
+      checked_by: null,
+      checked_at: null,
+      sort_order: 0,
+      created_at: '2026-01-01T00:00:00Z',
+    }
+    const remoteItem = {
+      ...existingItem,
+      id: 'item-remote',
+      name: '가족이 추가한 항목',
+      sort_order: 1,
+      created_at: '2026-01-01T00:00:01Z',
+    }
+    let rejectAdd: ((error: Error) => void) | null = null
+    const addPromise = new Promise<Awaited<ReturnType<typeof addReminderItem>>>((_, reject) => {
+      rejectAdd = reject
+    })
+    mockGetReminderItems.mockResolvedValueOnce([existingItem] as never)
+    mockAddReminderItem.mockReturnValueOnce(addPromise)
+    const user = userEvent.setup()
+
+    render(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
+
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    const input = within(await screen.findByTestId('bottom-add-item-input'))
+      .getByPlaceholderText('아이템 추가...')
+    await user.type(input, '버터')
+    await user.keyboard('{Enter}')
+    expect(screen.getByText('버터')).toBeInTheDocument()
+
+    mockGetReminderItems.mockResolvedValueOnce([existingItem, remoteItem] as never)
+    const refreshItems = mockUseRealtimeSync.mock.calls.find(
+      ([channelName]) => channelName === 'list_items_list-1'
+    )?.[1] as (() => void) | undefined
+    act(() => refreshItems?.())
+    expect(await screen.findByText('가족이 추가한 항목')).toBeInTheDocument()
+
+    await act(async () => {
+      rejectAdd?.(new Error('save failed'))
+      await addPromise.catch(() => {})
+    })
+
+    expect(screen.queryByText('버터')).not.toBeInTheDocument()
+    expect(screen.getByText('우유')).toBeInTheDocument()
+    expect(screen.getByText('가족이 추가한 항목')).toBeInTheDocument()
+    expect(input).toHaveValue('버터')
+    expect(input).not.toHaveAttribute('readonly')
+    expect(screen.getByText('아이템을 저장하지 못했어요')).toBeInTheDocument()
+  })
+
   it('floating 추가 입력창 바깥 빈 공간을 누르면 연속 추가를 종료한다', async () => {
     const user = userEvent.setup()
     mockGetReminderItems.mockResolvedValueOnce([

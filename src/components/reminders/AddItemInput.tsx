@@ -31,15 +31,19 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!value.trim() || loading) return
+    const submittedValue = value.trim()
+
+    ignoreNextEmptyBlurRef.current = true
+    setValue('')
     setLoading(true)
     try {
-      const created = await onAdd(value.trim())
+      const created = await onAdd(submittedValue)
       if (created) {
-        ignoreNextEmptyBlurRef.current = true
-        setValue('')
         requestAnimationFrame(() => {
           inputRef.current?.focus()
         })
+      } else {
+        setValue((currentValue) => currentValue || submittedValue)
       }
     } finally {
       setLoading(false)
@@ -60,6 +64,8 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        aria-busy={loading}
+        readOnly={loading}
         onBlur={() => {
           if (ignoreNextEmptyBlurRef.current) {
             ignoreNextEmptyBlurRef.current = false
