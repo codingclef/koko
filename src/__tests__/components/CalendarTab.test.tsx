@@ -1,8 +1,8 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { getCalendarMembers, getEventsByRange, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar } from '@/lib/calendar'
-import { deleteWithAuth, patchJsonWithAuth } from '@/lib/api-client'
+import { getCalendarMembers, getEventsByRange, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar, type CalendarEvent } from '@/lib/calendar'
+import { deleteWithAuth, patchJsonWithAuth, postJsonWithAuth } from '@/lib/api-client'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
 const mockReloadCalendars = jest.fn()
@@ -74,8 +74,9 @@ jest.mock('@/components/calendar/CalendarFilter', () => ({
   ),
 }))
 jest.mock('@/components/calendar/CalendarGrid', () => ({
-  CalendarGrid: ({ onSelectDate }: { onSelectDate: (date: Date) => void }) => (
+  CalendarGrid: ({ events, onSelectDate }: { events: CalendarEvent[]; onSelectDate: (date: Date) => void }) => (
     <div data-testid="calendar-grid">
+      {events.map((event) => <span key={event.id}>{event.title}</span>)}
       <button data-testid="select-date" onClick={() => onSelectDate(new Date('2026-04-17T00:00:00Z'))}>date</button>
     </div>
   ),
@@ -148,8 +149,9 @@ jest.mock('@/components/calendar/EventDetailSheet', () => ({
   ),
 }))
 jest.mock('@/components/calendar/EventFormModal', () => ({
-  EventFormModal: ({ initialRecurrence, onSave }: {
+  EventFormModal: ({ initialRecurrence, onClose, onSave }: {
     initialRecurrence?: import('@/types/recurrence').RecurrenceRule | null
+    onClose: () => void
     onSave: (params: {
       calendarId: string | null
       title: string
@@ -163,11 +165,57 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
       recurrence: import('@/types/recurrence').RecurrenceRule | null
       labelColor: string | null
     }) => Promise<void>
-  }) => (
-    <>
+  }) => {
+    const saveAndClose = async (params: Parameters<typeof onSave>[0]) => {
+      try {
+        await onSave(params)
+        onClose()
+      } catch {
+        // The real modal remains open and surfaces its own save error.
+      }
+    }
+
+    return <>
+    <div data-testid="event-form-modal" />
+    <button
+      data-testid="event-form-save-new-single"
+      onClick={() => void saveAndClose({
+        calendarId: 'cal-1',
+        title: '새 일반 일정',
+        description: null,
+        startAt: new Date().toISOString(),
+        endAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        localStartDate: '2026-08-26',
+        localEndDate: '2026-08-26',
+        isAllDay: false,
+        reminderMinutes: [],
+        recurrence: null,
+        labelColor: null,
+      })}
+    >
+      save new single
+    </button>
+    <button
+      data-testid="event-form-save-new-recurring"
+      onClick={() => void saveAndClose({
+        calendarId: 'cal-1',
+        title: '새 반복 일정',
+        description: null,
+        startAt: new Date().toISOString(),
+        endAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        localStartDate: '2026-08-26',
+        localEndDate: '2026-08-26',
+        isAllDay: false,
+        reminderMinutes: [],
+        recurrence: { freq: 'weekly', interval: 1 },
+        labelColor: null,
+      })}
+    >
+      save new recurring
+    </button>
     <button
       data-testid="event-form-save-following-date"
-      onClick={() => onSave({
+      onClick={() => void saveAndClose({
         calendarId: 'cal-1',
         title: '반복 일정 수정',
         description: null,
@@ -186,7 +234,7 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
     <button
       data-testid="event-form-save-following-recurrence"
       data-initial-recurrence={initialRecurrence ? `${initialRecurrence.freq}:${initialRecurrence.interval}` : ''}
-      onClick={() => onSave({
+      onClick={() => void saveAndClose({
         calendarId: 'cal-1',
         title: '반복 일정 수정',
         description: null,
@@ -204,7 +252,7 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
     </button>
     <button
       data-testid="event-form-save-convert-recurrence"
-      onClick={() => onSave({
+      onClick={() => void saveAndClose({
         calendarId: 'cal-1',
         title: '일반 일정',
         description: null,
@@ -221,7 +269,7 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
       convert recurrence
     </button>
     </>
-  ),
+  },
 }))
 jest.mock('@/components/calendar/CalendarFormModal', () => ({
   CalendarFormModal: () => <div />,
@@ -283,6 +331,7 @@ const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof 
 const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
 const mockDeleteWithAuth = deleteWithAuth as jest.MockedFunction<typeof deleteWithAuth>
 const mockPatchJsonWithAuth = patchJsonWithAuth as jest.MockedFunction<typeof patchJsonWithAuth>
+const mockPostJsonWithAuth = postJsonWithAuth as jest.MockedFunction<typeof postJsonWithAuth>
 let consoleErrorSpy: jest.SpyInstance
 const mockCalendars = [{
   id: 'cal-1',
@@ -304,6 +353,29 @@ const defaultProps = {
   calendarsLoading: false,
   calendarsError: null,
   reloadCalendars: mockReloadCalendars,
+}
+
+function buildEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+  const start = new Date()
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  return {
+    id: 'evt-created-1',
+    family_id: 'fam-1',
+    calendar_id: 'cal-1',
+    title: '새 일반 일정',
+    description: null,
+    start_at: start.toISOString(),
+    end_at: end.toISOString(),
+    is_all_day: false,
+    created_by: 'user-1',
+    created_at: start.toISOString(),
+    updated_at: start.toISOString(),
+    series_id: null,
+    series_occurrence_date: null,
+    is_cancelled: false,
+    label_color: null,
+    ...overrides,
+  }
 }
 
 describe('CalendarTab — touch-action 스크롤 차단', () => {
@@ -335,6 +407,192 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
     mockGetRecurrenceRule.mockResolvedValue({ freq: 'weekly', interval: 1, daysOfWeek: [5] })
     mockDeleteWithAuth.mockResolvedValue(undefined)
     mockPatchJsonWithAuth.mockResolvedValue(undefined)
+  })
+
+  it('일반 신규 일정은 목록 재조회 전에 확정 행을 표시하고 폼을 닫는다', async () => {
+    let resolveRefresh: ((events: CalendarEvent[]) => void) | null = null
+    const refreshPromise = new Promise<CalendarEvent[]>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const createdEvent = buildEvent()
+    mockGetEventsByRange
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(refreshPromise)
+    mockPostJsonWithAuth.mockResolvedValueOnce(createdEvent)
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    await waitFor(() => expect(mockPostJsonWithAuth).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByTestId('event-form-modal')).not.toBeInTheDocument())
+    expect(screen.getByText('새 일반 일정')).toBeInTheDocument()
+    expect(mockGetEventsByRange).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      resolveRefresh?.([createdEvent])
+      await refreshPromise
+    })
+  })
+
+  it('반복 신규 일정은 발생 행을 추측하지 않고 목록 재조회와 별개로 폼을 닫는다', async () => {
+    let resolveRefresh: ((events: CalendarEvent[]) => void) | null = null
+    const refreshPromise = new Promise<CalendarEvent[]>((resolve) => {
+      resolveRefresh = resolve
+    })
+    mockGetEventsByRange
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(refreshPromise)
+    mockPostJsonWithAuth.mockResolvedValueOnce({ seriesId: 'series-created-1', eventCount: 8 })
+    const recurringEvent = buildEvent({
+      id: 'evt-series-created-1',
+      title: '새 반복 일정',
+      series_id: 'series-created-1',
+      series_occurrence_date: '2026-08-26',
+    })
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-recurring'))
+
+    await waitFor(() => expect(screen.queryByTestId('event-form-modal')).not.toBeInTheDocument())
+    expect(screen.queryByText('새 반복 일정')).not.toBeInTheDocument()
+    expect(mockGetEventsByRange).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      resolveRefresh?.([recurringEvent])
+      await refreshPromise
+    })
+    expect(screen.getByText('새 반복 일정')).toBeInTheDocument()
+  })
+
+  it('현재 표시 범위 밖에 생성된 일반 일정은 현재 달에 임시로 표시하지 않는다', async () => {
+    let resolveRefresh: ((events: CalendarEvent[]) => void) | null = null
+    const refreshPromise = new Promise<CalendarEvent[]>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const outOfRangeEvent = buildEvent({
+      title: '다른 달 일정',
+      start_at: '2035-01-01T09:00:00.000Z',
+      end_at: '2035-01-01T10:00:00.000Z',
+    })
+    mockGetEventsByRange
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(refreshPromise)
+    mockPostJsonWithAuth.mockResolvedValueOnce(outOfRangeEvent)
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    await waitFor(() => expect(screen.queryByTestId('event-form-modal')).not.toBeInTheDocument())
+    expect(screen.queryByText('다른 달 일정')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveRefresh?.([])
+      await refreshPromise
+    })
+  })
+
+  it('저장 요청 중 가족이 바뀌면 이전 가족의 완료 결과를 새 가족 화면에 반영하지 않는다', async () => {
+    let resolveSave: ((event: CalendarEvent) => void) | null = null
+    const savePromise = new Promise<CalendarEvent>((resolve) => {
+      resolveSave = resolve
+    })
+    mockGetEventsByRange.mockResolvedValue([])
+    mockPostJsonWithAuth.mockReturnValueOnce(savePromise)
+
+    const { rerender } = render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+    await waitFor(() => expect(mockPostJsonWithAuth).toHaveBeenCalledTimes(1))
+
+    rerender(
+      <CalendarTab
+        {...defaultProps}
+        familyId="fam-2"
+        calendars={[{ ...mockCalendars[0], id: 'cal-2', family_id: 'fam-2' }]}
+      />
+    )
+    await act(async () => {})
+
+    await act(async () => {
+      resolveSave?.(buildEvent({ title: '이전 가족 일정' }))
+      await savePromise
+    })
+
+    expect(screen.queryByText('이전 가족 일정')).not.toBeInTheDocument()
+  })
+
+  it('저장 후 목록 재조회가 실패해도 기존 일정과 생성 행을 유지하고 동기화 경고를 표시한다', async () => {
+    const existingEvent = buildEvent({ id: 'evt-existing-1', title: '기존 일정' })
+    const createdEvent = buildEvent()
+    mockGetEventsByRange
+      .mockResolvedValueOnce([existingEvent])
+      .mockRejectedValueOnce(new Error('refresh failed'))
+    mockPostJsonWithAuth.mockResolvedValueOnce(createdEvent)
+
+    render(<CalendarTab {...defaultProps} />)
+    expect(await screen.findByText('기존 일정')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    expect(await screen.findByText('일정은 저장됐지만 최신 목록을 확인하지 못했어요')).toBeInTheDocument()
+    expect(screen.getByText('기존 일정')).toBeInTheDocument()
+    expect(screen.getByText('새 일반 일정')).toBeInTheDocument()
+    expect(screen.queryByText('이번 달 일정을 불러오지 못했어요.')).not.toBeInTheDocument()
+  })
+
+  it('저장 API가 실패하면 폼을 유지하고 목록 재조회를 시작하지 않는다', async () => {
+    mockGetEventsByRange.mockResolvedValueOnce([])
+    mockPostJsonWithAuth.mockRejectedValueOnce(new Error('save failed'))
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    expect(await screen.findByText('일정을 저장하지 못했어요')).toBeInTheDocument()
+    expect(screen.getByTestId('event-form-modal')).toBeInTheDocument()
+    expect(mockGetEventsByRange).toHaveBeenCalledTimes(1)
+  })
+
+  it('기존 일정 수정도 목록 재조회 전에 폼을 닫는다', async () => {
+    let resolveRefresh: ((events: CalendarEvent[]) => void) | null = null
+    const refreshPromise = new Promise<CalendarEvent[]>((resolve) => {
+      resolveRefresh = resolve
+    })
+    mockGetEventsByRange
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(refreshPromise)
+    mockPatchJsonWithAuth.mockResolvedValueOnce(undefined)
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+
+    fireEvent.click(screen.getByTestId('select-date'))
+    fireEvent.click(await screen.findByTestId('select-regular-event'))
+    fireEvent.click(await screen.findByTestId('detail-edit'))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    await waitFor(() => expect(mockPatchJsonWithAuth).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByTestId('event-form-modal')).not.toBeInTheDocument())
+    expect(mockGetEventsByRange).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      resolveRefresh?.([])
+      await refreshPromise
+    })
   })
 
   it('캘린더 목록 로딩 중에는 목록 의존 진입점을 비활성화한다', () => {
