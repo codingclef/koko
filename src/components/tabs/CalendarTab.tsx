@@ -54,6 +54,11 @@ interface EventRangeRequest {
   isCurrent: () => boolean
 }
 
+interface RecurringEventCreateResult {
+  seriesId: string
+  eventCount: number
+}
+
 // Keep dynamic render loaders and idle preload loaders identical so first-open chunks are actually warmed.
 const loadCalendarListSheet = () =>
   import('@/components/calendar/CalendarListSheet').then((mod) => mod.CalendarListSheet)
@@ -108,6 +113,14 @@ function getVisibleEventRange(familyId: string, year: number, month: number) {
     start,
     endExclusive,
   }
+}
+
+function isEventInRange(event: CalendarEvent, start: Date, endExclusive: Date) {
+  const eventStart = new Date(event.start_at)
+  if (eventStart >= endExclusive) return false
+  if (eventStart >= start) return true
+  if (!event.is_all_day || !event.end_at) return false
+  return new Date(event.end_at) >= start
 }
 
 function calendarFilterKey(familyId: string) {
@@ -165,6 +178,7 @@ export function CalendarTab({
   const [showCalendarList, setShowCalendarList] = useState(false)
   const [showYearMonthPicker, setShowYearMonthPicker] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [eventSyncWarning, setEventSyncWarning] = useState<string | null>(null)
   const [seriesScopeTarget, setSeriesScopeTarget] = useState<{ event: CalendarEvent; mode: 'edit' | 'delete' } | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -200,6 +214,7 @@ export function CalendarTab({
   const eventRangeRequestSeqRef = useRef(new Map<string, number>())
   const familyEventGenerationRef = useRef(new Map<string, number>())
   const currentFamilyIdRef = useRef<string | null>(familyId ?? null)
+  const eventSaveRequestSeqRef = useRef(0)
   const calendarOpenRequestSeqRef = useRef(0)
   const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
   const visibleEventRangeKeyRef = useRef<string | null>(
@@ -210,11 +225,13 @@ export function CalendarTab({
   useEffect(() => {
     const nextFamilyId = familyId ?? null
     currentFamilyIdRef.current = nextFamilyId
+    eventSaveRequestSeqRef.current += 1
     calendarOpenRequestSeqRef.current += 1
     setShowCalendarList(false)
     setCalendarForm(null)
     setCalendarMemberIds([])
     setPreparingCalendarForm(false)
+    setEventSyncWarning(null)
 
     if (!nextFamilyId) {
       setFamilyMembersState({
@@ -405,6 +422,8 @@ export function CalendarTab({
     force = false,
     silent = false,
     throwOnError = false,
+    preserveEventsOnError = false,
+    reportError = true,
   }: {
     targetFamilyId: string
     targetYear: number
@@ -412,6 +431,8 @@ export function CalendarTab({
     force?: boolean
     silent?: boolean
     throwOnError?: boolean
+    preserveEventsOnError?: boolean
+    reportError?: boolean
   }) => {
     const { key } = getVisibleEventRange(targetFamilyId, targetYear, targetMonth)
     const cached = !force ? eventRangeCacheRef.current.get(key) : undefined
@@ -432,7 +453,7 @@ export function CalendarTab({
       setEvents([])
       setEventsLoading(true)
     }
-    if (isVisibleRange()) setEventsError(null)
+    if (reportError && isVisibleRange()) setEventsError(null)
 
     const request = getEventRangeRequest(targetFamilyId, targetYear, targetMonth, { force })
 
@@ -443,8 +464,8 @@ export function CalendarTab({
     } catch (error) {
       console.error('[CalendarTab] loadEvents failed:', error)
       if (request.isCurrent() && isVisibleRange()) {
-        setEvents([])
-        setEventsError(error)
+        if (!preserveEventsOnError) setEvents([])
+        if (reportError) setEventsError(error)
         setEventsLoading(false)
       }
       if (throwOnError) throw error
@@ -552,6 +573,28 @@ export function CalendarTab({
       silent: true,
     })
   }, [clearFamilyEventRangeCache, familyId, year, month, loadVisibleEvents])
+
+  const reconcileEventsAfterSave = useCallback(async ({
+    targetFamilyId,
+    targetYear,
+    targetMonth,
+  }: {
+    targetFamilyId: string
+    targetYear: number
+    targetMonth: number
+  }) => {
+    clearFamilyEventRangeCache(targetFamilyId)
+    await loadVisibleEvents({
+      targetFamilyId,
+      targetYear,
+      targetMonth,
+      force: true,
+      silent: true,
+      throwOnError: true,
+      preserveEventsOnError: true,
+      reportError: false,
+    })
+  }, [clearFamilyEventRangeCache, loadVisibleEvents])
 
   const reloadCalendarContext = useCallback(async () => {
     await Promise.allSettled([
@@ -779,16 +822,26 @@ export function CalendarTab({
     scope?: RecurrenceScope
   }) => {
     if (!familyId) return
+    const requestFamilyId = familyId
+    const requestYear = year
+    const requestMonth = month
+    const requestRange = getVisibleEventRange(requestFamilyId, requestYear, requestMonth)
+    const requestSeq = ++eventSaveRequestSeqRef.current
+    const isCurrentSaveRequest = () => (
+      currentFamilyIdRef.current === requestFamilyId &&
+      eventSaveRequestSeqRef.current === requestSeq
+    )
     setMutationError(null)
+    setEventSyncWarning(null)
 
     try {
-      clearFamilyEventRangeCache(familyId)
-
       const saveLastLabelColor = (color: string | null, prev: string | null = null) => {
         if (color !== null && color !== prev) {
           updatePreferences({ last_label_color: color }).catch(() => {})
         }
       }
+
+      let createdEvent: CalendarEvent | null = null
 
       if (editingEvent?.event) {
         const prevLabelColor = editingEvent.event.label_color ?? null
@@ -836,8 +889,8 @@ export function CalendarTab({
           Promise.resolve(saveLastLabelColor(params.labelColor, prevLabelColor)),
         ])
       } else {
-        await Promise.all([
-          postJsonWithAuth('/api/events', {
+        const [createResult] = await Promise.all([
+          postJsonWithAuth<CalendarEvent | RecurringEventCreateResult>('/api/events', {
             calendarId: params.calendarId,
             title: params.title,
             description: params.description,
@@ -850,14 +903,40 @@ export function CalendarTab({
           }),
           Promise.resolve(saveLastLabelColor(params.labelColor)),
         ])
+        if (!params.recurrence && 'id' in createResult) {
+          createdEvent = createResult
+        }
       }
 
-      await refreshEvents()
+      if (!isCurrentSaveRequest()) return
+
+      if (
+        createdEvent &&
+        visibleEventRangeKeyRef.current === requestRange.key &&
+        isEventInRange(createdEvent, requestRange.start, requestRange.endExclusive)
+      ) {
+        setEvents((currentEvents) => (
+          [...currentEvents.filter((event) => event.id !== createdEvent.id), createdEvent]
+            .sort((a, b) => a.start_at.localeCompare(b.start_at))
+        ))
+      }
+
       broadcast()
+      void reconcileEventsAfterSave({
+        targetFamilyId: requestFamilyId,
+        targetYear: requestYear,
+        targetMonth: requestMonth,
+      }).then(() => {
+        if (isCurrentSaveRequest()) setEventSyncWarning(null)
+      }).catch((error) => {
+        console.error('[CalendarTab] reconcile after event save failed:', error)
+        if (isCurrentSaveRequest()) {
+          setEventSyncWarning('일정은 저장됐지만 최신 목록을 확인하지 못했어요')
+        }
+      })
     } catch (e) {
       console.error('[CalendarTab] handleEventSave failed:', e)
-      setMutationError('일정을 저장하지 못했어요')
-      await refreshEvents()
+      if (isCurrentSaveRequest()) setMutationError('일정을 저장하지 못했어요')
       throw e
     }
   }
@@ -923,11 +1002,12 @@ export function CalendarTab({
   const fetchError = calendarsError
 
   const handleRetry = async () => {
-    await Promise.allSettled([
+    const [, , eventResult] = await Promise.allSettled([
       reloadCalendars(),
       loadFamilyMembers({ force: true, silent: true }),
       reloadEvents(),
     ])
+    if (eventResult.status === 'fulfilled') setEventSyncWarning(null)
   }
 
   if (fetchError) {
@@ -1027,6 +1107,15 @@ export function CalendarTab({
         {mutationError && (
           <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
             {mutationError}
+          </div>
+        )}
+
+        {eventSyncWarning && (
+          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+            {eventSyncWarning}
+            <button onClick={() => void handleRetry()} className="ml-2 font-semibold underline underline-offset-2">
+              다시 시도
+            </button>
           </div>
         )}
 
