@@ -101,6 +101,7 @@ export function ReminderDetailView({
 
   const closeAddSessionIfDraftEmpty = useCallback(() => {
     const input = addInputRef.current
+    if (input?.readOnly) return
     if (input?.value.trim()) return
     setAddSession(null)
   }, [])
@@ -253,30 +254,41 @@ export function ReminderDetailView({
       is_checked: false,
       checked_by: null,
       checked_at: null,
-      sort_order: items.length,
+      sort_order: 0,
       created_at: new Date().toISOString(),
     }
-    const previousItems = items
-    const optimisticItems = withInsertedReminderItem(items, optimisticItem, afterItemId)
-    setItemsWithPreview(optimisticItems)
+    setItemsWithPreview((currentItems) => (
+      withInsertedReminderItem(currentItems, optimisticItem, afterItemId)
+    ))
 
     try {
       const realItem = await addReminderItem(listId, user.id, name, afterItemId ?? null)
-      const nextItems = optimisticItems.map((item) =>
-        item.id === optimisticItem.id
-          ? { ...realItem, sort_order: item.sort_order }
-          : item
-      )
-      setItemsWithPreview(nextItems)
+      setItemsWithPreview((currentItems) => {
+        const itemsWithoutExistingReal = currentItems.filter((item) => item.id !== realItem.id)
+        const optimisticIndex = itemsWithoutExistingReal.findIndex(
+          (item) => item.id === optimisticItem.id
+        )
+        if (optimisticIndex < 0) {
+          return withInsertedReminderItem(itemsWithoutExistingReal, realItem, afterItemId)
+        }
+
+        return itemsWithoutExistingReal.map((item) =>
+          item.id === optimisticItem.id
+            ? { ...realItem, sort_order: item.sort_order }
+            : item
+        )
+      })
       broadcast()
-      return nextItems.find((item) => item.id === realItem.id) ?? realItem
+      return realItem
     } catch (e) {
       console.error('[ReminderDetailView] addReminderItem failed:', e)
-      setItemsWithPreview(previousItems)
+      setItemsWithPreview((currentItems) => (
+        currentItems.filter((item) => item.id !== optimisticItem.id)
+      ))
       setMutationError('아이템을 저장하지 못했어요')
       return null
     }
-  }, [broadcast, items, listId, setItemsWithPreview, user.id])
+  }, [broadcast, listId, setItemsWithPreview, user.id])
 
   const handleBottomAdd = useCallback(
     async (name: string): Promise<boolean> => {

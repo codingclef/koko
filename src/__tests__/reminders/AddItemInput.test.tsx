@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AddItemInput } from '@/components/reminders/AddItemInput'
 
@@ -37,6 +37,36 @@ describe('AddItemInput', () => {
       expect(input).toHaveValue('')
       expect(input).toHaveFocus()
     })
+  })
+
+  it('저장 응답 전에도 입력값을 즉시 비우고 중복 제출을 막는다', async () => {
+    let resolveAdd: ((created: boolean) => void) | null = null
+    const addPromise = new Promise<boolean>((resolve) => {
+      resolveAdd = resolve
+    })
+    const onAdd = jest.fn().mockReturnValue(addPromise)
+    const user = userEvent.setup()
+    render(<AddItemInput onAdd={onAdd} />)
+
+    const input = screen.getByPlaceholderText('아이템 추가...')
+    await user.type(input, '우유')
+    await user.keyboard('{Enter}')
+
+    expect(onAdd).toHaveBeenCalledWith('우유')
+    expect(input).toHaveValue('')
+    expect(input).toHaveAttribute('aria-busy', 'true')
+    expect(input).toHaveAttribute('readonly')
+
+    await user.keyboard('{Enter}')
+    expect(onAdd).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveAdd?.(true)
+      await addPromise
+    })
+
+    expect(input).not.toHaveAttribute('readonly')
+    expect(input).toHaveFocus()
   })
 
   it('onAdd 실패 시 입력값을 유지하고 다시 제출 가능하다', async () => {
