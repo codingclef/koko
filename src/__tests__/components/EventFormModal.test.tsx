@@ -49,6 +49,11 @@ const calendars: Calendar[] = [
   { id: 'cal-1', family_id: 'fam-1', created_by: 'user-1', name: '가족', color: '#f97316', created_at: '', updated_at: '' },
 ]
 
+const multipleCalendars: Calendar[] = [
+  ...calendars,
+  { id: 'cal-2', family_id: 'fam-1', created_by: 'user-1', name: '개인', color: '#3b82f6', created_at: '', updated_at: '' },
+]
+
 const defaultProps = {
   calendars,
   onClose: jest.fn(),
@@ -882,6 +887,79 @@ describe('라벨 색상', () => {
     expect(screen.getByText('에메랄드')).toBeInTheDocument()
   })
 
+  it('캘린더별 기본 색상이 계정 기본 색상보다 우선한다', () => {
+    render(
+      <EventFormModal
+        {...defaultProps}
+        defaultLabelColor="#f97316"
+        defaultLabelColorsByCalendar={{ 'cal-1': '#10b981' }}
+      />
+    )
+    expect(screen.getByText('에메랄드')).toBeInTheDocument()
+  })
+
+  it('색상을 직접 고르기 전에는 캘린더 변경에 맞춰 기본 색상이 바뀐다', () => {
+    render(
+      <EventFormModal
+        {...defaultProps}
+        calendars={multipleCalendars}
+        defaultLabelColor="#f97316"
+        defaultLabelColorsByCalendar={{
+          'cal-1': '#10b981',
+          'cal-2': '#3b82f6',
+        }}
+      />
+    )
+
+    fireEvent.click(screen.getByText('개인'))
+    expect(screen.getByText('파란색')).toBeInTheDocument()
+  })
+
+  it('사용자가 직접 고른 색상은 캘린더를 변경해도 유지한다', () => {
+    render(
+      <EventFormModal
+        {...defaultProps}
+        calendars={multipleCalendars}
+        defaultLabelColorsByCalendar={{
+          'cal-1': '#10b981',
+          'cal-2': '#f97316',
+        }}
+      />
+    )
+
+    fireEvent.click(screen.getByText('라벨'))
+    fireEvent.click(screen.getByTitle('파란색'))
+    fireEvent.click(screen.getByText('개인'))
+    expect(screen.getByText('파란색')).toBeInTheDocument()
+  })
+
+  it('캘린더별 null 설정은 계정 기본 색상보다 우선한다', () => {
+    render(
+      <EventFormModal
+        {...defaultProps}
+        defaultLabelColor="#f97316"
+        defaultLabelColorsByCalendar={{ 'cal-1': null }}
+      />
+    )
+    expect(screen.getByText('캘린더 색상 사용')).toBeInTheDocument()
+  })
+
+  it('백그라운드에서 캘린더별 색상을 불러오면 미조작 신규 폼에 반영한다', () => {
+    const { rerender } = render(
+      <EventFormModal {...defaultProps} defaultLabelColor="#f97316" />
+    )
+    expect(screen.getByText('주황색')).toBeInTheDocument()
+
+    rerender(
+      <EventFormModal
+        {...defaultProps}
+        defaultLabelColor="#f97316"
+        defaultLabelColorsByCalendar={{ 'cal-1': '#10b981' }}
+      />
+    )
+    expect(screen.getByText('에메랄드')).toBeInTheDocument()
+  })
+
   it('기존 이벤트의 label_color가 defaultLabelColor보다 우선한다', () => {
     const initial: import('@/lib/calendar').CalendarEvent = {
       id: 'evt-1', family_id: 'fam-1', calendar_id: 'cal-1', created_by: 'user-1',
@@ -890,7 +968,14 @@ describe('라벨 색상', () => {
       series_id: null, series_occurrence_date: null, is_cancelled: false,
       created_at: '', updated_at: '',
     }
-    render(<EventFormModal {...defaultProps} initial={initial} defaultLabelColor="#10b981" />)
+    render(
+      <EventFormModal
+        {...defaultProps}
+        initial={initial}
+        defaultLabelColor="#10b981"
+        defaultLabelColorsByCalendar={{ 'cal-1': '#f97316' }}
+      />
+    )
     expect(screen.getByText('파란색')).toBeInTheDocument()
   })
 
