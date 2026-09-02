@@ -88,6 +88,7 @@ interface Props {
   initialRecurrence?: RecurrenceRule | null
   recurrenceScope?: RecurrenceScope
   defaultLabelColor?: string | null
+  defaultLabelColorsByCalendar?: Record<string, string | null>
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -105,6 +106,21 @@ interface Props {
   }) => Promise<void>
 }
 
+function resolveDefaultLabelColor(
+  calendarId: string | null,
+  colorsByCalendar: Record<string, string | null> | undefined,
+  fallbackColor: string | null | undefined
+): string | null {
+  if (
+    calendarId &&
+    colorsByCalendar &&
+    Object.prototype.hasOwnProperty.call(colorsByCalendar, calendarId)
+  ) {
+    return colorsByCalendar[calendarId]
+  }
+  return fallbackColor ?? null
+}
+
 export function EventFormModal({
   initial,
   initialDate,
@@ -112,6 +128,7 @@ export function EventFormModal({
   initialRecurrence = null,
   recurrenceScope,
   defaultLabelColor,
+  defaultLabelColorsByCalendar,
   calendars,
   onClose,
   onSave,
@@ -119,10 +136,9 @@ export function EventFormModal({
   const defaultDate = initialDate ?? new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const defaultDateStr = `${defaultDate.getFullYear()}-${pad(defaultDate.getMonth() + 1)}-${pad(defaultDate.getDate())}`
+  const initialCalendarId = initial?.calendar_id ?? (calendars[0]?.id ?? null)
 
-  const [calendarId, setCalendarId] = useState<string | null>(
-    initial?.calendar_id ?? (calendars[0]?.id ?? null)
-  )
+  const [calendarId, setCalendarId] = useState<string | null>(initialCalendarId)
   const [title, setTitle] = useState(initial?.title ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [isAllDay, setIsAllDay] = useState(initial?.is_all_day ?? true)
@@ -157,7 +173,13 @@ export function EventFormModal({
     new Set(initialReminderMinutes)
   )
   const [labelColor, setLabelColor] = useState<string | null>(
-    initial ? initial.label_color : (defaultLabelColor ?? null)
+    initial
+      ? initial.label_color
+      : resolveDefaultLabelColor(
+          initialCalendarId,
+          defaultLabelColorsByCalendar,
+          defaultLabelColor
+        )
   )
   const [labelPickerOpen, setLabelPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -197,6 +219,7 @@ export function EventFormModal({
   const startDateInputRef = useRef<HTMLInputElement>(null)
   const endDateInputRef = useRef<HTMLInputElement>(null)
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const labelColorTouchedRef = useRef(false)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -204,6 +227,15 @@ export function EventFormModal({
     }, 300)
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    if (initial || labelColorTouchedRef.current) return
+    setLabelColor(resolveDefaultLabelColor(
+      calendarId,
+      defaultLabelColorsByCalendar,
+      defaultLabelColor
+    ))
+  }, [calendarId, defaultLabelColor, defaultLabelColorsByCalendar, initial])
 
   useLayoutEffect(() => {
     const textarea = descriptionTextareaRef.current
@@ -616,7 +648,11 @@ export function EventFormModal({
               <div className="flex flex-wrap gap-3 pl-[3.25rem]">
                 <button
                   type="button"
-                  onClick={() => { setLabelColor(null); setLabelPickerOpen(false) }}
+                  onClick={() => {
+                    labelColorTouchedRef.current = true
+                    setLabelColor(null)
+                    setLabelPickerOpen(false)
+                  }}
                   className={`w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all ${
                     labelColor === null
                       ? 'border-stone-400 dark:border-stone-300'
@@ -631,7 +667,11 @@ export function EventFormModal({
                   <button
                     key={color}
                     type="button"
-                    onClick={() => { setLabelColor(color); setLabelPickerOpen(false) }}
+                    onClick={() => {
+                      labelColorTouchedRef.current = true
+                      setLabelColor(color)
+                      setLabelPickerOpen(false)
+                    }}
                     className={`w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all ${
                       labelColor === color
                         ? 'border-stone-800 dark:border-white scale-110'

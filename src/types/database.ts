@@ -92,6 +92,38 @@ export type Database = {
         }
         Relationships: []
       }
+      user_calendar_preferences: {
+        Row: {
+          user_id: string
+          calendar_id: string
+          last_label_color: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          calendar_id: string
+          last_label_color?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          calendar_id?: string
+          last_label_color?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_calendar_preferences_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "calendars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_reminders: {
         Row: {
           created_at: string

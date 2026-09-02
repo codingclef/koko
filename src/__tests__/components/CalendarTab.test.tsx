@@ -3,6 +3,10 @@ import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
 import { getCalendarMembers, getEventsByRange, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar, type CalendarEvent } from '@/lib/calendar'
 import { deleteWithAuth, patchJsonWithAuth, postJsonWithAuth } from '@/lib/api-client'
+import {
+  getUserCalendarPreferences,
+  upsertUserCalendarLabelColor,
+} from '@/lib/calendar-label-preferences'
 
 // ── 의존성 모킹 ──────────────────────────────────────────────
 const mockReloadCalendars = jest.fn()
@@ -29,6 +33,10 @@ jest.mock('@/lib/calendar', () => ({
   setReminders: jest.fn(),
   CALENDAR_COLORS: [],
   REMINDER_OPTIONS: [],
+}))
+jest.mock('@/lib/calendar-label-preferences', () => ({
+  getUserCalendarPreferences: jest.fn().mockResolvedValue([]),
+  upsertUserCalendarLabelColor: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -149,8 +157,9 @@ jest.mock('@/components/calendar/EventDetailSheet', () => ({
   ),
 }))
 jest.mock('@/components/calendar/EventFormModal', () => ({
-  EventFormModal: ({ initialRecurrence, onClose, onSave }: {
+  EventFormModal: ({ initialRecurrence, defaultLabelColorsByCalendar, onClose, onSave }: {
     initialRecurrence?: import('@/types/recurrence').RecurrenceRule | null
+    defaultLabelColorsByCalendar?: Record<string, string | null>
     onClose: () => void
     onSave: (params: {
       calendarId: string | null
@@ -176,7 +185,10 @@ jest.mock('@/components/calendar/EventFormModal', () => ({
     }
 
     return <>
-    <div data-testid="event-form-modal" />
+    <div
+      data-testid="event-form-modal"
+      data-calendar-label-color={defaultLabelColorsByCalendar?.['cal-1'] ?? ''}
+    />
     <button
       data-testid="event-form-save-new-single"
       onClick={() => void saveAndClose({
@@ -332,6 +344,8 @@ const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCa
 const mockDeleteWithAuth = deleteWithAuth as jest.MockedFunction<typeof deleteWithAuth>
 const mockPatchJsonWithAuth = patchJsonWithAuth as jest.MockedFunction<typeof patchJsonWithAuth>
 const mockPostJsonWithAuth = postJsonWithAuth as jest.MockedFunction<typeof postJsonWithAuth>
+const mockGetUserCalendarPreferences = getUserCalendarPreferences as jest.MockedFunction<typeof getUserCalendarPreferences>
+const mockUpsertUserCalendarLabelColor = upsertUserCalendarLabelColor as jest.MockedFunction<typeof upsertUserCalendarLabelColor>
 let consoleErrorSpy: jest.SpyInstance
 const mockCalendars = [{
   id: 'cal-1',
@@ -435,6 +449,58 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
       resolveRefresh?.([createdEvent])
       await refreshPromise
     })
+  })
+
+  it('신규 일정 폼을 열 때 캘린더별 라벨 색상을 불러와 전달한다', async () => {
+    mockGetUserCalendarPreferences.mockResolvedValueOnce([{
+      user_id: 'user-1',
+      calendar_id: 'cal-1',
+      last_label_color: '#10b981',
+      created_at: '',
+      updated_at: '',
+    }])
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+
+    await waitFor(() => expect(mockGetUserCalendarPreferences).toHaveBeenCalledWith('user-1'))
+    await waitFor(() => {
+      expect(screen.getByTestId('event-form-modal')).toHaveAttribute(
+        'data-calendar-label-color',
+        '#10b981'
+      )
+    })
+  })
+
+  it('신규 일정의 null 라벨 색상도 캘린더별로 기억한다', async () => {
+    mockPostJsonWithAuth.mockResolvedValueOnce(buildEvent())
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    await waitFor(() => {
+      expect(mockUpsertUserCalendarLabelColor).toHaveBeenCalledWith(
+        'user-1',
+        'cal-1',
+        null
+      )
+    })
+  })
+
+  it('캘린더별 색상 저장 실패가 일정 저장을 실패시키지 않는다', async () => {
+    mockPostJsonWithAuth.mockResolvedValueOnce(buildEvent())
+    mockUpsertUserCalendarLabelColor.mockRejectedValueOnce(new Error('preference failed'))
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByTestId('calendar-grid')
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.click(await screen.findByTestId('event-form-save-new-single'))
+
+    await waitFor(() => expect(mockPostJsonWithAuth).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByTestId('event-form-modal')).not.toBeInTheDocument())
   })
 
   it('반복 신규 일정은 발생 행을 추측하지 않고 목록 재조회와 별개로 폼을 닫는다', async () => {

@@ -29,6 +29,10 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { postJsonWithAuth, patchJsonWithAuth, deleteWithAuth } from '@/lib/api-client'
 import type { Calendar } from '@/lib/calendar'
 import { scheduleIdleWork } from '@/lib/idle-work'
+import {
+  getUserCalendarPreferences,
+  upsertUserCalendarLabelColor,
+} from '@/lib/calendar-label-preferences'
 
 interface Props extends AuthState {
   preferences: UserPreferences | null
@@ -180,6 +184,7 @@ export function CalendarTab({
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [eventSyncWarning, setEventSyncWarning] = useState<string | null>(null)
   const [seriesScopeTarget, setSeriesScopeTarget] = useState<{ event: CalendarEvent; mode: 'edit' | 'delete' } | null>(null)
+  const [calendarLabelColors, setCalendarLabelColors] = useState<Record<string, string | null>>({})
 
   const containerRef = useRef<HTMLDivElement>(null)
   const yearMonthButtonRef = useRef<HTMLButtonElement>(null)
@@ -214,6 +219,13 @@ export function CalendarTab({
   const eventRangeRequestSeqRef = useRef(new Map<string, number>())
   const familyEventGenerationRef = useRef(new Map<string, number>())
   const currentFamilyIdRef = useRef<string | null>(familyId ?? null)
+  const currentUserIdRef = useRef<string | null>(user?.id ?? null)
+  const calendarLabelPreferencesUserIdRef = useRef<string | null>(null)
+  const calendarLabelPreferencesRequestRef = useRef<{
+    userId: string
+    promise: Promise<void>
+  } | null>(null)
+  const calendarLabelPreferencesRevisionRef = useRef(0)
   const eventSaveRequestSeqRef = useRef(0)
   const calendarOpenRequestSeqRef = useRef(0)
   const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
@@ -221,6 +233,14 @@ export function CalendarTab({
     familyId ? getVisibleEventRange(familyId, year, month).key : null
   )
   currentFamilyIdRef.current = familyId ?? null
+  currentUserIdRef.current = user?.id ?? null
+
+  useEffect(() => {
+    calendarLabelPreferencesRevisionRef.current += 1
+    calendarLabelPreferencesUserIdRef.current = null
+    calendarLabelPreferencesRequestRef.current = null
+    setCalendarLabelColors({})
+  }, [user?.id])
 
   useEffect(() => {
     const nextFamilyId = familyId ?? null
@@ -254,6 +274,65 @@ export function CalendarTab({
     currentFamilyIdRef.current === requestFamilyId &&
     calendarOpenRequestSeqRef.current === requestSeq
   ), [])
+
+  const loadCalendarLabelPreferences = useCallback(async () => {
+    const targetUserId = user?.id
+    if (!targetUserId) return
+    if (calendarLabelPreferencesUserIdRef.current === targetUserId) return
+
+    const inFlight = calendarLabelPreferencesRequestRef.current
+    if (inFlight?.userId === targetUserId) return inFlight.promise
+    const requestRevision = calendarLabelPreferencesRevisionRef.current
+
+    const request = getUserCalendarPreferences(targetUserId)
+      .then((preferences) => {
+        if (currentUserIdRef.current !== targetUserId) return
+        const loadedColors = Object.fromEntries(
+          preferences.map((preference) => [
+            preference.calendar_id,
+            preference.last_label_color,
+          ])
+        )
+        if (calendarLabelPreferencesRevisionRef.current === requestRevision) {
+          setCalendarLabelColors(loadedColors)
+          calendarLabelPreferencesUserIdRef.current = targetUserId
+        } else {
+          setCalendarLabelColors((current) => ({ ...loadedColors, ...current }))
+        }
+      })
+      .finally(() => {
+        if (calendarLabelPreferencesRequestRef.current?.promise === request) {
+          calendarLabelPreferencesRequestRef.current = null
+        }
+      })
+
+    calendarLabelPreferencesRequestRef.current = {
+      userId: targetUserId,
+      promise: request,
+    }
+    return request
+  }, [user?.id])
+
+  const rememberCalendarLabelColor = useCallback((
+    calendarId: string | null,
+    labelColor: string | null
+  ) => {
+    const targetUserId = user?.id
+    if (!targetUserId || !calendarId) return
+
+    calendarLabelPreferencesRevisionRef.current += 1
+    setCalendarLabelColors((current) => ({
+      ...current,
+      [calendarId]: labelColor,
+    }))
+    void upsertUserCalendarLabelColor(targetUserId, calendarId, labelColor)
+      .catch((error) => {
+        console.error('[CalendarTab] save calendar label preference failed:', error)
+        if (currentUserIdRef.current === targetUserId) {
+          calendarLabelPreferencesUserIdRef.current = null
+        }
+      })
+  }, [user?.id])
 
   const loadFamilyMembers = useCallback(async ({
     force = false,
@@ -539,12 +618,18 @@ export function CalendarTab({
     const cancelMemberPreload = scheduleIdleWork(() => {
       void loadFamilyMembers({ silent: true }).catch(() => {})
     })
+    const cancelLabelPreferencePreload = scheduleIdleWork(() => {
+      void loadCalendarLabelPreferences().catch((error) => {
+        console.error('[CalendarTab] preload calendar label preferences failed:', error)
+      })
+    })
 
     return () => {
       cancelOverlayPreload()
       cancelMemberPreload()
+      cancelLabelPreferencePreload()
     }
-  }, [familyId, loadFamilyMembers])
+  }, [familyId, loadCalendarLabelPreferences, loadFamilyMembers])
 
   const filteredEvents = useMemo(
     () => events.filter((e) => activeIds.size === 0 || !e.calendar_id || activeIds.has(e.calendar_id)),
@@ -835,8 +920,21 @@ export function CalendarTab({
     setEventSyncWarning(null)
 
     try {
-      const saveLastLabelColor = (color: string | null, prev: string | null = null) => {
-        if (color !== null && color !== prev) {
+      const saveLastLabelColor = ({
+        calendarId,
+        color,
+        previousColor = null,
+        isNewEvent = false,
+      }: {
+        calendarId: string | null
+        color: string | null
+        previousColor?: string | null
+        isNewEvent?: boolean
+      }) => {
+        if (isNewEvent || color !== previousColor) {
+          rememberCalendarLabelColor(calendarId, color)
+        }
+        if (color !== null && color !== previousColor) {
           updatePreferences({ last_label_color: color }).catch(() => {})
         }
       }
@@ -886,7 +984,11 @@ export function CalendarTab({
               anchorOccurrenceDate: editingEvent.event.series_occurrence_date,
             } : {}),
           }),
-          Promise.resolve(saveLastLabelColor(params.labelColor, prevLabelColor)),
+          Promise.resolve(saveLastLabelColor({
+            calendarId: params.calendarId,
+            color: params.labelColor,
+            previousColor: prevLabelColor,
+          })),
         ])
       } else {
         const [createResult] = await Promise.all([
@@ -901,7 +1003,11 @@ export function CalendarTab({
             labelColor: params.labelColor,
             ...(params.recurrence ? { recurrence: params.recurrence } : {}),
           }),
-          Promise.resolve(saveLastLabelColor(params.labelColor)),
+          Promise.resolve(saveLastLabelColor({
+            calendarId: params.calendarId,
+            color: params.labelColor,
+            isNewEvent: true,
+          })),
         ])
         if (!params.recurrence && 'id' in createResult) {
           createdEvent = createResult
@@ -997,6 +1103,13 @@ export function CalendarTab({
 
     setEditingEvent({ event: selectedEvent })
     setSelectedEvent(null)
+  }
+
+  const openNewEvent = (date: Date) => {
+    void loadCalendarLabelPreferences().catch((error) => {
+      console.error('[CalendarTab] load calendar label preferences failed:', error)
+    })
+    setEditingEvent({ date })
   }
 
   const fetchError = calendarsError
@@ -1154,7 +1267,7 @@ export function CalendarTab({
 
       <button
         aria-label="일정 추가"
-        onClick={() => setEditingEvent({ date: selectedDate ?? today })}
+        onClick={() => openNewEvent(selectedDate ?? today)}
         disabled={!calendarContextReady}
         className="absolute right-4 bottom-4 w-11 h-11 rounded-full bg-accent-400 hover:bg-accent-500 disabled:cursor-default disabled:bg-stone-300 disabled:shadow-none dark:disabled:bg-stone-700 text-white shadow-lg flex items-center justify-center transition-colors z-30"
       >
@@ -1168,7 +1281,7 @@ export function CalendarTab({
           calendars={calendars}
           onClose={() => setSelectedDate(null)}
           onSelectEvent={setSelectedEvent}
-          onAddEvent={() => setEditingEvent({ date: selectedDate })}
+          onAddEvent={() => openNewEvent(selectedDate)}
         />
       )}
 
@@ -1190,6 +1303,7 @@ export function CalendarTab({
           event={editingEvent.event}
           date={editingEvent.date}
           defaultLabelColor={preferences?.last_label_color ?? null}
+          defaultLabelColorsByCalendar={calendarLabelColors}
           calendars={calendars}
           onClose={() => setEditingEvent(null)}
           onSave={handleEventSave}
@@ -1249,6 +1363,7 @@ function EventFormModalWithReminders({
   event,
   date,
   defaultLabelColor,
+  defaultLabelColorsByCalendar,
   calendars,
   onClose,
   onSave,
@@ -1256,6 +1371,7 @@ function EventFormModalWithReminders({
   event?: CalendarEvent
   date?: Date
   defaultLabelColor?: string | null
+  defaultLabelColorsByCalendar?: Record<string, string | null>
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -1305,6 +1421,7 @@ function EventFormModalWithReminders({
       initialRecurrence={initialRecurrence}
       recurrenceScope={recurrenceScope}
       defaultLabelColor={defaultLabelColor}
+      defaultLabelColorsByCalendar={defaultLabelColorsByCalendar}
       calendars={calendars}
       onClose={onClose}
       onSave={onSave}
