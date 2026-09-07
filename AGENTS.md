@@ -95,6 +95,12 @@ Before any action, restate the request and wait for approval.
 - Use `type: summary` format.
 - Keep summaries short and specific.
 
+### Versioning
+
+- `package.json`의 `version`을 앱 버전의 단일 기준으로 사용한다.
+- 사용자에게 배포되는 변경은 SemVer에 따라 버전을 올리고 `package-lock.json`도 함께 갱신한다.
+- 버그 수정은 patch, 하위 호환 기능 추가는 minor, 호환되지 않는 변경은 major를 올린다.
+
 ### PR Body
 
 Include:

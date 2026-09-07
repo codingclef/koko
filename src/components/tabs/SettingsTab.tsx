@@ -27,6 +27,7 @@ import { ApiClientError, postJsonWithAuth } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
 import type { AuthState, Tab } from '@/types/tabs'
+import packageInfo from '../../../package.json'
 
 type SettingsView = 'main' | 'account' | 'family' | 'calendar' | 'app'
 type FamilyMembersStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -738,6 +739,7 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
             })}
           </div>
         </div>
+
       </div>
     )
   }
@@ -826,6 +828,10 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
             })}
           </div>
         </div>
+
+        <p className="text-center text-xs text-stone-400 dark:text-stone-500">
+          버전 {packageInfo.version}
+        </p>
       </div>
     )
   }
