@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_THEME } from '@/lib/preferences'
 import type { User } from '@supabase/supabase-js'
+import packageInfo from '../../../package.json'
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -154,6 +155,11 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
     expect(container).toBeInTheDocument()
     expect(container.className).toContain('pt-2')
     expect(container.className).not.toContain('py-8')
+  })
+
+  it('현재 앱 버전을 표시한다', async () => {
+    await navigateToApp()
+    expect(screen.getByText(`버전 ${packageInfo.version}`)).toBeInTheDocument()
   })
 
   it('권한이 granted일 때 실제 구독을 동기화하고 연결 상태를 표시한다', async () => {
