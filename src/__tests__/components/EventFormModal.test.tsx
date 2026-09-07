@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, act, createEvent } from '@testing-library/react'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
-import type { Calendar } from '@/lib/calendar'
+import { getEventSuggestions, type Calendar } from '@/lib/calendar'
 
 jest.mock('@/lib/calendar', () => ({
+  getEventSuggestions: jest.fn().mockResolvedValue([]),
   REMINDER_OPTIONS: [
     { minutes: 0, label: '정각' },
     { minutes: 10, label: '10분 전' },
@@ -59,6 +60,8 @@ const defaultProps = {
   onClose: jest.fn(),
   onSave: jest.fn().mockResolvedValue(undefined),
 }
+
+const mockGetEventSuggestions = getEventSuggestions as jest.MockedFunction<typeof getEventSuggestions>
 
 describe('EventFormModal', () => {
   beforeEach(() => {
@@ -863,6 +866,119 @@ describe('EventFormModal', () => {
         }),
       })
     )
+  })
+})
+
+// ── 일정 제목 추천 ───────────────────────────────────────────
+
+describe('일정 제목 추천', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+    mockGetEventSuggestions.mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('추천 선택 시 날짜를 유지하고 이전 일정 설정을 적용한다', async () => {
+    const sourceStart = new Date(2026, 0, 1, 15, 30)
+    const sourceEnd = new Date(sourceStart.getTime() + 90 * 60 * 1000)
+    mockGetEventSuggestions.mockResolvedValueOnce([{
+      id: 'evt-suggestion',
+      title: '태하병원',
+      calendar_id: 'cal-2',
+      start_at: sourceStart.toISOString(),
+      end_at: sourceEnd.toISOString(),
+      is_all_day: false,
+      label_color: '#3b82f6',
+      event_reminders: [
+        { remind_minutes_before: 10 },
+        { remind_minutes_before: 30 },
+      ],
+    }])
+
+    render(
+      <EventFormModal
+        {...defaultProps}
+        calendars={multipleCalendars}
+        initialDate={new Date(2026, 8, 7)}
+        familyId="fam-1"
+        userId="user-1"
+      />
+    )
+
+    const titleInput = screen.getByPlaceholderText('제목')
+    fireEvent.focus(titleInput)
+    fireEvent.change(titleInput, { target: { value: '태' } })
+    await act(async () => {
+      jest.advanceTimersByTime(250)
+      await Promise.resolve()
+    })
+
+    expect(mockGetEventSuggestions).toHaveBeenCalledWith('fam-1', 'user-1', '태')
+    fireEvent.click(screen.getByRole('option', { name: /태하병원/ }))
+    await act(async () => { fireEvent.click(screen.getByText('저장')) })
+
+    const saved = defaultProps.onSave.mock.calls[0][0]
+    expect(saved).toEqual(expect.objectContaining({
+      calendarId: 'cal-2',
+      title: '태하병원',
+      localStartDate: '2026-09-07',
+      isAllDay: false,
+      reminderMinutes: [10, 30],
+      recurrence: null,
+      labelColor: '#3b82f6',
+    }))
+    expect(new Date(saved.startAt).getHours()).toBe(15)
+    expect(new Date(saved.startAt).getMinutes()).toBe(30)
+    expect(new Date(saved.endAt!).getTime() - new Date(saved.startAt).getTime()).toBe(90 * 60 * 1000)
+  })
+
+  it('일본어 입력 조합이 끝난 뒤에만 접두어를 검색한다', async () => {
+    render(
+      <EventFormModal
+        {...defaultProps}
+        familyId="fam-1"
+        userId="user-1"
+      />
+    )
+
+    const titleInput = screen.getByPlaceholderText('제목')
+    fireEvent.compositionStart(titleInput)
+    fireEvent.change(titleInput, { target: { value: 'レ' } })
+    await act(async () => { jest.advanceTimersByTime(300) })
+    expect(mockGetEventSuggestions).not.toHaveBeenCalled()
+
+    fireEvent.compositionEnd(titleInput, { data: 'レ' })
+    await act(async () => {
+      jest.advanceTimersByTime(250)
+      await Promise.resolve()
+    })
+    expect(mockGetEventSuggestions).toHaveBeenCalledWith('fam-1', 'user-1', 'レ')
+  })
+
+  it('기존 일정 편집에서는 제목 추천을 조회하지 않는다', async () => {
+    const initial: import('@/lib/calendar').CalendarEvent = {
+      id: 'evt-1', family_id: 'fam-1', calendar_id: 'cal-1', created_by: 'user-1',
+      title: '기존 일정', description: null, start_at: '2026-09-07T09:00:00Z',
+      end_at: '2026-09-07T10:00:00Z', is_all_day: false, label_color: null,
+      series_id: null, series_occurrence_date: null, is_cancelled: false,
+      created_at: '', updated_at: '',
+    }
+    render(
+      <EventFormModal
+        {...defaultProps}
+        initial={initial}
+        familyId="fam-1"
+        userId="user-1"
+      />
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '태' } })
+    await act(async () => { jest.advanceTimersByTime(300) })
+    expect(mockGetEventSuggestions).not.toHaveBeenCalled()
   })
 })
 

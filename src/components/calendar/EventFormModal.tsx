@@ -2,7 +2,15 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, type MouseEvent } from 'react'
 import { X, Bell, RefreshCw, Check, Tag, CalendarDays, Clock3, ChevronRight, AlignLeft } from 'lucide-react'
-import { REMINDER_OPTIONS, LABEL_COLORS, LABEL_COLOR_NAMES, type Calendar, type CalendarEvent } from '@/lib/calendar'
+import {
+  getEventSuggestions,
+  REMINDER_OPTIONS,
+  LABEL_COLORS,
+  LABEL_COLOR_NAMES,
+  type Calendar,
+  type CalendarEvent,
+  type EventSuggestion,
+} from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
 import { TimeWheelPicker } from './TimeWheelPicker'
 import { RecurrencePickerSheet } from './RecurrencePickerSheet'
@@ -89,6 +97,8 @@ interface Props {
   recurrenceScope?: RecurrenceScope
   defaultLabelColor?: string | null
   defaultLabelColorsByCalendar?: Record<string, string | null>
+  familyId?: string | null
+  userId?: string | null
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -129,6 +139,8 @@ export function EventFormModal({
   recurrenceScope,
   defaultLabelColor,
   defaultLabelColorsByCalendar,
+  familyId,
+  userId,
   calendars,
   onClose,
   onSave,
@@ -186,6 +198,9 @@ export function EventFormModal({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
   const [showConversionConfirm, setShowConversionConfirm] = useState(false)
+  const [suggestions, setSuggestions] = useState<EventSuggestion[]>([])
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [isComposingTitle, setIsComposingTitle] = useState(false)
 
   const isNewEvent = !initial
   const isRegularEventEdit = Boolean(initial && !initial.series_id)
@@ -220,6 +235,8 @@ export function EventFormModal({
   const endDateInputRef = useRef<HTMLInputElement>(null)
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null)
   const labelColorTouchedRef = useRef(false)
+  const suggestionRequestSeqRef = useRef(0)
+  const selectedSuggestionTitleRef = useRef<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -236,6 +253,31 @@ export function EventFormModal({
       defaultLabelColor
     ))
   }, [calendarId, defaultLabelColor, defaultLabelColorsByCalendar, initial])
+
+  useEffect(() => {
+    const query = title.trim()
+    if (
+      !isNewEvent ||
+      !familyId ||
+      !userId ||
+      !query ||
+      isComposingTitle ||
+      selectedSuggestionTitleRef.current === title
+    ) return
+
+    const requestSeq = suggestionRequestSeqRef.current
+    const timer = setTimeout(() => {
+      void getEventSuggestions(familyId, userId, query)
+        .then((results) => {
+          if (suggestionRequestSeqRef.current === requestSeq) setSuggestions(results)
+        })
+        .catch(() => {
+          if (suggestionRequestSeqRef.current === requestSeq) setSuggestions([])
+        })
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [familyId, isComposingTitle, isNewEvent, title, userId])
 
   useLayoutEffect(() => {
     const textarea = descriptionTextareaRef.current
@@ -359,6 +401,52 @@ export function EventFormModal({
     })
   }
 
+  const handleTitleChange = (value: string) => {
+    suggestionRequestSeqRef.current += 1
+    selectedSuggestionTitleRef.current = null
+    setTitle(value)
+    setSuggestions([])
+  }
+
+  const applySuggestion = (suggestion: EventSuggestion) => {
+    suggestionRequestSeqRef.current += 1
+    selectedSuggestionTitleRef.current = suggestion.title
+    labelColorTouchedRef.current = true
+    setTitle(suggestion.title)
+    setSuggestions([])
+    setSuggestionsOpen(false)
+    setLabelColor(suggestion.label_color)
+    setLabelPickerOpen(false)
+    setReminderMinutes(new Set(
+      suggestion.event_reminders.map((reminder) => reminder.remind_minutes_before)
+    ))
+    setIsAllDay(suggestion.is_all_day)
+    setActiveTimePicker(null)
+    setDateError(null)
+
+    if (suggestion.calendar_id && calendars.some((calendar) => calendar.id === suggestion.calendar_id)) {
+      setCalendarId(suggestion.calendar_id)
+    }
+
+    if (suggestion.is_all_day) {
+      setEndDate(startDate)
+      return
+    }
+
+    const sourceStart = new Date(suggestion.start_at)
+    const sourceEnd = suggestion.end_at ? new Date(suggestion.end_at) : null
+    const durationMs = sourceEnd && sourceEnd > sourceStart
+      ? sourceEnd.getTime() - sourceStart.getTime()
+      : 60 * 60 * 1000
+    const nextStartTime = formatLocalTime(sourceStart)
+    const nextStart = buildLocalDateTime(startDate, nextStartTime)
+    const nextEnd = new Date(nextStart.getTime() + durationMs)
+
+    setStartTime(nextStartTime)
+    setEndDate(formatLocalDate(nextEnd))
+    setEndTime(formatLocalTime(nextEnd))
+  }
+
   const persistEvent = async () => {
     if (!title.trim() || !startDate) return
     if (dateError || regularConversionError) return
@@ -453,15 +541,68 @@ export function EventFormModal({
 
       <div className="flex-1 overflow-y-auto pb-8 sm:pb-10">
         {/* 제목 */}
-        <div className="px-5 pb-4 sm:px-8 sm:pb-5">
+        <div
+          className="relative px-5 pb-4 sm:px-8 sm:pb-5"
+          onFocus={() => setSuggestionsOpen(true)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setSuggestionsOpen(false)
+            }
+          }}
+        >
           <input
             ref={titleInputRef}
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(event) => handleTitleChange(event.target.value)}
+            onCompositionStart={() => {
+              suggestionRequestSeqRef.current += 1
+              setIsComposingTitle(true)
+            }}
+            onCompositionEnd={(event) => {
+              handleTitleChange(event.currentTarget.value)
+              setIsComposingTitle(false)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setSuggestionsOpen(false)
+            }}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={suggestionsOpen && suggestions.length > 0}
+            aria-controls="event-title-suggestions"
             placeholder="제목"
             className="w-full bg-transparent text-[1.625rem] font-extrabold leading-tight tracking-normal text-stone-900 placeholder:text-stone-400 focus:outline-none dark:text-stone-100 dark:placeholder:text-stone-600 sm:text-[2rem]"
           />
+          {suggestionsOpen && suggestions.length > 0 && (
+            <div
+              id="event-title-suggestions"
+              role="listbox"
+              className="absolute left-5 right-5 top-full z-20 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-lg dark:border-stone-800 dark:bg-stone-900 sm:left-8 sm:right-8"
+            >
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  onClick={() => applySuggestion(suggestion)}
+                  className="flex w-full items-center justify-between gap-4 border-b border-stone-100 px-4 py-3 text-left last:border-b-0 hover:bg-stone-50 focus:bg-stone-50 focus:outline-none dark:border-stone-800 dark:hover:bg-stone-800 dark:focus:bg-stone-800"
+                >
+                  <span className="min-w-0 truncate text-base font-semibold text-stone-900 dark:text-stone-100">
+                    {suggestion.title}
+                  </span>
+                  <span className="shrink-0 text-xs font-medium text-stone-400">
+                    {suggestion.is_all_day
+                      ? '종일'
+                      : formatLocalTime(new Date(suggestion.start_at))}
+                    {suggestion.event_reminders.length > 0
+                      ? ` · 알림 ${suggestion.event_reminders.length}개`
+                      : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {(dateError ?? regularConversionError ?? saveError) && (

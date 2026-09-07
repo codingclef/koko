@@ -7,6 +7,12 @@ export type Calendar = Database['public']['Tables']['calendars']['Row']
 export type CalendarMember = Database['public']['Tables']['calendar_members']['Row']
 export type CalendarEvent = Database['public']['Tables']['events']['Row']
 export type EventReminder = Database['public']['Tables']['event_reminders']['Row']
+export type EventSuggestion = Pick<
+  CalendarEvent,
+  'id' | 'title' | 'calendar_id' | 'start_at' | 'end_at' | 'is_all_day' | 'label_color'
+> & {
+  event_reminders: Pick<EventReminder, 'remind_minutes_before'>[]
+}
 type RecurrenceRuleRow = Database['public']['Tables']['recurrence_rules']['Row']
 type RecurrenceSeriesRow = Database['public']['Tables']['recurrence_series']['Row']
 
@@ -180,6 +186,34 @@ export async function getEventsByRange(
 
   if (error) throw error
   return data ?? []
+}
+
+export async function getEventSuggestions(
+  familyId: string,
+  userId: string,
+  prefix: string
+): Promise<EventSuggestion[]> {
+  const pattern = `${prefix.trim().replace(/[\\%_]/g, '\\$&')}%`
+  const { data, error } = await supabase
+    .from('events')
+    .select('id,title,calendar_id,start_at,end_at,is_all_day,label_color,event_reminders(remind_minutes_before)')
+    .eq('family_id', familyId)
+    .eq('created_by', userId)
+    .eq('is_cancelled', false)
+    .is('series_id', null)
+    .ilike('title', pattern)
+    .order('updated_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw error
+
+  const seen = new Set<string>()
+  return (data ?? []).filter((event) => {
+    const key = event.title.trim().toLocaleLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).slice(0, 5)
 }
 
 // ── Reminders ──────────────────────────────────────────────
