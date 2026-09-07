@@ -8,13 +8,14 @@ import {
   setCalendarMembers,
   getFamilyMembers,
   getEventsByRange,
+  getEventSuggestions,
   getReminders,
 } from '@/lib/calendar'
 
 function makeChain(result: { data: unknown; error: unknown }) {
   const p = Promise.resolve(result)
   const chain: Record<string, unknown> = {}
-  ;['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'gte', 'lte', 'lt', 'or', 'order'].forEach((m) => {
+  ;['select', 'insert', 'update', 'delete', 'eq', 'neq', 'in', 'gte', 'lte', 'lt', 'or', 'order', 'is', 'ilike', 'limit'].forEach((m) => {
     chain[m] = jest.fn().mockReturnValue(chain)
   })
   chain.single = jest.fn().mockReturnValue(p)
@@ -246,6 +247,32 @@ describe('getEventsByRange', () => {
   it('error가 있으면 throw한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'fetch error' } }))
     await expect(getEventsByRange('fam-1', start, endExclusive)).rejects.toEqual({ message: 'fetch error' })
+  })
+})
+
+// ── getEventSuggestions ──────────────────────────────────
+
+describe('getEventSuggestions', () => {
+  it('본인의 일반 일정만 접두어 검색하고 같은 제목은 최신 하나만 반환한다', async () => {
+    const newest = {
+      id: 'evt-2', title: '태하병원', calendar_id: 'cal-1',
+      start_at: '2026-09-07T01:00:00Z', end_at: '2026-09-07T02:00:00Z',
+      is_all_day: false, label_color: '#3b82f6', event_reminders: [],
+    }
+    const chain = makeChain({
+      data: [newest, { ...newest, id: 'evt-1' }, { ...newest, id: 'evt-3', title: '태권도' }],
+      error: null,
+    })
+    mockFrom.mockReturnValue(chain)
+
+    const result = await getEventSuggestions('fam-1', 'user-1', '태')
+
+    expect(result.map((event) => event.id)).toEqual(['evt-2', 'evt-3'])
+    expect(chain.eq).toHaveBeenCalledWith('family_id', 'fam-1')
+    expect(chain.eq).toHaveBeenCalledWith('created_by', 'user-1')
+    expect(chain.is).toHaveBeenCalledWith('series_id', null)
+    expect(chain.ilike).toHaveBeenCalledWith('title', '태%')
+    expect(chain.limit).toHaveBeenCalledWith(50)
   })
 })
 

@@ -1304,6 +1304,8 @@ export function CalendarTab({
           date={editingEvent.date}
           defaultLabelColor={preferences?.last_label_color ?? null}
           defaultLabelColorsByCalendar={calendarLabelColors}
+          familyId={familyId}
+          userId={user?.id}
           calendars={calendars}
           onClose={() => setEditingEvent(null)}
           onSave={handleEventSave}
@@ -1364,6 +1366,8 @@ function EventFormModalWithReminders({
   date,
   defaultLabelColor,
   defaultLabelColorsByCalendar,
+  familyId,
+  userId,
   calendars,
   onClose,
   onSave,
@@ -1372,6 +1376,8 @@ function EventFormModalWithReminders({
   date?: Date
   defaultLabelColor?: string | null
   defaultLabelColorsByCalendar?: Record<string, string | null>
+  familyId?: string | null
+  userId?: string | null
   calendars: Calendar[]
   onClose: () => void
   onSave: (params: {
@@ -1422,6 +1428,8 @@ function EventFormModalWithReminders({
       recurrenceScope={recurrenceScope}
       defaultLabelColor={defaultLabelColor}
       defaultLabelColorsByCalendar={defaultLabelColorsByCalendar}
+      familyId={familyId}
+      userId={userId}
       calendars={calendars}
       onClose={onClose}
       onSave={onSave}
