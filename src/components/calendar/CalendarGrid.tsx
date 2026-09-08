@@ -1,6 +1,19 @@
 'use client'
 
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import { buildCalendarGrid, type CalendarDayCell as DayCell } from '@/lib/calendar-grid'
@@ -293,13 +306,82 @@ interface Props {
   holidays?: Holiday[]
   selectedDate: Date | null
   onSelectDate: (date: Date) => void
+  onMoveEvent?: (event: CalendarEvent, date: Date) => void
+  movingEventId?: string | null
+  onEventDragStateChange?: (dragging: boolean) => void
   showLunar?: boolean
   className?: string
 }
 
+function DroppableDay({
+  date,
+  disabled,
+  className,
+  ariaLabel,
+  onClick,
+  children,
+}: {
+  date: Date
+  disabled: boolean
+  className: string
+  ariaLabel: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `date:${date.getTime()}`,
+    data: { date },
+    disabled,
+  })
+
+  return (
+    <button
+      ref={setNodeRef}
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={`${className}${isOver ? ' bg-accent-100 dark:bg-accent-900/50' : ''}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function DraggableEventChip({
+  event,
+  color,
+  disabled,
+}: {
+  event: CalendarEvent
+  color: string
+  disabled: boolean
+}) {
+  const { isDragging, listeners, setNodeRef } = useDraggable({
+    id: `event:${event.id}`,
+    data: { event },
+    disabled,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      data-event-id={event.id}
+      data-draggable={!disabled}
+      className={`w-full select-none rounded text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap${event.is_all_day ? ' text-white' : ''}${isDragging ? ' opacity-30' : ''}`}
+      style={{ ...getChipStyle(event.is_all_day, color), WebkitTouchCallout: 'none' }}
+      onContextMenu={(event) => {
+        if (!disabled) event.preventDefault()
+      }}
+    >
+      {event.title}
+    </div>
+  )
+}
+
 export function CalendarGrid({
   year, month, events, calendars, activeIds,
-  holidays = [], selectedDate, onSelectDate, showLunar = false, className,
+  holidays = [], selectedDate, onSelectDate, onMoveEvent, movingEventId,
+  onEventDragStateChange, showLunar = false, className,
 }: Props) {
   const gridRef = useRef<HTMLDivElement>(null)
   const weekdayHeaderRef = useRef<HTMLDivElement>(null)
@@ -307,6 +389,11 @@ export function CalendarGrid({
     height: 0,
     weekdayHeaderHeight: WEEKDAY_HEADER_HEIGHT,
   })
+  const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null)
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  )
   const cells = useMemo(() => buildCalendarGrid(year, month), [year, month])
   const today = useMemo(() => new Date(), [])
   const calendarMap = useMemo(() => new Map(calendars.map((c) => [c.id, c])), [calendars])
@@ -407,13 +494,41 @@ export function CalendarGrid({
     }
   }, [rows.length])
 
+  const handleDragStart = (dragEvent: DragStartEvent) => {
+    const event = dragEvent.active.data.current?.event as CalendarEvent | undefined
+    if (!event || event.series_id) return
+    setDraggedEvent(event)
+    onEventDragStateChange?.(true)
+  }
+
+  const handleDragEnd = (dragEvent: DragEndEvent) => {
+    const event = dragEvent.active.data.current?.event as CalendarEvent | undefined
+    const date = dragEvent.over?.data.current?.date as Date | undefined
+    setDraggedEvent(null)
+    onEventDragStateChange?.(false)
+    if (event && date && !event.series_id) onMoveEvent?.(event, date)
+  }
+
+  const handleDragCancel = () => {
+    setDraggedEvent(null)
+    onEventDragStateChange?.(false)
+  }
+
   return (
-    <div
-      ref={gridRef}
-      data-testid="calendar-grid"
-      className={`w-full grid ${className ?? ''}`}
-      style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))`, height: '100%' }}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      autoScroll={false}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
+      <div
+        ref={gridRef}
+        data-testid="calendar-grid"
+        className={`w-full grid ${className ?? ''}`}
+        style={{ gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))`, height: '100%' }}
+      >
       {/* 요일 헤더 — auto 트랙 */}
       <div ref={weekdayHeaderRef} className="grid grid-cols-7">
         {DOW.map((d, i) => (
@@ -481,10 +596,12 @@ export function CalendarGrid({
                   const hiddenSingleEventCount = daySingleEvents.length - visibleSingleEvents.length
 
                   return (
-                    <button
+                    <DroppableDay
                       key={colIdx}
+                      date={cell.date}
+                      disabled={!onMoveEvent || Boolean(movingEventId)}
                       onClick={() => onSelectDate(cell.date)}
-                      aria-label={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
+                      ariaLabel={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
                       className={`relative flex flex-col items-start p-0.5 border-t transition-colors min-h-0 overflow-hidden ${
                         isSelected
                           ? 'bg-accent-50 dark:bg-accent-950/30'
@@ -564,13 +681,12 @@ export function CalendarGrid({
                         {visibleSingleEvents.map((evt) => {
                           const color = getEventColor(evt)
                           return (
-                            <div
+                            <DraggableEventChip
                               key={evt.id}
-                              className={`w-full rounded text-[10px] leading-tight px-1 py-0.5 overflow-hidden whitespace-nowrap${evt.is_all_day ? ' text-white' : ''}`}
-                              style={getChipStyle(evt.is_all_day, color)}
-                            >
-                              {evt.title}
-                            </div>
+                              event={evt}
+                              color={color}
+                              disabled={Boolean(evt.series_id) || Boolean(movingEventId)}
+                            />
                           )
                         })}
                         {singleEventDisplay.showOverflow && hiddenSingleEventCount > 0 && (
@@ -579,7 +695,7 @@ export function CalendarGrid({
                           </div>
                         )}
                       </div>
-                    </button>
+                    </DroppableDay>
                   )
                 })}
               </div>
@@ -635,6 +751,17 @@ export function CalendarGrid({
             </div>
           )
         })}
-    </div>
+      </div>
+      <DragOverlay>
+        {draggedEvent ? (
+          <div
+            className={`max-w-36 rounded text-[10px] leading-tight px-2 py-1 overflow-hidden whitespace-nowrap shadow-lg${draggedEvent.is_all_day ? ' text-white' : ''}`}
+            style={getChipStyle(draggedEvent.is_all_day, getEventColor(draggedEvent))}
+          >
+            {draggedEvent.title}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   )
 }

@@ -42,6 +42,35 @@ export { LABEL_COLORS, LABEL_COLOR_NAMES } from './label-colors'
 
 export type SaveResult = { status: 'success' } | { status: 'partial' }
 
+export function moveEventToDate(event: CalendarEvent, targetDate: Date): CalendarEvent {
+  const start = new Date(event.start_at)
+  if (
+    start.getFullYear() === targetDate.getFullYear() &&
+    start.getMonth() === targetDate.getMonth() &&
+    start.getDate() === targetDate.getDate()
+  ) return event
+
+  const nextStart = new Date(
+    targetDate.getFullYear(),
+    targetDate.getMonth(),
+    targetDate.getDate(),
+    start.getHours(),
+    start.getMinutes(),
+    start.getSeconds(),
+    start.getMilliseconds()
+  )
+  const end = event.end_at ? new Date(event.end_at) : null
+  const nextEnd = end
+    ? new Date(nextStart.getTime() + end.getTime() - start.getTime())
+    : null
+
+  return {
+    ...event,
+    start_at: nextStart.toISOString(),
+    end_at: nextEnd?.toISOString() ?? null,
+  }
+}
+
 export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [
   { label: '5분 전', minutes: 5 },
   { label: '10분 전', minutes: 10 },

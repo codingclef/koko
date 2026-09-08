@@ -17,6 +17,7 @@ import {
   getFamilyMembers,
   getReminders,
   getRecurrenceRule,
+  moveEventToDate,
   type CalendarEvent,
   type FamilyMember,
   type SaveResult,
@@ -183,6 +184,7 @@ export function CalendarTab({
   const [showYearMonthPicker, setShowYearMonthPicker] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [eventSyncWarning, setEventSyncWarning] = useState<string | null>(null)
+  const [movingEventId, setMovingEventId] = useState<string | null>(null)
   const [seriesScopeTarget, setSeriesScopeTarget] = useState<{ event: CalendarEvent; mode: 'edit' | 'delete' } | null>(null)
   const [calendarLabelColors, setCalendarLabelColors] = useState<Record<string, string | null>>({})
 
@@ -227,7 +229,10 @@ export function CalendarTab({
   } | null>(null)
   const calendarLabelPreferencesRevisionRef = useRef(0)
   const eventSaveRequestSeqRef = useRef(0)
+  const eventMoveRequestSeqRef = useRef(0)
   const calendarOpenRequestSeqRef = useRef(0)
+  const eventDragGestureRef = useRef(false)
+  const eventDragResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const previousFamilyIdRef = useRef<string | null>(familyId ?? null)
   const visibleEventRangeKeyRef = useRef<string | null>(
     familyId ? getVisibleEventRange(familyId, year, month).key : null
@@ -246,7 +251,10 @@ export function CalendarTab({
     const nextFamilyId = familyId ?? null
     currentFamilyIdRef.current = nextFamilyId
     eventSaveRequestSeqRef.current += 1
+    eventMoveRequestSeqRef.current += 1
     calendarOpenRequestSeqRef.current += 1
+    eventDragGestureRef.current = false
+    setMovingEventId(null)
     setShowCalendarList(false)
     setCalendarForm(null)
     setCalendarMemberIds([])
@@ -269,6 +277,10 @@ export function CalendarTab({
       status: cachedMembers ? 'ready' : 'idle',
     })
   }, [familyId])
+
+  useEffect(() => () => {
+    if (eventDragResetTimerRef.current) clearTimeout(eventDragResetTimerRef.current)
+  }, [])
 
   const isCurrentCalendarOpenRequest = useCallback((requestFamilyId: string, requestSeq: number) => (
     currentFamilyIdRef.current === requestFamilyId &&
@@ -1047,6 +1059,87 @@ export function CalendarTab({
     }
   }
 
+  const handleEventMove = useCallback(async (event: CalendarEvent, targetDate: Date) => {
+    if (!familyId || event.series_id || movingEventId) return
+
+    const movedEvent = moveEventToDate(event, targetDate)
+    if (movedEvent.start_at === event.start_at) return
+
+    const requestFamilyId = familyId
+    const requestYear = year
+    const requestMonth = month
+    const requestRange = getVisibleEventRange(requestFamilyId, requestYear, requestMonth)
+    const requestSeq = ++eventMoveRequestSeqRef.current
+    const isCurrentMoveRequest = () => (
+      currentFamilyIdRef.current === requestFamilyId &&
+      eventMoveRequestSeqRef.current === requestSeq
+    )
+
+    setMutationError(null)
+    setEventSyncWarning(null)
+    setMovingEventId(event.id)
+    clearFamilyEventRangeCache(requestFamilyId)
+    setEvents((currentEvents) => (
+      currentEvents
+        .map((currentEvent) => currentEvent.id === event.id ? movedEvent : currentEvent)
+        .sort((a, b) => a.start_at.localeCompare(b.start_at))
+    ))
+
+    try {
+      await patchJsonWithAuth(`/api/events/${event.id}`, {
+        startAt: movedEvent.start_at,
+        endAt: movedEvent.end_at,
+      })
+      if (!isCurrentMoveRequest()) return
+
+      setMovingEventId(null)
+      broadcast()
+      void reconcileEventsAfterSave({
+        targetFamilyId: requestFamilyId,
+        targetYear: requestYear,
+        targetMonth: requestMonth,
+      }).then(() => {
+        if (isCurrentMoveRequest()) setEventSyncWarning(null)
+      }).catch((error) => {
+        console.error('[CalendarTab] reconcile after event move failed:', error)
+        if (isCurrentMoveRequest()) {
+          setEventSyncWarning('일정은 이동됐지만 최신 목록을 확인하지 못했어요')
+        }
+      })
+    } catch (error) {
+      console.error('[CalendarTab] handleEventMove failed:', error)
+      if (!isCurrentMoveRequest()) return
+
+      setMovingEventId(null)
+      if (visibleEventRangeKeyRef.current === requestRange.key) {
+        setEvents((currentEvents) => (
+          currentEvents
+            .map((currentEvent) => currentEvent.id === event.id ? event : currentEvent)
+            .sort((a, b) => a.start_at.localeCompare(b.start_at))
+        ))
+      }
+      setMutationError('일정을 옮기지 못했어요')
+      void reconcileEventsAfterSave({
+        targetFamilyId: requestFamilyId,
+        targetYear: requestYear,
+        targetMonth: requestMonth,
+      }).catch((reconcileError) => {
+        console.error('[CalendarTab] reconcile after event move failure failed:', reconcileError)
+      })
+    }
+  }, [broadcast, clearFamilyEventRangeCache, familyId, month, movingEventId, reconcileEventsAfterSave, year])
+
+  const handleEventDragStateChange = useCallback((dragging: boolean) => {
+    if (eventDragResetTimerRef.current) clearTimeout(eventDragResetTimerRef.current)
+    if (dragging) {
+      eventDragGestureRef.current = true
+      return
+    }
+    eventDragResetTimerRef.current = setTimeout(() => {
+      eventDragGestureRef.current = false
+    }, 0)
+  }, [])
+
   const handleEventDelete = async (scope?: RecurrenceScope, eventOverride?: CalendarEvent) => {
     const targetEvent = eventOverride ?? selectedEvent
     if (!targetEvent || !familyId) return
@@ -1163,7 +1256,9 @@ export function CalendarTab({
       className="relative w-full flex-1 min-h-0 flex flex-col bg-white dark:bg-stone-950 overflow-hidden"
       style={{ touchAction: isModalOpen ? 'auto' : 'none' }}
       onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      onTouchEnd={(event) => {
+        if (!eventDragGestureRef.current) onTouchEnd(event)
+      }}
     >
       {/* 헤더 */}
       <div data-testid="calendar-tab-header" className="px-4 pt-2 pb-2 shrink-0">
@@ -1255,11 +1350,14 @@ export function CalendarTab({
           holidays={holidays}
           selectedDate={selectedDate}
           onSelectDate={(date) => {
-            if (!calendarContextReady) return
+            if (!calendarContextReady || eventDragGestureRef.current) return
             setSelectedDate((prev) =>
               prev?.toDateString() === date.toDateString() ? null : date
             )
           }}
+          onMoveEvent={handleEventMove}
+          movingEventId={movingEventId}
+          onEventDragStateChange={handleEventDragStateChange}
           showLunar={preferences?.show_lunar ?? false}
           className="flex-1 min-h-0"
         />

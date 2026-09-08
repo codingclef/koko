@@ -30,6 +30,19 @@ jest.mock('@/lib/calendar', () => ({
   updateEvent: jest.fn(),
   deleteEvent: jest.fn(),
   getReminders: jest.fn().mockResolvedValue([]),
+  moveEventToDate: (event: CalendarEvent, targetDate: Date) => {
+    const start = new Date(event.start_at)
+    const end = event.end_at ? new Date(event.end_at) : null
+    const nextStart = new Date(
+      targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(),
+      start.getHours(), start.getMinutes(), start.getSeconds(), start.getMilliseconds()
+    )
+    return {
+      ...event,
+      start_at: nextStart.toISOString(),
+      end_at: end ? new Date(nextStart.getTime() + end.getTime() - start.getTime()).toISOString() : null,
+    }
+  },
   setReminders: jest.fn(),
   CALENDAR_COLORS: [],
   REMINDER_OPTIONS: [],
@@ -82,10 +95,26 @@ jest.mock('@/components/calendar/CalendarFilter', () => ({
   ),
 }))
 jest.mock('@/components/calendar/CalendarGrid', () => ({
-  CalendarGrid: ({ events, onSelectDate }: { events: CalendarEvent[]; onSelectDate: (date: Date) => void }) => (
+  CalendarGrid: ({ events, onSelectDate, onMoveEvent }: {
+    events: CalendarEvent[]
+    onSelectDate: (date: Date) => void
+    onMoveEvent?: (event: CalendarEvent, date: Date) => void
+  }) => (
     <div data-testid="calendar-grid">
-      {events.map((event) => <span key={event.id}>{event.title}</span>)}
+      {events.map((event) => (
+        <span key={event.id} data-testid={`event-start-${event.id}`} data-start-at={event.start_at}>
+          {event.title}
+        </span>
+      ))}
       <button data-testid="select-date" onClick={() => onSelectDate(new Date('2026-04-17T00:00:00Z'))}>date</button>
+      {events[0] && (
+        <button
+          data-testid="move-event"
+          onClick={() => onMoveEvent?.(events[0], new Date(2026, 8, 10))}
+        >
+          move
+        </button>
+      )}
     </div>
   ),
 }))
@@ -449,6 +478,52 @@ describe('CalendarTab — touch-action 스크롤 차단', () => {
       resolveRefresh?.([createdEvent])
       await refreshPromise
     })
+  })
+
+  it('일반 일정은 날짜 이동을 즉시 반영하고 시각 필드만 저장한다', async () => {
+    const event = buildEvent({
+      start_at: new Date(2026, 8, 7, 9, 30).toISOString(),
+      end_at: new Date(2026, 8, 7, 10, 30).toISOString(),
+    })
+    let resolvePatch: (() => void) | null = null
+    const patchPromise = new Promise<void>((resolve) => {
+      resolvePatch = resolve
+    })
+    mockGetEventsByRange.mockResolvedValue([event])
+    mockPatchJsonWithAuth.mockReturnValueOnce(patchPromise)
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByText('새 일반 일정')
+    fireEvent.click(screen.getByTestId('move-event'))
+
+    const movedStart = new Date(2026, 8, 10, 9, 30).toISOString()
+    const movedEnd = new Date(2026, 8, 10, 10, 30).toISOString()
+    expect(screen.getByTestId(`event-start-${event.id}`)).toHaveAttribute('data-start-at', movedStart)
+    expect(mockPatchJsonWithAuth).toHaveBeenCalledWith(`/api/events/${event.id}`, {
+      startAt: movedStart,
+      endAt: movedEnd,
+    })
+
+    await act(async () => {
+      resolvePatch?.()
+      await patchPromise
+    })
+  })
+
+  it('일정 날짜 이동 저장이 실패하면 원래 날짜로 복원한다', async () => {
+    const event = buildEvent({
+      start_at: new Date(2026, 8, 7, 9, 30).toISOString(),
+      end_at: new Date(2026, 8, 7, 10, 30).toISOString(),
+    })
+    mockGetEventsByRange.mockResolvedValue([event])
+    mockPatchJsonWithAuth.mockRejectedValueOnce(new Error('move failed'))
+
+    render(<CalendarTab {...defaultProps} />)
+    await screen.findByText('새 일반 일정')
+    fireEvent.click(screen.getByTestId('move-event'))
+
+    expect(await screen.findByText('일정을 옮기지 못했어요')).toBeInTheDocument()
+    expect(screen.getByTestId(`event-start-${event.id}`)).toHaveAttribute('data-start-at', event.start_at)
   })
 
   it('신규 일정 폼을 열 때 캘린더별 라벨 색상을 불러와 전달한다', async () => {
