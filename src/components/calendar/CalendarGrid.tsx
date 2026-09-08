@@ -339,7 +339,7 @@ function DroppableDay({
       ref={setNodeRef}
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`${className}${isOver ? ' bg-accent-100 dark:bg-accent-900/50' : ''}`}
+      className={`${className}${isOver ? ' bg-accent-100/70 ring-1 ring-inset ring-accent-400/50 dark:bg-accent-950/50 dark:ring-accent-400/60' : ''}`}
     >
       {children}
     </button>
