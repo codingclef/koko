@@ -11,13 +11,19 @@ jest.mock('@/lib/webpush', () => ({
   default: { sendNotification: (...args: unknown[]) => mockSendNotification(...args) },
 }))
 
-let mockRpcResult: { data: unknown; error: unknown } = { data: [], error: null }
+let mockClaimResult: { data: unknown; error: unknown } = { data: [], error: null }
+let mockAckResult: { data: unknown; error: unknown } = { data: 0, error: null }
 
-const mockRpc: jest.Mock = jest.fn(() => Promise.resolve(mockRpcResult))
+const mockRpc: jest.Mock = jest.fn((name: string) =>
+  Promise.resolve(name === 'claim_due_reminders' ? mockClaimResult : mockAckResult)
+)
 const mockFrom: jest.Mock = jest.fn()
 
 jest.mock('@/lib/supabase-admin', () => ({
-  supabaseAdmin: { rpc: (arg: unknown) => mockRpc(arg), from: (arg: unknown) => mockFrom(arg) },
+  supabaseAdmin: {
+    rpc: (...args: unknown[]) => mockRpc(...args),
+    from: (arg: unknown) => mockFrom(arg),
+  },
 }))
 
 function makeRequest(secret = 'test-secret') {
@@ -38,6 +44,8 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'pub-key'
   process.env.VAPID_PRIVATE_KEY = 'priv-key'
   process.env.CRON_SECRET = 'test-secret'
+  mockClaimResult = { data: [], error: null }
+  mockAckResult = { data: 0, error: null }
 })
 
 describe('POST /api/cron/send-reminders', () => {
@@ -47,21 +55,22 @@ describe('POST /api/cron/send-reminders', () => {
   })
 
   it('발송 대상이 없으면 sent: 0을 반환한다', async () => {
-    mockRpcResult = { data: [], error: null }
+    mockClaimResult = { data: [], error: null }
     const res = await POST(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.sent).toBe(0)
+    expect(mockRpc).toHaveBeenCalledWith('claim_due_reminders')
   })
 
   it('RPC 에러 시 500을 반환한다', async () => {
-    mockRpcResult = { data: null, error: { message: 'rpc error' } }
+    mockClaimResult = { data: null, error: { message: 'rpc error' } }
     const res = await POST(makeRequest())
     expect(res.status).toBe(500)
   })
 
   it('리마인더가 있고 구독이 있으면 web-push를 호출한다', async () => {
-    mockRpcResult = {
+    mockClaimResult = {
       data: [{
         reminder_id: 'r1',
         event_title: '회의',
@@ -97,10 +106,13 @@ describe('POST /api/cron/send-reminders', () => {
     const body = await res.json()
     expect(body.sent).toBe(1)
     expect(mockSendNotification).toHaveBeenCalledTimes(1)
+    expect(mockRpc).toHaveBeenCalledWith('acknowledge_reminders', {
+      p_reminder_ids: ['r1'],
+    })
   })
 
   it('리마인더 본문은 Asia/Tokyo 기준으로 일정 시간을 표시한다', async () => {
-    mockRpcResult = {
+    mockClaimResult = {
       data: [{
         reminder_id: 'r1',
         event_title: '椅子届け',
@@ -134,7 +146,7 @@ describe('POST /api/cron/send-reminders', () => {
   })
 
   it('종일 일정 리마인더 본문에는 시간을 표시하지 않는다', async () => {
-    mockRpcResult = {
+    mockClaimResult = {
       data: [{
         reminder_id: 'r1',
         event_title: '楽天トラベルキャンセル〆',
@@ -168,7 +180,7 @@ describe('POST /api/cron/send-reminders', () => {
   })
 
   it('만료된 구독(410)은 삭제된다', async () => {
-    mockRpcResult = {
+    mockClaimResult = {
       data: [{
         reminder_id: 'r1',
         event_title: '회의',
@@ -202,5 +214,66 @@ describe('POST /api/cron/send-reminders', () => {
     const body = await res.json()
     expect(body.sent).toBe(0)
     expect(body.removed).toBe(1)
+    expect(mockRpc).toHaveBeenCalledWith('acknowledge_reminders', {
+      p_reminder_ids: ['r1'],
+    })
+  })
+
+  it('모든 전송이 일시 실패하면 ack하지 않고 재시도 대상으로 남긴다', async () => {
+    mockClaimResult = {
+      data: [{
+        reminder_id: 'r1',
+        event_title: '회의',
+        event_start: '2026-04-05T10:00:00Z',
+        is_all_day: false,
+        family_id: 'f1',
+      }],
+      error: null,
+    }
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ data: [{ user_id: 'u1', family_id: 'f1' }] }),
+    }))
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({
+        data: [{ id: 'sub1', endpoint: 'https://ep', p256dh: 'k', auth: 'a', user_id: 'u1' }],
+      }),
+    }))
+    mockSendNotification.mockRejectedValue(new Error('temporary failure'))
+
+    const res = await POST(makeRequest())
+    const body = await res.json()
+
+    expect(body).toEqual({ sent: 0, removed: 0, retry: 1 })
+    expect(mockRpc).not.toHaveBeenCalledWith('acknowledge_reminders', expect.anything())
+  })
+
+  it('수신 가능한 구독이 없으면 재시도하지 않고 ack한다', async () => {
+    mockClaimResult = {
+      data: [{
+        reminder_id: 'r1',
+        event_title: '회의',
+        event_start: '2026-04-05T10:00:00Z',
+        is_all_day: false,
+        family_id: 'f1',
+      }],
+      error: null,
+    }
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ data: [{ user_id: 'u1', family_id: 'f1' }] }),
+    }))
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ data: [] }),
+    }))
+
+    const res = await POST(makeRequest())
+
+    expect(await res.json()).toEqual({ sent: 0, removed: 0, retry: 0 })
+    expect(mockRpc).toHaveBeenCalledWith('acknowledge_reminders', {
+      p_reminder_ids: ['r1'],
+    })
   })
 })

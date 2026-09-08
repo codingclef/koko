@@ -126,6 +126,7 @@ export type Database = {
       }
       event_reminders: {
         Row: {
+          claimed_at: string | null
           created_at: string
           event_id: string
           id: string
@@ -133,6 +134,7 @@ export type Database = {
           sent_at: string | null
         }
         Insert: {
+          claimed_at?: string | null
           created_at?: string
           event_id: string
           id?: string
@@ -140,6 +142,7 @@ export type Database = {
           sent_at?: string | null
         }
         Update: {
+          claimed_at?: string | null
           created_at?: string
           event_id?: string
           id?: string
@@ -867,6 +870,20 @@ export type Database = {
           is_all_day: boolean
           family_id: string
         }[]
+      }
+      claim_due_reminders: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          reminder_id: string
+          event_title: string
+          event_start: string
+          is_all_day: boolean
+          family_id: string
+        }[]
+      }
+      acknowledge_reminders: {
+        Args: { p_reminder_ids: string[] }
+        Returns: number
       }
       cleanup_sent_event_reminders: {
         Args: {
