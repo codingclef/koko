@@ -13,7 +13,6 @@ import {
 import type { FamilyMember } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
 
-type SaveResult = { status: 'success' } | { status: 'partial' }
 type View = 'list' | 'detail' | 'new'
 type MemberMap = Record<string, ReminderGroupMember[]>
 
@@ -28,7 +27,7 @@ interface Props {
     name: string,
     color: string,
     memberIds: string[] | null
-  ) => Promise<SaveResult>
+  ) => Promise<void>
   onDelete: (reminderGroupId: string) => Promise<void>
 }
 
@@ -42,7 +41,6 @@ export function ReminderGroupListSheet({
   onDelete,
 }: Props) {
   const [memberMap, setMemberMap] = useState<MemberMap>({})
-  const [listWarning, setListWarning] = useState<string | null>(null)
   const [view, setView] = useState<View>('list')
   const [selectedGroup, setSelectedGroup] = useState<ReminderGroup | null>(null)
   const [memberIds, setMemberIds] = useState<string[] | null>(null)
@@ -75,7 +73,6 @@ export function ReminderGroupListSheet({
     setSelectedGroup(group)
     setMemberIds(null)
     setMemberLoadError(false)
-    setListWarning(null)
     setView('detail')
 
     const seq = ++memberLoadSeqRef.current
@@ -95,7 +92,6 @@ export function ReminderGroupListSheet({
     setSelectedGroup(null)
     setMemberIds([])
     setMemberLoadError(false)
-    setListWarning(null)
     setView('new')
   }
 
@@ -104,19 +100,6 @@ export function ReminderGroupListSheet({
     setSelectedGroup(null)
     setMemberIds(null)
     setMemberLoadError(false)
-  }
-
-  const handleSave = async (
-    reminderGroupId: string,
-    name: string,
-    color: string,
-    nextMemberIds: string[] | null
-  ): Promise<SaveResult> => {
-    const result = await onSave(reminderGroupId, name, color, nextMemberIds)
-    if (result.status === 'partial') {
-      setListWarning('그룹 정보는 저장됐지만 멤버는 저장하지 못했어요')
-    }
-    return result
   }
 
   return (
@@ -135,12 +118,6 @@ export function ReminderGroupListSheet({
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 pb-safe space-y-2">
-            {listWarning && (
-              <div className="mb-1 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
-                {listWarning}
-              </div>
-            )}
-
             <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
               그룹 ({groups.length})
             </p>
@@ -213,7 +190,7 @@ export function ReminderGroupListSheet({
           familyMembers={familyMembers}
           currentUserId={currentUserId}
           onBack={handleBack}
-          onSave={handleSave}
+            onSave={onSave}
           onDelete={onDelete}
         />
       )}
@@ -246,7 +223,7 @@ interface DetailProps {
     name: string,
     color: string,
     memberIds: string[] | null
-  ) => Promise<SaveResult>
+  ) => Promise<void>
   onDelete?: (reminderGroupId: string) => Promise<void>
 }
 

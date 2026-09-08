@@ -5,7 +5,6 @@ import {
   deleteReminderGroup,
   getReminderGroupMembers,
   getReminderGroupMembersForGroups,
-  setReminderGroupMembers,
   createReminderList,
   deleteReminderList,
   getReminderList,
@@ -74,15 +73,9 @@ describe('getReminderGroups', () => {
 })
 
 describe('createReminderGroup', () => {
-  it('그룹 생성 후 owner와 멤버를 등록한다', async () => {
+  it('그룹과 멤버를 원자적으로 생성한다', async () => {
     const mockGroup = { id: 'group-1', name: '집', color: '#3b82f6' }
-    const groupChain = makeChain({ data: mockGroup, error: null })
-    const ownerChain = makeChain({ data: null, error: null })
-    const memberChain = makeChain({ data: null, error: null })
-    mockFrom
-      .mockReturnValueOnce(groupChain)
-      .mockReturnValueOnce(ownerChain)
-      .mockReturnValueOnce(memberChain)
+    mockRpc.mockResolvedValueOnce({ data: mockGroup, error: null })
 
     const result = await createReminderGroup(
       'fam-1',
@@ -93,28 +86,17 @@ describe('createReminderGroup', () => {
     )
 
     expect(result).toEqual(mockGroup)
-    expect(mockFrom).toHaveBeenNthCalledWith(1, 'reminder_groups')
-    expect(groupChain.insert).toHaveBeenCalledWith({
-      family_id: 'fam-1',
-      created_by: 'user-1',
-      name: '집',
-      color: '#3b82f6',
+    expect(mockRpc).toHaveBeenCalledWith('create_reminder_group_with_members_authorized', {
+      p_actor_user_id: 'user-1',
+      p_family_id: 'fam-1',
+      p_name: '집',
+      p_color: '#3b82f6',
+      p_member_user_ids: ['user-1', 'user-2'],
     })
-    expect(mockFrom).toHaveBeenNthCalledWith(2, 'reminder_group_members')
-    expect(ownerChain.insert).toHaveBeenCalledWith({
-      reminder_group_id: 'group-1',
-      user_id: 'user-1',
-      role: 'owner',
-    })
-    expect(memberChain.insert).toHaveBeenCalledWith([
-      { reminder_group_id: 'group-1', user_id: 'user-2', role: 'member' },
-    ])
   })
 
-  it('owner 등록 실패 시 throw한다', async () => {
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: { id: 'group-1' }, error: null }))
-      .mockReturnValueOnce(makeChain({ data: null, error: { message: 'owner error' } }))
+  it('RPC 실패 시 throw한다', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'owner error' } })
 
     await expect(createReminderGroup('fam-1', 'user-1', '집', '#3b82f6')).rejects.toEqual({
       message: 'owner error',
@@ -123,10 +105,17 @@ describe('createReminderGroup', () => {
 })
 
 describe('updateReminderGroup', () => {
-  it('updated_at과 함께 그룹 정보를 수정한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(updateReminderGroup('group-1', { name: '회사' })).resolves.toBeUndefined()
-    expect(mockFrom).toHaveBeenCalledWith('reminder_groups')
+  it('그룹 정보와 멤버를 원자적으로 수정한다', async () => {
+    await expect(
+      updateReminderGroup('group-1', 'user-1', { name: '회사', color: '#22c55e' }, ['user-2'])
+    ).resolves.toBeUndefined()
+    expect(mockRpc).toHaveBeenCalledWith('update_reminder_group_with_members_authorized', {
+      p_actor_user_id: 'user-1',
+      p_reminder_group_id: 'group-1',
+      p_name: '회사',
+      p_color: '#22c55e',
+      p_member_user_ids: ['user-2'],
+    })
   })
 })
 
@@ -160,23 +149,6 @@ describe('getReminderGroupMembersForGroups', () => {
     const result = await getReminderGroupMembersForGroups(['group-1'])
     expect(result).toEqual(mockData)
     expect(mockFrom).toHaveBeenCalledWith('reminder_group_members')
-  })
-})
-
-describe('setReminderGroupMembers', () => {
-  it('owner 제외 멤버를 교체한다', async () => {
-    const deleteChain = makeChain({ data: null, error: null })
-    const insertChain = makeChain({ data: null, error: null })
-    mockFrom.mockReturnValueOnce(deleteChain).mockReturnValueOnce(insertChain)
-
-    await expect(
-      setReminderGroupMembers('group-1', 'user-1', ['user-1', 'user-2'])
-    ).resolves.toBeUndefined()
-
-    expect(deleteChain.neq).toHaveBeenCalledWith('user_id', 'user-1')
-    expect(insertChain.insert).toHaveBeenCalledWith([
-      { reminder_group_id: 'group-1', user_id: 'user-2', role: 'member' },
-    ])
   })
 })
 

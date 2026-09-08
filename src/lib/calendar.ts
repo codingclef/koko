@@ -40,8 +40,6 @@ export const CALENDAR_COLOR_NAMES: Record<string, string> = {
 
 export { LABEL_COLORS, LABEL_COLOR_NAMES } from './label-colors'
 
-export type SaveResult = { status: 'success' } | { status: 'partial' }
-
 export function moveEventToDate(event: CalendarEvent, targetDate: Date): CalendarEvent {
   const start = new Date(event.start_at)
   if (
@@ -111,40 +109,31 @@ export async function createCalendar(
   memberUserIds: string[] = []
 ): Promise<Calendar> {
   const { data, error } = await supabase
-    .from('calendars')
-    .insert({ family_id: familyId, created_by: userId, name, color })
-    .select()
-    .single()
+    .rpc('create_calendar_with_members_authorized', {
+      p_actor_user_id: userId,
+      p_family_id: familyId,
+      p_name: name,
+      p_color: color,
+      p_member_user_ids: memberUserIds,
+    })
   if (error) throw error
-
-  // Step 1: 생성자를 owner로 먼저 단독 insert
-  // (bootstrap RLS 정책 케이스 A — owner 레코드가 없는 상태에서 첫 레코드 등록)
-  const { error: ownerError } = await supabase
-    .from('calendar_members')
-    .insert({ calendar_id: data.id, user_id: userId, role: 'owner' })
-  if (ownerError) throw ownerError
-
-  // Step 2: 나머지 멤버 insert
-  // (owner 레코드가 존재하므로 RLS 케이스 B 통과)
-  const newMembers = memberUserIds
-    .filter((id) => id !== userId)
-    .map((id) => ({ calendar_id: data.id, user_id: id, role: 'member' as const }))
-  if (newMembers.length > 0) {
-    const { error: memberError } = await supabase.from('calendar_members').insert(newMembers)
-    if (memberError) throw memberError
-  }
-
+  if (!data) throw new Error('Calendar creation returned no data')
   return data
 }
 
 export async function updateCalendar(
   calendarId: string,
-  updates: { name?: string; color?: string }
+  userId: string,
+  updates: { name: string; color: string },
+  memberUserIds: string[] | null
 ): Promise<void> {
-  const { error } = await supabase
-    .from('calendars')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', calendarId)
+  const { error } = await supabase.rpc('update_calendar_with_members_authorized', {
+    p_actor_user_id: userId,
+    p_calendar_id: calendarId,
+    p_name: updates.name,
+    p_color: updates.color,
+    p_member_user_ids: memberUserIds,
+  })
   if (error) throw error
 }
 
@@ -177,30 +166,6 @@ export async function getCalendarMembersForCalendars(
     .order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
-}
-
-/** 캘린더 멤버 목록을 일괄 교체 (owner는 항상 유지) */
-export async function setCalendarMembers(
-  calendarId: string,
-  ownerUserId: string,
-  memberUserIds: string[]
-): Promise<void> {
-  // owner 제외한 기존 멤버 전체 삭제
-  const { error: delError } = await supabase
-    .from('calendar_members')
-    .delete()
-    .eq('calendar_id', calendarId)
-    .neq('user_id', ownerUserId)
-  if (delError) throw delError
-
-  const newMembers = memberUserIds
-    .filter((id) => id !== ownerUserId)
-    .map((id) => ({ calendar_id: calendarId, user_id: id, role: 'member' as const }))
-
-  if (newMembers.length === 0) return
-
-  const { error } = await supabase.from('calendar_members').insert(newMembers)
-  if (error) throw error
 }
 
 // ── Events ─────────────────────────────────────────────────

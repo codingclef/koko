@@ -39,7 +39,7 @@ describe('CalendarDetailScreen', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('멤버 로드 실패(memberLoadError) 시 onSave에 null 전달', async () => {
-    defaultProps.onSave.mockResolvedValue({ status: 'success' })
+    defaultProps.onSave.mockResolvedValue(undefined)
 
     render(
       <CalendarDetailScreen
@@ -68,26 +68,8 @@ describe('CalendarDetailScreen', () => {
     expect(screen.getByText('저장').closest('button')).toBeDisabled()
   })
 
-  it('onSave가 success 반환 시 onBack 호출', async () => {
-    defaultProps.onSave.mockResolvedValue({ status: 'success' })
-
-    render(
-      <CalendarDetailScreen
-        {...defaultProps}
-        memberIds={['user-1']}
-        memberLoadError={false}
-      />
-    )
-
-    fireEvent.click(screen.getByText('저장'))
-
-    await waitFor(() => {
-      expect(defaultProps.onBack).toHaveBeenCalled()
-    })
-  })
-
-  it('onSave가 partial 반환 시 onBack 호출', async () => {
-    defaultProps.onSave.mockResolvedValue({ status: 'partial' })
+  it('onSave 성공 시 onBack 호출', async () => {
+    defaultProps.onSave.mockResolvedValue(undefined)
 
     render(
       <CalendarDetailScreen

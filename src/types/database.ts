@@ -740,6 +740,46 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_calendar_with_members_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_family_id: string
+          p_name: string
+          p_color: string
+          p_member_user_ids?: string[]
+        }
+        Returns: Database["public"]["Tables"]["calendars"]["Row"]
+      }
+      update_calendar_with_members_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_calendar_id: string
+          p_name: string
+          p_color: string
+          p_member_user_ids?: string[] | null
+        }
+        Returns: Database["public"]["Tables"]["calendars"]["Row"]
+      }
+      create_reminder_group_with_members_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_family_id: string
+          p_name: string
+          p_color: string
+          p_member_user_ids?: string[]
+        }
+        Returns: Database["public"]["Tables"]["reminder_groups"]["Row"]
+      }
+      update_reminder_group_with_members_authorized: {
+        Args: {
+          p_actor_user_id: string
+          p_reminder_group_id: string
+          p_name: string
+          p_color: string
+          p_member_user_ids?: string[] | null
+        }
+        Returns: Database["public"]["Tables"]["reminder_groups"]["Row"]
+      }
       get_or_create_family: {
         Args: { p_user_id: string }
         Returns: string

@@ -5,7 +5,6 @@ import {
   deleteCalendar,
   getCalendarMembers,
   getCalendarMembersForCalendars,
-  setCalendarMembers,
   getFamilyMembers,
   getEventsByRange,
   getEventSuggestions,
@@ -27,14 +26,19 @@ function makeChain(result: { data: unknown; error: unknown }) {
 }
 
 const mockFrom = jest.fn()
+const mockRpc = jest.fn()
 
 jest.mock('@/lib/supabase', () => ({
-  supabase: { from: (...args: unknown[]) => mockFrom(...args) },
+  supabase: {
+    from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
+  },
 }))
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
+  mockRpc.mockResolvedValue({ data: null, error: null })
 })
 
 describe('moveEventToDate', () => {
@@ -103,42 +107,40 @@ describe('getCalendars', () => {
 // ── createCalendar ────────────────────────────────────────
 
 describe('createCalendar', () => {
-  it('생성된 캘린더를 반환한다 (owner 먼저, members 따로)', async () => {
+  it('캘린더와 멤버를 원자적으로 생성한다', async () => {
     const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))  // calendars insert
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members: owner
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members: members
+    mockRpc.mockResolvedValueOnce({ data: mockCal, error: null })
     const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316', ['user-2'])
     expect(result).toEqual(mockCal)
-    expect(mockFrom).toHaveBeenCalledWith('calendars')
-    expect(mockFrom).toHaveBeenCalledWith('calendar_members')
-    // owner + members = calendar_members 2회 호출
-    expect(mockFrom.mock.calls.filter(([t]) => t === 'calendar_members')).toHaveLength(2)
+    expect(mockRpc).toHaveBeenCalledWith('create_calendar_with_members_authorized', {
+      p_actor_user_id: 'user-1',
+      p_family_id: 'fam-1',
+      p_name: '가족',
+      p_color: '#f97316',
+      p_member_user_ids: ['user-2'],
+    })
   })
 
-  it('memberUserIds 없이도 동작한다 (owner만 등록, members insert 생략)', async () => {
+  it('memberUserIds 없이 빈 배열을 전달한다', async () => {
     const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))  // calendars insert
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))      // calendar_members: owner only
+    mockRpc.mockResolvedValueOnce({ data: mockCal, error: null })
     const result = await createCalendar('fam-1', 'user-1', '가족', '#f97316')
     expect(result).toEqual(mockCal)
-    // owner만 = calendar_members 1회 호출
-    expect(mockFrom.mock.calls.filter(([t]) => t === 'calendar_members')).toHaveLength(1)
+    expect(mockRpc).toHaveBeenCalledWith(
+      'create_calendar_with_members_authorized',
+      expect.objectContaining({ p_member_user_ids: [] })
+    )
   })
 
-  it('calendars insert error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValueOnce(makeChain({ data: null, error: { message: 'insert error' } }))
+  it('RPC error가 있으면 throw한다', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'insert error' } })
     await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toEqual({ message: 'insert error' })
   })
 
-  it('owner insert error가 있으면 throw한다', async () => {
-    const mockCal = { id: 'cal-1', name: '가족', color: '#f97316' }
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: mockCal, error: null }))
-      .mockReturnValueOnce(makeChain({ data: null, error: { message: 'owner insert error' } }))
-    await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toEqual({ message: 'owner insert error' })
+  it('RPC가 데이터를 반환하지 않으면 throw한다', async () => {
+    await expect(createCalendar('fam-1', 'user-1', '가족', '#f97316')).rejects.toThrow(
+      'Calendar creation returned no data'
+    )
   })
 })
 
@@ -189,27 +191,6 @@ describe('getCalendarMembersForCalendars', () => {
   })
 })
 
-// ── setCalendarMembers ────────────────────────────────────
-
-describe('setCalendarMembers', () => {
-  it('owner 제외 기존 멤버 삭제 후 새 멤버를 등록한다', async () => {
-    mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
-    await setCalendarMembers('cal-1', 'owner-1', ['user-2', 'user-3'])
-    expect(mockFrom).toHaveBeenCalledWith('calendar_members')
-  })
-
-  it('새 멤버가 없으면 삭제만 한다', async () => {
-    mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
-    await setCalendarMembers('cal-1', 'owner-1', [])
-    expect(mockFrom).toHaveBeenCalledTimes(1)
-  })
-
-  it('삭제 시 error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'delete error' } }))
-    await expect(setCalendarMembers('cal-1', 'owner-1', ['user-2'])).rejects.toEqual({ message: 'delete error' })
-  })
-})
-
 // ── getFamilyMembers ──────────────────────────────────────
 
 describe('getFamilyMembers', () => {
@@ -235,14 +216,24 @@ describe('getFamilyMembers', () => {
 // ── updateCalendar ────────────────────────────────────────
 
 describe('updateCalendar', () => {
-  it('에러 없이 완료된다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    await expect(updateCalendar('cal-1', { name: '새이름' })).resolves.toBeUndefined()
+  it('기본 정보와 멤버를 원자적으로 수정한다', async () => {
+    await expect(
+      updateCalendar('cal-1', 'user-1', { name: '새이름', color: '#3b82f6' }, ['user-2'])
+    ).resolves.toBeUndefined()
+    expect(mockRpc).toHaveBeenCalledWith('update_calendar_with_members_authorized', {
+      p_actor_user_id: 'user-1',
+      p_calendar_id: 'cal-1',
+      p_name: '새이름',
+      p_color: '#3b82f6',
+      p_member_user_ids: ['user-2'],
+    })
   })
 
   it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'update error' } }))
-    await expect(updateCalendar('cal-1', { name: '새이름' })).rejects.toEqual({ message: 'update error' })
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'update error' } })
+    await expect(
+      updateCalendar('cal-1', 'user-1', { name: '새이름', color: '#3b82f6' }, null)
+    ).rejects.toEqual({ message: 'update error' })
   })
 })
 

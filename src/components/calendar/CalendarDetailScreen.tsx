@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Check } from 'lucide-react'
-import { CALENDAR_COLORS, CALENDAR_COLOR_NAMES, type Calendar, type FamilyMember, type SaveResult } from '@/lib/calendar'
+import { CALENDAR_COLORS, CALENDAR_COLOR_NAMES, type Calendar, type FamilyMember } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
 
 interface Props {
@@ -13,17 +13,12 @@ interface Props {
    * memberLoadError=true 일 때도 null 유지 (빈 배열로 위장하지 않음)
    */
   memberIds: string[] | null
-  /** true 면 멤버 섹션에 에러 문구 표시, 저장 시 setCalendarMembers skip */
+  /** true면 멤버 섹션에 에러 문구를 표시하고 저장 시 기존 멤버를 유지 */
   memberLoadError: boolean
   familyMembers: FamilyMember[]
   currentUserId: string
   onBack: () => void
-  /**
-   * memberIds가 null(에러 포함) 이면 멤버 변경 저장 skip.
-   * 이름/색상 실패 → throw → 이 컴포넌트 catch → 화면 유지 + 에러 표시
-   * 이름/색상 성공 + 멤버 실패 → { status: 'partial' } 반환 → onBack() 호출
-   */
-  onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<SaveResult>
+  onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<void>
   /** 성공 시 onBack() 호출. 실패 시 detail 화면 유지 + 에러 표시 */
   onDelete: (calendarId: string) => Promise<void>
 }
