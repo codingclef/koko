@@ -40,6 +40,30 @@ export function dateOnly(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
+export function addCalendarDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
+}
+
+export function calendarDayDifference(from: Date, to: Date): number {
+  return Math.round((
+    Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) -
+    Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())
+  ) / 86_400_000)
+}
+
+export function getMultiDayDragOffset(
+  eventStart: Date,
+  segmentStart: Date,
+  segmentDayCount: number,
+  pointerRatio: number
+): number {
+  const grabbedDayIndex = Math.min(
+    segmentDayCount - 1,
+    Math.max(0, Math.floor(pointerRatio * segmentDayCount))
+  )
+  return calendarDayDifference(eventStart, addCalendarDays(segmentStart, grabbedDayIndex))
+}
+
 export function isMultiDayAllDay(event: CalendarEvent): boolean {
   if (!event.is_all_day || !event.end_at) return false
   return dateOnly(new Date(event.end_at)) > dateOnly(new Date(event.start_at))

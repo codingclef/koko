@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import {
   isMultiDayAllDay,
+  getMultiDayDragOffset,
   isEventOnDate,
   computeSegments,
   computeLaneHeightsByColumn,
@@ -60,6 +61,26 @@ const defaultProps = {
   selectedDate: null,
   onSelectDate: jest.fn(),
 }
+
+describe('getMultiDayDragOffset', () => {
+  it('여러 날 일정에서 누른 날짜와 시작일의 간격을 계산한다', () => {
+    expect(getMultiDayDragOffset(
+      new Date(2026, 8, 21),
+      new Date(2026, 8, 21),
+      6,
+      3.5 / 6
+    )).toBe(3)
+  })
+
+  it('다음 주에 이어진 조각에서도 원래 시작일부터의 간격을 유지한다', () => {
+    expect(getMultiDayDragOffset(
+      new Date(2026, 8, 30),
+      new Date(2026, 9, 4),
+      3,
+      0.1
+    )).toBe(4)
+  })
+})
 
 // ── isMultiDayAllDay ─────────────────────────────────────────
 
