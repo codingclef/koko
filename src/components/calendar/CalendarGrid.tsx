@@ -16,284 +16,32 @@ import {
 } from '@dnd-kit/core'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
-import { buildCalendarGrid, type CalendarDayCell as DayCell } from '@/lib/calendar-grid'
+import {
+  buildCalendarGrid,
+  CALENDAR_EVENT_LANE_HEIGHT,
+  computeLaneHeightsByColumn,
+  computeReservedLaneHeightsByColumn,
+  computeSegments,
+  dateOnly,
+  getSingleEventDisplayBudget,
+  isMultiDayAllDay,
+  isSameDay,
+  shouldRenderMultiDayAboveHolidays,
+  splitSegmentsByHolidayOffsets,
+  type CalendarDayCell as DayCell,
+} from '@/lib/calendar-grid'
 import { toDisplayColor } from '@/lib/label-colors'
 import type { Holiday } from '@/types/holidays'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 const DATE_HEADER_HEIGHT = 28  // px – date circle (h-6=24) + mb-0.5 (2) + border (1) ≈ 28
 const LUNAR_DATE_HEIGHT = 12   // px – text-[9px] leading-tight (9 × 1.25 ≈ 12)
-const LANE_HEIGHT = 18         // px – bar (16) + gap (2)
 const WEEKDAY_HEADER_HEIGHT = 28
-const CELL_VERTICAL_CHROME = 5 // p-0.5 top/bottom + border-t
-const CHIP_HEIGHT = 17        // text-[10px] leading-tight + py-0.5
-const CHIP_GAP = 2            // space-y-0.5
-const HOLIDAY_EVENT_GAP = 2
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
-}
-
-function dateOnly(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
-}
-
-export function isMultiDayAllDay(event: CalendarEvent): boolean {
-  if (!event.is_all_day || !event.end_at) return false
-  return dateOnly(new Date(event.end_at)) > dateOnly(new Date(event.start_at))
-}
-
-export function isEventOnDate(event: CalendarEvent, date: Date): boolean {
-  const target = dateOnly(date)
-  const start = dateOnly(new Date(event.start_at))
-  if (isMultiDayAllDay(event)) {
-    const end = dateOnly(new Date(event.end_at!))
-    return target >= start && target <= end
-  }
-  return target.getTime() === start.getTime()
-}
 
 function getChipStyle(isAllDay: boolean, color: string): CSSProperties {
   if (isAllDay) return { backgroundColor: color }
   return { backgroundColor: color + '26', color }
 }
-
-export function getHolidayBlockHeight(holidayCount: number): number {
-  if (holidayCount <= 0) return 0
-  return holidayCount * CHIP_HEIGHT + Math.max(0, holidayCount - 1) * CHIP_GAP
-}
-
-export function getHolidayOverlayOffset(holidayCount: number): number {
-  if (holidayCount <= 0) return 0
-  return getHolidayBlockHeight(holidayCount) + HOLIDAY_EVENT_GAP
-}
-
-interface DisplaySegment extends EventSegment {
-  holidayOffset: number
-  showLeadingContinuation: boolean
-  showTrailingContinuation: boolean
-  insetLeft: boolean
-  insetRight: boolean
-}
-
-export function shouldRenderMultiDayAboveHolidays(
-  segments: EventSegment[],
-  holidayCountsByColumn: number[]
-): boolean {
-  // Default policy keeps holiday-aware splits so holiday-free days do not drop.
-  // Long holiday streaks are the exception: keep one continuous multi-day bar above them.
-  let streakStart = -1
-
-  for (let col = 0; col <= holidayCountsByColumn.length; col += 1) {
-    const hasHoliday = col < holidayCountsByColumn.length && (holidayCountsByColumn[col] ?? 0) > 0
-
-    if (hasHoliday) {
-      if (streakStart === -1) streakStart = col
-      continue
-    }
-
-    if (streakStart === -1) continue
-
-    const streakEnd = col
-    const streakLength = streakEnd - streakStart
-    if (streakLength >= 2) {
-      const crossesHolidayStreak = segments.some((seg) => (
-        seg.colStart < streakStart &&
-        seg.colStart + seg.colSpan > streakStart &&
-        seg.colStart + seg.colSpan >= streakEnd
-      ))
-      if (crossesHolidayStreak) return true
-    }
-
-    streakStart = -1
-  }
-
-  return false
-}
-
-export function splitSegmentsByHolidayOffsets(
-  segments: EventSegment[],
-  holidayCountsByColumn: number[]
-): DisplaySegment[] {
-  const displaySegments: DisplaySegment[] = []
-
-  for (const seg of segments) {
-    const segmentEnd = seg.colStart + seg.colSpan
-    let pieceStart = seg.colStart
-    let currentHolidayCount = holidayCountsByColumn[pieceStart] ?? 0
-
-    for (let col = seg.colStart + 1; col <= segmentEnd; col += 1) {
-      const nextHolidayCount = col < segmentEnd ? (holidayCountsByColumn[col] ?? 0) : null
-      if (nextHolidayCount === currentHolidayCount) continue
-
-      const isPieceStart = pieceStart === seg.colStart
-      const isPieceEnd = col === segmentEnd
-      displaySegments.push({
-        ...seg,
-        colStart: pieceStart,
-        colSpan: col - pieceStart,
-        isStart: seg.isStart && isPieceStart,
-        isEnd: seg.isEnd && isPieceEnd,
-        holidayOffset: getHolidayOverlayOffset(currentHolidayCount),
-        showLeadingContinuation: !seg.isStart && isPieceStart,
-        showTrailingContinuation: !seg.isEnd && isPieceEnd,
-        insetLeft: isPieceStart,
-        insetRight: isPieceEnd,
-      })
-
-      pieceStart = col
-      currentHolidayCount = nextHolidayCount ?? 0
-    }
-  }
-
-  return displaySegments
-}
-
-export function getSingleEventDisplayBudget({
-  rowHeight,
-  dateHeaderHeight,
-  laneAreaHeight,
-  holidayCount,
-  hasHolidaysAndEvents,
-  singleEventCount,
-}: {
-  rowHeight: number | null
-  dateHeaderHeight: number
-  laneAreaHeight: number
-  holidayCount: number
-  hasHolidaysAndEvents: boolean
-  singleEventCount: number
-}): { visibleCount: number; showOverflow: boolean } {
-  if (singleEventCount <= 0) return { visibleCount: 0, showOverflow: false }
-  if (rowHeight === null || rowHeight <= 0) {
-    const visibleCount = Math.min(3, singleEventCount)
-    return { visibleCount, showOverflow: singleEventCount > visibleCount }
-  }
-
-  const reservedHeight =
-    CELL_VERTICAL_CHROME +
-    dateHeaderHeight +
-    laneAreaHeight +
-    holidayCount * CHIP_HEIGHT +
-    Math.max(0, holidayCount - 1) * CHIP_GAP +
-    (hasHolidaysAndEvents ? HOLIDAY_EVENT_GAP : 0)
-  const availableHeight = Math.max(0, rowHeight - reservedHeight)
-  const availableLines = availableHeight >= CHIP_HEIGHT
-    ? Math.floor((availableHeight + CHIP_GAP) / (CHIP_HEIGHT + CHIP_GAP))
-    : 0
-
-  if (availableLines <= 0) return { visibleCount: 0, showOverflow: false }
-  if (singleEventCount <= availableLines) {
-    return { visibleCount: singleEventCount, showOverflow: false }
-  }
-
-  // Leave one visible line for the "+N" overflow indicator.
-  return { visibleCount: Math.max(0, availableLines - 1), showOverflow: true }
-}
-
-interface EventSegment {
-  event: CalendarEvent
-  colStart: number // 0–6 within this row
-  colSpan: number  // 1–7
-  lane: number
-  isStart: boolean // first visible segment of the event
-  isEnd: boolean   // last visible segment of the event
-}
-
-export function computeSegments(row: DayCell[], multiDayEvents: CalendarEvent[]): EventSegment[] {
-  if (multiDayEvents.length === 0 || row.length < 7) return []
-  const rowStart = dateOnly(row[0].date)
-  const rowEnd = dateOnly(row[6].date)
-
-  const segments: EventSegment[] = []
-
-  for (const event of multiDayEvents) {
-    const eventStart = dateOnly(new Date(event.start_at))
-    const eventEnd = dateOnly(new Date(event.end_at!))
-
-    if (eventEnd < rowStart || eventStart > rowEnd) continue
-
-    // Clamp to row bounds
-    const segStart = eventStart < rowStart ? rowStart : eventStart
-    const segEnd = eventEnd > rowEnd ? rowEnd : eventEnd
-    const colStart = segStart.getDay()
-    const colSpan = segEnd.getDay() - colStart + 1
-
-    segments.push({
-      event,
-      colStart,
-      colSpan,
-      lane: 0,
-      isStart: isSameDay(segStart, eventStart),
-      isEnd: isSameDay(segEnd, eventEnd),
-    })
-  }
-
-  // Precompute sort keys to avoid repeated dateOnly() calls inside comparator
-  const sortKeys = new Map(multiDayEvents.map((e) => {
-    const start = dateOnly(new Date(e.start_at)).getTime()
-    const dur = e.end_at ? dateOnly(new Date(e.end_at)).getTime() - start : 0
-    return [e.id, { start, dur }]
-  }))
-
-  // Stable sort: start asc → duration desc → id asc
-  segments.sort((a, b) => {
-    const ak = sortKeys.get(a.event.id)!
-    const bk = sortKeys.get(b.event.id)!
-    return ak.start - bk.start || bk.dur - ak.dur || a.event.id.localeCompare(b.event.id)
-  })
-
-  // Greedy lane assignment
-  const laneEndCol: number[] = []
-  for (const seg of segments) {
-    let lane = laneEndCol.findIndex((end) => end < seg.colStart)
-    if (lane === -1) {
-      lane = laneEndCol.length
-      laneEndCol.push(-1)
-    }
-    seg.lane = lane
-    laneEndCol[lane] = seg.colStart + seg.colSpan - 1
-  }
-
-  return segments
-}
-
-export function computeLaneHeightsByColumn(segments: EventSegment[], baseOffset = 0): number[] {
-  const heights = Array.from({ length: 7 }, () => 0)
-
-  for (const seg of segments) {
-    const laneHeight = baseOffset + (seg.lane + 1) * LANE_HEIGHT
-    const endCol = seg.colStart + seg.colSpan
-    for (let col = seg.colStart; col < endCol; col += 1) {
-      if (laneHeight > heights[col]) heights[col] = laneHeight
-    }
-  }
-
-  return heights
-}
-
-export function computeReservedLaneHeightsByColumn(
-  segments: DisplaySegment[],
-  holidayCountsByColumn: number[]
-): number[] {
-  const heights = Array.from({ length: 7 }, () => 0)
-
-  for (const seg of segments) {
-    const segmentBottom = seg.holidayOffset + (seg.lane + 1) * LANE_HEIGHT
-    const endCol = seg.colStart + seg.colSpan
-    for (let col = seg.colStart; col < endCol; col += 1) {
-      const reservedHeight = Math.max(0, segmentBottom - getHolidayBlockHeight(holidayCountsByColumn[col] ?? 0))
-      if (reservedHeight > heights[col]) heights[col] = reservedHeight
-    }
-  }
-
-  return heights
-}
-
 
 interface Props {
   year: number
@@ -763,7 +511,7 @@ export function CalendarGrid({
                         style={{
                           left: `${(seg.colStart / 7) * 100}%`,
                           width: `${(seg.colSpan / 7) * 100}%`,
-                          top: seg.holidayOffset + seg.lane * LANE_HEIGHT,
+                          top: seg.holidayOffset + seg.lane * CALENDAR_EVENT_LANE_HEIGHT,
                           height: 16,
                           paddingLeft: seg.insetLeft ? 2 : 0,
                           paddingRight: seg.insetRight ? 2 : 0,

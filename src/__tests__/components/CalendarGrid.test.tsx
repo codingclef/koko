@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import {
-  CalendarGrid,
   isMultiDayAllDay,
   isEventOnDate,
   computeSegments,
@@ -11,7 +10,8 @@ import {
   getHolidayOverlayOffset,
   splitSegmentsByHolidayOffsets,
   shouldRenderMultiDayAboveHolidays,
-} from '@/components/calendar/CalendarGrid'
+} from '@/lib/calendar-grid'
+import { CalendarGrid } from '@/components/calendar/CalendarGrid'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import type { Holiday } from '@/hooks/useHolidays'
 
