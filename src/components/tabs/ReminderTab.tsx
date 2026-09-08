@@ -18,7 +18,6 @@ import {
   createReminderGroup,
   updateReminderGroup,
   deleteReminderGroup,
-  setReminderGroupMembers,
   getReminderListsWithPreviews,
   createReminderList,
   deleteReminderList,
@@ -243,27 +242,12 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
     name: string,
     color: string,
     memberIds: string[] | null
-  ): Promise<{ status: 'success' } | { status: 'partial' }> => {
+  ): Promise<void> => {
+    if (!user) return
     setMutationError(null)
-    await updateReminderGroup(reminderGroupId, { name, color })
-
-    if (memberIds === null || !user) {
-      await refreshGroups()
-      broadcast()
-      return { status: 'success' }
-    }
-
-    try {
-      await setReminderGroupMembers(reminderGroupId, user.id, memberIds)
-      await refreshGroups()
-      broadcast()
-      return { status: 'success' }
-    } catch (e) {
-      console.error('[ReminderTab] setReminderGroupMembers failed:', e)
-      await refreshGroups()
-      broadcast()
-      return { status: 'partial' }
-    }
+    await updateReminderGroup(reminderGroupId, user.id, { name, color }, memberIds)
+    await refreshGroups()
+    broadcast()
   }
 
   const handleGroupDelete = async (reminderGroupId: string): Promise<void> => {

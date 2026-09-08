@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { CalendarListSheet } from '@/components/calendar/CalendarListSheet'
 import type { Calendar, FamilyMember } from '@/lib/calendar'
 
@@ -15,7 +15,7 @@ jest.mock('@/components/calendar/CalendarDetailScreen', () => ({
     onSave,
   }: {
     onBack: () => void
-    onSave: (id: string, name: string, color: string, memberIds: string[] | null) => Promise<{ status: string }>
+    onSave: (id: string, name: string, color: string, memberIds: string[] | null) => Promise<void>
   }) => (
     <div data-testid="calendar-detail">
       <button onClick={onBack}>뒤로</button>
@@ -42,14 +42,14 @@ const defaultProps = {
   currentUserId: 'user-1',
   onClose: jest.fn(),
   onAdd: jest.fn(),
-  onSave: jest.fn().mockResolvedValue({ status: 'success' }),
+  onSave: jest.fn().mockResolvedValue(undefined),
   onDelete: jest.fn(),
 }
 
 describe('CalendarListSheet', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    defaultProps.onSave.mockResolvedValue({ status: 'success' })
+    defaultProps.onSave.mockResolvedValue(undefined)
   })
 
   it('캘린더 클릭 시 상세 뷰로 진입', async () => {
@@ -80,18 +80,4 @@ describe('CalendarListSheet', () => {
     expect(defaultProps.onAdd).toHaveBeenCalled()
   })
 
-  it('onSave가 partial 반환 시 리스트 뷰에 경고 배너 표시', async () => {
-    defaultProps.onSave.mockResolvedValue({ status: 'partial' })
-
-    render(<CalendarListSheet {...defaultProps} />)
-
-    fireEvent.click(screen.getByText('가족'))
-    await screen.findByTestId('calendar-detail')
-
-    fireEvent.click(screen.getByText('저장(빈멤버)'))
-
-    await waitFor(() => {
-      expect(screen.getByText('캘린더 정보는 저장됐지만 멤버는 저장하지 못했어요')).toBeInTheDocument()
-    })
-  })
 })

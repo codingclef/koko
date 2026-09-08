@@ -8,7 +8,6 @@ const mockGetReminderGroups = jest.fn()
 const mockCreateReminderGroup = jest.fn()
 const mockUpdateReminderGroup = jest.fn()
 const mockDeleteReminderGroup = jest.fn()
-const mockSetReminderGroupMembers = jest.fn()
 const mockGetFamilyMembers = jest.fn()
 const mockGetReminderListsWithPreviews = jest.fn()
 const mockDeleteReminderList = jest.fn()
@@ -30,7 +29,6 @@ jest.mock('@/lib/reminder-lists', () => ({
   createReminderGroup: (...args: unknown[]) => mockCreateReminderGroup(...args),
   updateReminderGroup: (...args: unknown[]) => mockUpdateReminderGroup(...args),
   deleteReminderGroup: (...args: unknown[]) => mockDeleteReminderGroup(...args),
-  setReminderGroupMembers: (...args: unknown[]) => mockSetReminderGroupMembers(...args),
   getReminderListsWithPreviews: (...args: unknown[]) => mockGetReminderListsWithPreviews(...args),
   createReminderList: (...args: unknown[]) => mockCreateReminderList(...args),
   deleteReminderList: (...args: unknown[]) => mockDeleteReminderList(...args),
@@ -137,7 +135,6 @@ describe('ReminderTab', () => {
     mockCreateReminderGroup.mockResolvedValue({ id: 'group-1' })
     mockUpdateReminderGroup.mockResolvedValue(undefined)
     mockDeleteReminderGroup.mockResolvedValue(undefined)
-    mockSetReminderGroupMembers.mockResolvedValue(undefined)
   })
 
   afterAll(() => {

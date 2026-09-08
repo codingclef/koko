@@ -1,7 +1,7 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { User } from '@supabase/supabase-js'
 import { CalendarTab } from '@/components/tabs/CalendarTab'
-import { getCalendarMembers, getEventsByRange, getFamilyMembers, getRecurrenceRule, setCalendarMembers, updateCalendar, type CalendarEvent } from '@/lib/calendar'
+import { getCalendarMembers, getEventsByRange, getFamilyMembers, getRecurrenceRule, updateCalendar, type CalendarEvent } from '@/lib/calendar'
 import { deleteWithAuth, patchJsonWithAuth, postJsonWithAuth } from '@/lib/api-client'
 import {
   getUserCalendarPreferences,
@@ -23,7 +23,6 @@ jest.mock('@/lib/calendar', () => ({
   deleteCalendar: jest.fn(),
   getCalendarMembers: jest.fn().mockResolvedValue([]),
   getCalendarMembersForCalendars: jest.fn().mockResolvedValue([]),
-  setCalendarMembers: jest.fn(),
   getFamilyMembers: jest.fn().mockResolvedValue([]),
   getRecurrenceRule: jest.fn().mockResolvedValue(null),
   createEvent: jest.fn(),
@@ -322,12 +321,12 @@ jest.mock('@/components/calendar/CalendarListSheet', () => ({
     onDelete,
   }: {
     familyMembers: { user_id: string }[]
-    onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<{ status: string }>
+    onSave: (calendarId: string, name: string, color: string, memberIds: string[] | null) => Promise<void>
     onDelete: (calendarId: string) => Promise<void>
   }) => (
     <div data-testid="calendar-list-sheet" data-member-count={familyMembers.length}>
-      <button data-testid="list-save-null-members" onClick={() => onSave('cal-1', '가족', '#f97316', null)} />
-      <button data-testid="list-save-with-members" onClick={() => onSave('cal-1', '가족', '#f97316', ['user-2'])} />
+      <button data-testid="list-save-null-members" onClick={() => { void onSave('cal-1', '가족', '#f97316', null).catch(() => undefined) }} />
+      <button data-testid="list-save-with-members" onClick={() => { void onSave('cal-1', '가족', '#f97316', ['user-2']).catch(() => undefined) }} />
       <button data-testid="list-delete" onClick={() => onDelete('cal-1')} />
     </div>
   ),
@@ -368,7 +367,6 @@ const mockGetEventsByRange = getEventsByRange as jest.MockedFunction<typeof getE
 const mockGetFamilyMembers = getFamilyMembers as jest.MockedFunction<typeof getFamilyMembers>
 const mockGetCalendarMembers = getCalendarMembers as jest.MockedFunction<typeof getCalendarMembers>
 const mockGetRecurrenceRule = getRecurrenceRule as jest.MockedFunction<typeof getRecurrenceRule>
-const mockSetCalendarMembers = setCalendarMembers as jest.MockedFunction<typeof setCalendarMembers>
 const mockUpdateCalendar = updateCalendar as jest.MockedFunction<typeof updateCalendar>
 const mockDeleteWithAuth = deleteWithAuth as jest.MockedFunction<typeof deleteWithAuth>
 const mockPatchJsonWithAuth = patchJsonWithAuth as jest.MockedFunction<typeof patchJsonWithAuth>
@@ -1241,7 +1239,6 @@ describe('CalendarTab — handleCalendarUpdate', () => {
     mockGetFamilyMembers.mockResolvedValue([])
     mockGetCalendarMembers.mockResolvedValue([])
     mockUpdateCalendar.mockResolvedValue(undefined)
-    mockSetCalendarMembers.mockResolvedValue(undefined)
   })
 
   const openCalendarList = async () => {
@@ -1251,38 +1248,45 @@ describe('CalendarTab — handleCalendarUpdate', () => {
     await screen.findByTestId('calendar-list-sheet')
   }
 
-  it('memberIds null 이면 setCalendarMembers를 호출하지 않는다', async () => {
+  it('멤버 로드 실패 시 기본 정보만 원자적으로 수정한다', async () => {
     await openCalendarList()
 
     fireEvent.click(screen.getByTestId('list-save-null-members'))
 
     await waitFor(() => {
-      expect(mockUpdateCalendar).toHaveBeenCalledWith('cal-1', { name: '가족', color: '#f97316' })
-      expect(mockSetCalendarMembers).not.toHaveBeenCalled()
+      expect(mockUpdateCalendar).toHaveBeenCalledWith(
+        'cal-1',
+        'user-1',
+        { name: '가족', color: '#f97316' },
+        null
+      )
     })
   })
 
-  it('memberIds 배열이면 setCalendarMembers를 호출한다', async () => {
+  it('기본 정보와 멤버를 한 번에 수정한다', async () => {
     await openCalendarList()
 
     fireEvent.click(screen.getByTestId('list-save-with-members'))
 
     await waitFor(() => {
-      expect(mockSetCalendarMembers).toHaveBeenCalledWith('cal-1', 'user-1', ['user-2'])
+      expect(mockUpdateCalendar).toHaveBeenCalledWith(
+        'cal-1',
+        'user-1',
+        { name: '가족', color: '#f97316' },
+        ['user-2']
+      )
     })
   })
 
-  it('setCalendarMembers 실패 시 CalendarTab 에러 배너를 표시하지 않는다 (부분 성공)', async () => {
-    mockSetCalendarMembers.mockRejectedValue(new Error('member save failed'))
+  it('원자적 수정 실패 시 CalendarTab 에러 배너를 표시한다', async () => {
+    mockUpdateCalendar.mockRejectedValue(new Error('save failed'))
 
     await openCalendarList()
     fireEvent.click(screen.getByTestId('list-save-with-members'))
 
     await waitFor(() => {
       expect(mockUpdateCalendar).toHaveBeenCalled()
-      expect(mockSetCalendarMembers).toHaveBeenCalled()
+      expect(screen.getByText('캘린더를 저장하지 못했어요')).toBeInTheDocument()
     })
-    // 부분 성공은 throw가 아닌 partial 반환이므로 CalendarTab 에러 배너 없음
-    expect(screen.queryByText('캘린더를 저장하지 못했어요')).not.toBeInTheDocument()
   })
 })

@@ -56,39 +56,31 @@ export async function createReminderGroup(
   color: string,
   memberUserIds: string[] = []
 ): Promise<ReminderGroup> {
-  const { data, error } = await supabase
-    .from('reminder_groups')
-    .insert({ family_id: familyId, created_by: userId, name, color })
-    .select()
-    .single()
-
+  const { data, error } = await supabase.rpc('create_reminder_group_with_members_authorized', {
+    p_actor_user_id: userId,
+    p_family_id: familyId,
+    p_name: name,
+    p_color: color,
+    p_member_user_ids: memberUserIds,
+  })
   if (error) throw error
-
-  const { error: ownerError } = await supabase
-    .from('reminder_group_members')
-    .insert({ reminder_group_id: data.id, user_id: userId, role: 'owner' })
-  if (ownerError) throw ownerError
-
-  const newMembers = memberUserIds
-    .filter((id) => id !== userId)
-    .map((id) => ({ reminder_group_id: data.id, user_id: id, role: 'member' as const }))
-
-  if (newMembers.length > 0) {
-    const { error: memberError } = await supabase.from('reminder_group_members').insert(newMembers)
-    if (memberError) throw memberError
-  }
-
+  if (!data) throw new Error('Reminder group creation returned no data')
   return data
 }
 
 export async function updateReminderGroup(
   reminderGroupId: string,
-  updates: { name?: string; color?: string }
+  userId: string,
+  updates: { name: string; color: string },
+  memberUserIds: string[] | null
 ): Promise<void> {
-  const { error } = await supabase
-    .from('reminder_groups')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', reminderGroupId)
+  const { error } = await supabase.rpc('update_reminder_group_with_members_authorized', {
+    p_actor_user_id: userId,
+    p_reminder_group_id: reminderGroupId,
+    p_name: updates.name,
+    p_color: updates.color,
+    p_member_user_ids: memberUserIds,
+  })
   if (error) throw error
 }
 
@@ -123,28 +115,6 @@ export async function getReminderGroupMembersForGroups(
 
   if (error) throw error
   return data ?? []
-}
-
-export async function setReminderGroupMembers(
-  reminderGroupId: string,
-  ownerUserId: string,
-  memberUserIds: string[]
-): Promise<void> {
-  const { error: delError } = await supabase
-    .from('reminder_group_members')
-    .delete()
-    .eq('reminder_group_id', reminderGroupId)
-    .neq('user_id', ownerUserId)
-  if (delError) throw delError
-
-  const newMembers = memberUserIds
-    .filter((id) => id !== ownerUserId)
-    .map((id) => ({ reminder_group_id: reminderGroupId, user_id: id, role: 'member' as const }))
-
-  if (newMembers.length === 0) return
-
-  const { error } = await supabase.from('reminder_group_members').insert(newMembers)
-  if (error) throw error
 }
 
 export async function getReminderListsWithPreviews(familyId: string): Promise<ReminderListWithPreview[]> {

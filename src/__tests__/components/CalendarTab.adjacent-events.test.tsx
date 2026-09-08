@@ -111,7 +111,6 @@ jest.mock('@/lib/calendar', () => ({
   deleteCalendar: jest.fn(),
   getCalendarMembers: jest.fn().mockResolvedValue([]),
   getCalendarMembersForCalendars: jest.fn().mockResolvedValue([]),
-  setCalendarMembers: jest.fn(),
   getFamilyMembers: jest.fn().mockResolvedValue([]),
   createEvent: jest.fn(),
   updateEvent: jest.fn(),

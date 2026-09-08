@@ -13,14 +13,12 @@ import {
   updateCalendar,
   deleteCalendar,
   getCalendarMembers,
-  setCalendarMembers,
   getFamilyMembers,
   getReminders,
   getRecurrenceRule,
   moveEventToDate,
   type CalendarEvent,
   type FamilyMember,
-  type SaveResult,
 } from '@/lib/calendar'
 import { getCalendarGridRange } from '@/lib/calendar-grid'
 import { CalendarFilter } from '@/components/calendar/CalendarFilter'
@@ -810,8 +808,7 @@ export function CalendarTab({
 
     try {
       if (calendarForm?.calendar) {
-        await updateCalendar(calendarForm.calendar.id, { name, color })
-        await setCalendarMembers(calendarForm.calendar.id, user.id, memberUserIds)
+        await updateCalendar(calendarForm.calendar.id, user.id, { name, color }, memberUserIds)
       } else {
         await createCalendar(familyId, user.id, name, color, memberUserIds)
       }
@@ -853,33 +850,19 @@ export function CalendarTab({
     name: string,
     color: string,
     memberUserIds: string[] | null,
-  ): Promise<SaveResult> => {
-    if (!user) return { status: 'success' }
+  ): Promise<void> => {
+    if (!user) return
     setMutationError(null)
 
-    // 기본 정보 저장 실패 → 전체 실패 (throw)
     try {
-      await updateCalendar(calendarId, { name, color })
+      await updateCalendar(calendarId, user.id, { name, color }, memberUserIds)
+      await reloadCalendarContext()
     } catch (e) {
       console.error('[CalendarTab] handleCalendarUpdate failed:', e)
       setMutationError('캘린더를 저장하지 못했어요')
       await reloadCalendarContext()
       throw e
     }
-
-    // memberUserIds 가 null 이면 멤버 로드 실패 상태 — setCalendarMembers skip
-    if (memberUserIds !== null) {
-      try {
-        await setCalendarMembers(calendarId, user.id, memberUserIds)
-      } catch (e) {
-        console.error('[CalendarTab] setCalendarMembers failed:', e)
-        await reloadCalendarContext()
-        return { status: 'partial' }
-      }
-    }
-
-    await reloadCalendarContext()
-    return { status: 'success' }
   }
 
   /** CalendarDetailScreen 에서 캘린더 삭제 시 사용 */
