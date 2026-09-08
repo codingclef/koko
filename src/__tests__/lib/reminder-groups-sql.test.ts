@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { readLatestMigrationMatching } from '@/test-utils/migrations'
 
 const migrationPath = path.join(
   process.cwd(),
@@ -32,6 +33,9 @@ const createListSql = () => fs.readFileSync(createListMigrationPath, 'utf8')
 const lockDirectInsertSql = () => fs.readFileSync(lockDirectInsertMigrationPath, 'utf8')
 const updateListGroupSql = () => fs.readFileSync(updateListGroupMigrationPath, 'utf8')
 const addItemSql = () => fs.readFileSync(addItemMigrationPath, 'utf8')
+const groupAccessSql = readLatestMigrationMatching(/create or replace function get_my_reminder_group_ids\(\)/i)
+const listAccessSql = readLatestMigrationMatching(/create or replace function get_my_list_ids\(\)/i)
+const scopeGuardSql = readLatestMigrationMatching(/create or replace function prevent_reminder_list_scope_change\(\)/i)
 
 describe('reminder groups migration', () => {
   it('does not expose grouped lists by clearing reminder_group_id on group delete', () => {
@@ -43,19 +47,15 @@ describe('reminder groups migration', () => {
   })
 
   it('blocks direct list scope changes after creation', () => {
-    const migration = sql()
-
-    expect(migration).toContain('create or replace function prevent_reminder_list_scope_change()')
-    expect(migration).toContain('reminder_list_scope_change_not_allowed')
-    expect(migration).toContain('before update of family_id, reminder_group_id on shopping_lists')
+    expect(scopeGuardSql).toContain('create or replace function prevent_reminder_list_scope_change()')
+    expect(scopeGuardSql).toContain('reminder_list_scope_change_not_allowed')
+    expect(sql()).toContain('before update of family_id, reminder_group_id on shopping_lists')
   })
 
   it('keeps grouped list access behind reminder group membership helpers', () => {
-    const migration = sql()
-
-    expect(migration).toContain('create or replace function get_my_reminder_group_ids()')
-    expect(migration).toContain('create or replace function get_my_list_ids()')
-    expect(migration).toContain('sl.reminder_group_id in (select get_my_reminder_group_ids())')
+    expect(groupAccessSql).toContain('create or replace function get_my_reminder_group_ids()')
+    expect(listAccessSql).toContain('create or replace function get_my_list_ids()')
+    expect(listAccessSql).toContain('sl.reminder_group_id in (select get_my_reminder_group_ids())')
   })
 
   it('backfills group owners and includes created groups in access helpers', () => {
