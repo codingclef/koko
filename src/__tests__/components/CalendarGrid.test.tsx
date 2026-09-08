@@ -616,6 +616,35 @@ describe('CalendarGrid', () => {
     expect(bar).toHaveTextContent('근짱 일본')
   })
 
+  it('비반복 멀티데이 일정 바만 날짜 이동을 시작할 수 있다', () => {
+    const regular = makeEvent({
+      id: 'multi-draggable',
+      title: '일반 여행',
+      is_all_day: true,
+      start_at: '2025-06-10T00:00:00Z',
+      end_at: '2025-06-12T00:00:00Z',
+    })
+    const recurring = makeEvent({
+      id: 'multi-recurring',
+      title: '반복 여행',
+      is_all_day: true,
+      start_at: '2025-06-17T00:00:00Z',
+      end_at: '2025-06-19T00:00:00Z',
+      series_id: 'series-1',
+    })
+
+    render(
+      <CalendarGrid
+        {...defaultProps}
+        events={[regular, recurring]}
+        onMoveEvent={jest.fn()}
+      />
+    )
+
+    expect(screen.getByTitle('일반 여행')).toHaveAttribute('data-draggable', 'true')
+    expect(screen.getByTitle('반복 여행')).toHaveAttribute('data-draggable', 'false')
+  })
+
   it('멀티데이 이벤트는 단일 이벤트 pill로 중복 렌더링되지 않는다', () => {
     const multiEvent = makeEvent({
       id: 'multi-2',

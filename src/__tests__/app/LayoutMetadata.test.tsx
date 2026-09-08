@@ -43,5 +43,9 @@ describe('RootLayout metadata', () => {
     expect(scriptBody).toContain('localStorage.getItem(k)')
     expect(scriptBody).toContain('try{ls=localStorage.getItem(k);}catch(e){}')
     expect(scriptBody).toContain('document.cookie.match')
+    expect(scriptBody).toContain("de.classList.add(dark?'dark':'light')")
+
+    const splashStyle = head.props.children[5].props.dangerouslySetInnerHTML.__html as string
+    expect(splashStyle).toContain('.light #koko-pre-splash{background:#fafaf9}')
   })
 })

@@ -339,7 +339,7 @@ function DroppableDay({
       ref={setNodeRef}
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`${className}${isOver ? ' bg-accent-100 dark:bg-accent-900/50' : ''}`}
+      className={`${className}${isOver ? ' bg-accent-100/70 ring-1 ring-inset ring-accent-400/50 dark:bg-accent-950/50 dark:ring-accent-400/60' : ''}`}
     >
       {children}
     </button>
@@ -375,6 +375,50 @@ function DraggableEventChip({
     >
       {event.title}
     </div>
+  )
+}
+
+function DraggableMultiDaySegment({
+  event,
+  dragId,
+  disabled,
+  className,
+  style,
+  onClick,
+  children,
+}: {
+  event: CalendarEvent
+  dragId: string
+  disabled: boolean
+  className: string
+  style: CSSProperties
+  onClick: () => void
+  children: ReactNode
+}) {
+  const { isDragging, listeners, setNodeRef } = useDraggable({
+    id: dragId,
+    data: { event },
+    disabled,
+  })
+
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      type="button"
+      title={event.title}
+      data-event-id={event.id}
+      data-draggable={!disabled}
+      data-multi-day="true"
+      className={`${className}${isDragging ? ' opacity-30' : ''}`}
+      style={{ ...style, WebkitTouchCallout: 'none' }}
+      onClick={onClick}
+      onContextMenu={(event) => {
+        if (!disabled) event.preventDefault()
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -727,9 +771,10 @@ export function CalendarGrid({
                           paddingRight: seg.insetRight ? 2 : 0,
                         }}
                       >
-                        <button
-                          type="button"
-                          title={seg.event.title}
+                        <DraggableMultiDaySegment
+                          event={seg.event}
+                          dragId={`multi:${seg.event.id}:${rowIdx}:${segIdx}`}
+                          disabled={Boolean(seg.event.series_id) || Boolean(movingEventId)}
                           className="w-full h-full flex items-center justify-center gap-0.5 text-white text-[10px] overflow-hidden whitespace-nowrap pointer-events-auto"
                           style={{
                             backgroundColor: color,
@@ -742,7 +787,7 @@ export function CalendarGrid({
                           {seg.showLeadingContinuation && <span className="shrink-0 opacity-70">‹</span>}
                           <span className="overflow-hidden min-w-0">{seg.event.title}</span>
                           {seg.showTrailingContinuation && <span className="shrink-0 opacity-70">›</span>}
-                        </button>
+                        </DraggableMultiDaySegment>
                       </div>
                     )
                   })}

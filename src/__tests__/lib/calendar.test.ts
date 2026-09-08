@@ -61,6 +61,21 @@ describe('moveEventToDate', () => {
     expect([movedStart.getHours(), movedStart.getMinutes()]).toEqual([9, 30])
     expect(movedEnd.getTime() - movedStart.getTime()).toBe(90 * 60 * 1000)
   })
+
+  it('여러 날 종일 일정은 표시 일수를 유지한다', () => {
+    const event = {
+      is_all_day: true,
+      start_at: new Date(2026, 8, 29).toISOString(),
+      end_at: new Date(2026, 9, 2).toISOString(),
+    } as Parameters<typeof moveEventToDate>[0]
+
+    const moved = moveEventToDate(event, new Date(2026, 10, 5))
+
+    const movedStart = new Date(moved.start_at)
+    const movedEnd = new Date(moved.end_at!)
+    expect([movedStart.getFullYear(), movedStart.getMonth(), movedStart.getDate()]).toEqual([2026, 10, 5])
+    expect([movedEnd.getFullYear(), movedEnd.getMonth(), movedEnd.getDate()]).toEqual([2026, 10, 8])
+  })
 })
 
 // ── getCalendars ──────────────────────────────────────────

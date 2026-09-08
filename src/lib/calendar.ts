@@ -60,9 +60,18 @@ export function moveEventToDate(event: CalendarEvent, targetDate: Date): Calenda
     start.getMilliseconds()
   )
   const end = event.end_at ? new Date(event.end_at) : null
-  const nextEnd = end
+  let nextEnd = end
     ? new Date(nextStart.getTime() + end.getTime() - start.getTime())
     : null
+
+  if (event.is_all_day && end) {
+    const daySpan = Math.round((
+      Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) -
+      Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())
+    ) / 86_400_000)
+    nextEnd = new Date(nextStart)
+    nextEnd.setDate(nextEnd.getDate() + daySpan)
+  }
 
   return {
     ...event,
