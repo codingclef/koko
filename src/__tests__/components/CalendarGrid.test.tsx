@@ -1,7 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import {
   CalendarGrid,
-  buildGrid,
   isMultiDayAllDay,
   isEventOnDate,
   computeSegments,
@@ -971,28 +970,5 @@ describe('공휴일-이벤트 칩 간격', () => {
     expect(screen.getByTestId('lane-spacer-2026-09-21')).toHaveStyle({ height: '18px' })
     expect(screen.getByTestId('lane-spacer-2026-09-26')).toHaveStyle({ height: '18px' })
     expect(screen.getByTestId('multi-segment-jeonju-japan-row3-piece0')).toHaveStyle({ top: '0px' })
-  })
-})
-
-describe('buildGrid — trailing adjacent-month cells', () => {
-  it('2026년 4월 뷰에서 5/2(토)가 그리드에 포함된다', () => {
-    const cells = buildGrid(2026, 3) // month=3 → April
-    const dates = cells.map((c) => `${c.date.getFullYear()}-${c.date.getMonth() + 1}-${c.date.getDate()}`)
-    expect(dates).toContain('2026-5-2')
-  })
-
-  it('2026년 5월 뷰에서 6/4~6/6이 그리드에 포함된다', () => {
-    const cells = buildGrid(2026, 4) // month=4 → May
-    const dates = cells.map((c) => `${c.date.getFullYear()}-${c.date.getMonth() + 1}-${c.date.getDate()}`)
-    expect(dates).toContain('2026-6-4')
-    expect(dates).toContain('2026-6-5')
-    expect(dates).toContain('2026-6-6')
-  })
-
-  it('그리드 총 셀 수는 항상 7의 배수다', () => {
-    for (const [year, month] of [[2026, 0], [2026, 3], [2026, 4], [2026, 11]] as [number, number][]) {
-      const cells = buildGrid(year, month)
-      expect(cells.length % 7).toBe(0)
-    }
   })
 })

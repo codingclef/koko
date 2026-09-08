@@ -147,18 +147,6 @@ export async function setReminderGroupMembers(
   if (error) throw error
 }
 
-export async function getReminderLists(familyId: string): Promise<ReminderList[]> {
-  const { data, error } = await supabase
-    .from('shopping_lists')
-    .select('*')
-    .eq('family_id', familyId)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data ?? []
-}
-
 export async function getReminderListsWithPreviews(familyId: string): Promise<ReminderListWithPreview[]> {
   const { data, error } = await supabase
     .from('shopping_lists')

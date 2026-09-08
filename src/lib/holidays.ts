@@ -21,10 +21,6 @@ const DISPLAY_NAME_ALIAS: Record<string, string> = {
 
 const fallbackCache = new Map<string, Holiday[]>()
 
-export function clearFallbackHolidayCache() {
-  fallbackCache.clear()
-}
-
 export function normalizeHolidayName(name: string): string {
   return DISPLAY_NAME_ALIAS[name] ?? name
 }

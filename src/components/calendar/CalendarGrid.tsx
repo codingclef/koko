@@ -30,8 +30,6 @@ const CHIP_HEIGHT = 17        // text-[10px] leading-tight + py-0.5
 const CHIP_GAP = 2            // space-y-0.5
 const HOLIDAY_EVENT_GAP = 2
 
-export const buildGrid = buildCalendarGrid
-
 function isSameDay(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
