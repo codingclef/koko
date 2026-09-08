@@ -12,18 +12,22 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
 import KoreanLunarCalendar from 'korean-lunar-calendar'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import {
+  addCalendarDays,
   buildCalendarGrid,
   CALENDAR_EVENT_LANE_HEIGHT,
+  calendarDayDifference,
   computeLaneHeightsByColumn,
   computeReservedLaneHeightsByColumn,
   computeSegments,
   dateOnly,
   getSingleEventDisplayBudget,
+  getMultiDayDragOffset,
   isMultiDayAllDay,
   isSameDay,
   shouldRenderMultiDayAboveHolidays,
@@ -62,6 +66,7 @@ interface Props {
 function DroppableDay({
   date,
   disabled,
+  dragPreview,
   className,
   ariaLabel,
   onClick,
@@ -69,12 +74,13 @@ function DroppableDay({
 }: {
   date: Date
   disabled: boolean
+  dragPreview: 'start' | 'range' | null
   className: string
   ariaLabel: string
   onClick: () => void
   children: ReactNode
 }) {
-  const { isOver, setNodeRef } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id: `date:${date.getTime()}`,
     data: { date },
     disabled,
@@ -85,7 +91,14 @@ function DroppableDay({
       ref={setNodeRef}
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`${className}${isOver ? ' bg-accent-100/70 ring-1 ring-inset ring-accent-400/50 dark:bg-accent-950/50 dark:ring-accent-400/60' : ''}`}
+      data-drag-preview={dragPreview ?? undefined}
+      className={`${className}${
+        dragPreview === 'start'
+          ? ' bg-accent-100/70 ring-1 ring-inset ring-accent-400/50 dark:bg-accent-950/50 dark:ring-accent-400/60'
+          : dragPreview === 'range'
+            ? ' bg-accent-100/40 dark:bg-accent-950/30'
+            : ''
+      }`}
     >
       {children}
     </button>
@@ -127,6 +140,8 @@ function DraggableEventChip({
 function DraggableMultiDaySegment({
   event,
   dragId,
+  segmentStart,
+  segmentDayCount,
   disabled,
   className,
   style,
@@ -135,6 +150,8 @@ function DraggableMultiDaySegment({
 }: {
   event: CalendarEvent
   dragId: string
+  segmentStart: Date
+  segmentDayCount: number
   disabled: boolean
   className: string
   style: CSSProperties
@@ -143,7 +160,7 @@ function DraggableMultiDaySegment({
 }) {
   const { isDragging, listeners, setNodeRef } = useDraggable({
     id: dragId,
-    data: { event },
+    data: { event, segmentStart, segmentDayCount },
     disabled,
   })
 
@@ -180,6 +197,9 @@ export function CalendarGrid({
     weekdayHeaderHeight: WEEKDAY_HEADER_HEIGHT,
   })
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null)
+  const [dragPreviewStart, setDragPreviewStart] = useState<Date | null>(null)
+  const dragDayOffsetRef = useRef(0)
+  const dragOffsetReadyRef = useRef(true)
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
@@ -287,22 +307,75 @@ export function CalendarGrid({
   const handleDragStart = (dragEvent: DragStartEvent) => {
     const event = dragEvent.active.data.current?.event as CalendarEvent | undefined
     if (!event || event.series_id) return
+    const segmentStart = dragEvent.active.data.current?.segmentStart as Date | undefined
+    const segmentDayCount = dragEvent.active.data.current?.segmentDayCount as number | undefined
+    const rect = dragEvent.active.rect.current.initial
+    const activatorEvent = dragEvent.activatorEvent
+    const pointerX = 'touches' in activatorEvent
+      ? (activatorEvent as TouchEvent).touches[0]?.clientX
+      : 'clientX' in activatorEvent
+        ? (activatorEvent as MouseEvent).clientX
+        : undefined
+
+    const hasUsablePointer = rect && pointerX !== undefined &&
+      rect.width > 0 && pointerX >= rect.left && pointerX <= rect.right
+    dragOffsetReadyRef.current = !isMultiDayAllDay(event) || Boolean(
+      segmentStart && segmentDayCount && hasUsablePointer
+    )
+    dragDayOffsetRef.current = segmentStart && segmentDayCount && hasUsablePointer
+      ? getMultiDayDragOffset(
+          dateOnly(new Date(event.start_at)),
+          segmentStart,
+          segmentDayCount,
+          (pointerX! - rect!.left) / rect!.width
+        )
+      : 0
     setDraggedEvent(event)
+    setDragPreviewStart(dateOnly(new Date(event.start_at)))
     onEventDragStateChange?.(true)
+  }
+
+  const handleDragOver = (dragEvent: DragOverEvent) => {
+    const date = dragEvent.over?.data.current?.date as Date | undefined
+    const event = dragEvent.active.data.current?.event as CalendarEvent | undefined
+    if (date && event && !dragOffsetReadyRef.current) {
+      const start = dateOnly(new Date(event.start_at))
+      const end = dateOnly(new Date(event.end_at!))
+      if (date >= start && date <= end) {
+        dragDayOffsetRef.current = calendarDayDifference(start, date)
+      }
+      dragOffsetReadyRef.current = true
+    }
+    setDragPreviewStart(date ? addCalendarDays(date, -dragDayOffsetRef.current) : null)
   }
 
   const handleDragEnd = (dragEvent: DragEndEvent) => {
     const event = dragEvent.active.data.current?.event as CalendarEvent | undefined
     const date = dragEvent.over?.data.current?.date as Date | undefined
+    const targetStart = date ? addCalendarDays(date, -dragDayOffsetRef.current) : undefined
     setDraggedEvent(null)
+    setDragPreviewStart(null)
     onEventDragStateChange?.(false)
-    if (event && date && !event.series_id) onMoveEvent?.(event, date)
+    if (event && targetStart && !event.series_id) onMoveEvent?.(event, targetStart)
   }
 
   const handleDragCancel = () => {
     setDraggedEvent(null)
+    setDragPreviewStart(null)
     onEventDragStateChange?.(false)
   }
+
+  const dragPreviewEnd = draggedEvent && dragPreviewStart
+    ? addCalendarDays(
+        dragPreviewStart,
+        isMultiDayAllDay(draggedEvent)
+          ? calendarDayDifference(
+              dateOnly(new Date(draggedEvent.start_at)),
+              dateOnly(new Date(draggedEvent.end_at!))
+            )
+          : 0
+      )
+    : null
 
   return (
     <DndContext
@@ -310,6 +383,7 @@ export function CalendarGrid({
       collisionDetection={pointerWithin}
       autoScroll={false}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
@@ -367,6 +441,12 @@ export function CalendarGrid({
                   const dayHolidays = holidaysByDate.get(ymd) ?? []
                   const isToday = isSameDay(cell.date, today)
                   const isSelected = selectedDate ? isSameDay(cell.date, selectedDate) : false
+                  const isDragPreviewStart = dragPreviewStart
+                    ? isSameDay(cell.date, dragPreviewStart)
+                    : false
+                  const isDragPreviewRange = dragPreviewStart && dragPreviewEnd
+                    ? cell.date >= dragPreviewStart && cell.date <= dragPreviewEnd
+                    : false
                   const dow = cell.date.getDay()
                   const isSun = dow === 0
                   const isSat = dow === 6
@@ -390,6 +470,7 @@ export function CalendarGrid({
                       key={colIdx}
                       date={cell.date}
                       disabled={!onMoveEvent || Boolean(movingEventId)}
+                      dragPreview={isDragPreviewStart ? 'start' : isDragPreviewRange ? 'range' : null}
                       onClick={() => onSelectDate(cell.date)}
                       ariaLabel={`${cell.date.getFullYear()}년 ${cell.date.getMonth() + 1}월 ${cell.date.getDate()}일`}
                       className={`relative flex flex-col items-start p-0.5 border-t transition-colors min-h-0 overflow-hidden ${
@@ -520,6 +601,8 @@ export function CalendarGrid({
                         <DraggableMultiDaySegment
                           event={seg.event}
                           dragId={`multi:${seg.event.id}:${rowIdx}:${segIdx}`}
+                          segmentStart={row[seg.colStart].date}
+                          segmentDayCount={seg.colSpan}
                           disabled={Boolean(seg.event.series_id) || Boolean(movingEventId)}
                           className="w-full h-full flex items-center justify-center gap-0.5 text-white text-[10px] overflow-hidden whitespace-nowrap pointer-events-auto"
                           style={{
