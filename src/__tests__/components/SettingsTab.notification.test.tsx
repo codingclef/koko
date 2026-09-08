@@ -8,6 +8,7 @@ import {
 } from '@/lib/push'
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_THEME } from '@/lib/preferences'
+import { useTheme } from 'next-themes'
 import type { User } from '@supabase/supabase-js'
 import packageInfo from '../../../package.json'
 
@@ -28,6 +29,10 @@ jest.mock('@/lib/push', () => ({
   syncPushSubscriptionIfGranted: jest.fn().mockResolvedValue('connected'),
 }))
 jest.mock('next/navigation', () => ({ useRouter: () => ({ replace: jest.fn() }) }))
+jest.mock('next-themes', () => ({ useTheme: jest.fn() }))
+
+const mockUseTheme = useTheme as jest.MockedFunction<typeof useTheme>
+const mockSetTheme = jest.fn()
 
 const mockUser = { id: 'user-1', email: 'test@example.com' } as User
 
@@ -40,6 +45,14 @@ const defaultProps = {
   appRole: 'member' as const,
   isInitializing: false,
 }
+
+beforeEach(() => {
+  mockUseTheme.mockReturnValue({
+    theme: 'system',
+    setTheme: mockSetTheme,
+    themes: ['system', 'light', 'dark'],
+  })
+})
 
 // 앱 서브뷰로 이동하는 헬퍼
 async function navigateToApp() {
@@ -160,6 +173,16 @@ describe('SettingsTab 앱 서브뷰 — 알림', () => {
   it('현재 앱 버전을 표시한다', async () => {
     await navigateToApp()
     expect(screen.getByText(`버전 ${packageInfo.version}`)).toBeInTheDocument()
+  })
+
+  it('화면 테마를 시스템, 밝게, 어둡게 중에서 선택한다', async () => {
+    await navigateToApp()
+
+    expect(screen.getByRole('button', { name: '시스템' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '밝게' })).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(screen.getByRole('button', { name: '어둡게' }))
+    expect(mockSetTheme).toHaveBeenCalledWith('dark')
   })
 
   it('권한이 granted일 때 실제 구독을 동기화하고 연결 상태를 표시한다', async () => {

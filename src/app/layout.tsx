@@ -27,7 +27,7 @@ export const viewport: Viewport = {
 
 // Applies accent theme and dark class before first paint to prevent FOUC.
 // next-themes stores dark/light preference under 'theme' key in localStorage.
-const HEAD_SCRIPT = `(function(){var de=document.documentElement;var k='koko_theme';var ls=null;try{ls=localStorage.getItem(k);}catch(e){}if(ls){de.setAttribute('data-theme',ls);}else{var m=document.cookie.match('(?:^|;)\\s*'+k+'=([^;]+)');if(m)de.setAttribute('data-theme',m[1]);}var t=null;try{t=localStorage.getItem('theme');}catch(e){}var dark=(t==='dark')||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)de.classList.add('dark');})();`
+const HEAD_SCRIPT = `(function(){var de=document.documentElement;var k='koko_theme';var ls=null;try{ls=localStorage.getItem(k);}catch(e){}if(ls){de.setAttribute('data-theme',ls);}else{var m=document.cookie.match('(?:^|;)\\s*'+k+'=([^;]+)');if(m)de.setAttribute('data-theme',m[1]);}var t=null;try{t=localStorage.getItem('theme');}catch(e){}var dark=(t==='dark')||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);de.classList.add(dark?'dark':'light');})();`
 
 export default function RootLayout({
   children,
@@ -52,7 +52,7 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-jp.min.css"
         />
         <link rel="preload" href="/logo.webp" as="image" />
-        <style dangerouslySetInnerHTML={{ __html: `#koko-pre-splash{background:#fafaf9}@media(prefers-color-scheme:dark){#koko-pre-splash{background:#0f0e0d}}.dark #koko-pre-splash{background:#0f0e0d}` }} />
+        <style dangerouslySetInnerHTML={{ __html: `#koko-pre-splash{background:#fafaf9}@media(prefers-color-scheme:dark){#koko-pre-splash{background:#0f0e0d}}.light #koko-pre-splash{background:#fafaf9}.dark #koko-pre-splash{background:#0f0e0d}` }} />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <PreHydrationSplash />

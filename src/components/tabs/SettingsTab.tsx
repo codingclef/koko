@@ -2,10 +2,11 @@
 
 import { useEffect, useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import {
   LogOut, Share2, Check, Users, Pencil, X,
   Bell, BellOff, ChevronLeft, ChevronRight, UserPlus,
-  UserRound, CalendarDays, Smartphone, RefreshCw,
+  UserRound, CalendarDays, Smartphone, RefreshCw, Monitor, Sun, Moon,
   type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -45,6 +46,12 @@ const SUPPORTED_HOLIDAY_COUNTRIES = [
   { code: 'US', label: '🇺🇸 미국' },
 ]
 
+const DISPLAY_THEMES = [
+  { key: 'system', label: '시스템', icon: Monitor },
+  { key: 'light', label: '밝게', icon: Sun },
+  { key: 'dark', label: '어둡게', icon: Moon },
+] as const
+
 interface Props extends AuthState {
   onNavigateToTab: (tab: Tab) => void
   preferences: UserPreferences | null
@@ -77,6 +84,7 @@ function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
 
 export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, user, familyId, appRole, isInitializing }: Props) {
   const router = useRouter()
+  const { theme = 'system', setTheme } = useTheme()
   const logoutTitleId = useId()
 
   const [view, setView] = useState<SettingsView>('main')
@@ -800,6 +808,31 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
             )}
           </div>
         )}
+
+        <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
+          <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">화면 테마</p>
+          <div role="group" aria-label="화면 테마" className="grid grid-cols-3 gap-2">
+            {DISPLAY_THEMES.map(({ key, label, icon: Icon }) => {
+              const selected = theme === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setTheme(key)}
+                  className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                    selected
+                      ? 'border-accent-400 bg-accent-50 text-accent-700 dark:bg-accent-950/50 dark:text-accent-300'
+                      : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-400 dark:hover:bg-stone-800'
+                  }`}
+                >
+                  <Icon size={20} />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
           <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">테마 색상</p>
