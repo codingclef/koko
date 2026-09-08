@@ -108,12 +108,6 @@ export async function sendEventNotification(params: EventNotificationParams): Pr
   await dispatchPushNotifications(subs, payload)
 }
 
-export function fireEventNotification(params: EventNotificationParams): void {
-  void sendEventNotification(params).catch((err) =>
-    console.error('[push-utils] sendEventNotification failed:', err)
-  )
-}
-
 function getEndpointHost(endpoint: string): string {
   try {
     return new URL(endpoint).host

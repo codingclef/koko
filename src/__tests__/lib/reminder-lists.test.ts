@@ -6,7 +6,6 @@ import {
   getReminderGroupMembers,
   getReminderGroupMembersForGroups,
   setReminderGroupMembers,
-  getReminderLists,
   createReminderList,
   deleteReminderList,
   getReminderList,
@@ -178,27 +177,6 @@ describe('setReminderGroupMembers', () => {
     expect(insertChain.insert).toHaveBeenCalledWith([
       { reminder_group_id: 'group-1', user_id: 'user-2', role: 'member' },
     ])
-  })
-})
-
-describe('getReminderLists', () => {
-  it('정렬된 리스트를 반환한다', async () => {
-    const mockData = [{ id: 'list-1', name: '이마트', sort_order: 0 }]
-    mockFrom.mockReturnValue(makeChain({ data: mockData, error: null }))
-    const result = await getReminderLists('fam-1')
-    expect(result).toEqual(mockData)
-    expect(mockFrom).toHaveBeenCalledWith('shopping_lists')
-  })
-
-  it('data가 null이면 빈 배열을 반환한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
-    const result = await getReminderLists('fam-1')
-    expect(result).toEqual([])
-  })
-
-  it('error가 있으면 throw한다', async () => {
-    mockFrom.mockReturnValue(makeChain({ data: null, error: { message: 'DB error' } }))
-    await expect(getReminderLists('fam-1')).rejects.toEqual({ message: 'DB error' })
   })
 })
 
