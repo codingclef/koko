@@ -10,6 +10,7 @@ import {
   getEventsByRange,
   getEventSuggestions,
   getReminders,
+  moveEventToDate,
 } from '@/lib/calendar'
 
 function makeChain(result: { data: unknown; error: unknown }) {
@@ -34,6 +35,32 @@ jest.mock('@/lib/supabase', () => ({
 beforeEach(() => {
   jest.clearAllMocks()
   mockFrom.mockImplementation(() => makeChain({ data: null, error: null }))
+})
+
+describe('moveEventToDate', () => {
+  it('같은 날짜로 놓으면 원본을 그대로 반환한다', () => {
+    const event = {
+      start_at: '2026-09-07T09:30:00+09:00',
+      end_at: '2026-09-07T10:30:00+09:00',
+    } as Parameters<typeof moveEventToDate>[0]
+
+    expect(moveEventToDate(event, new Date(2026, 8, 7))).toBe(event)
+  })
+
+  it('시작 시각과 기간을 유지하며 날짜만 옮긴다', () => {
+    const event = {
+      start_at: new Date(2026, 8, 7, 9, 30).toISOString(),
+      end_at: new Date(2026, 8, 7, 11, 0).toISOString(),
+    } as Parameters<typeof moveEventToDate>[0]
+
+    const moved = moveEventToDate(event, new Date(2026, 9, 2))
+
+    const movedStart = new Date(moved.start_at)
+    const movedEnd = new Date(moved.end_at!)
+    expect([movedStart.getFullYear(), movedStart.getMonth(), movedStart.getDate()]).toEqual([2026, 9, 2])
+    expect([movedStart.getHours(), movedStart.getMinutes()]).toEqual([9, 30])
+    expect(movedEnd.getTime() - movedStart.getTime()).toBe(90 * 60 * 1000)
+  })
 })
 
 // ── getCalendars ──────────────────────────────────────────

@@ -552,6 +552,24 @@ describe('CalendarGrid', () => {
     expect(screen.getByText('생일파티')).toBeInTheDocument()
   })
 
+  it('일반 단일 일정만 날짜 이동을 시작할 수 있다', () => {
+    const recurringEvent = makeEvent({
+      id: 'evt-recurring',
+      title: '반복 일정',
+      series_id: 'series-1',
+    })
+    render(
+      <CalendarGrid
+        {...defaultProps}
+        events={[singleEvent, recurringEvent]}
+        onMoveEvent={jest.fn()}
+      />
+    )
+
+    expect(screen.getByText('생일파티')).toHaveAttribute('data-draggable', 'true')
+    expect(screen.getByText('반복 일정')).toHaveAttribute('data-draggable', 'false')
+  })
+
   it('이벤트 pill은 role=button 없이 렌더링된다', () => {
     render(<CalendarGrid {...defaultProps} />)
     expect(screen.getByText('생일파티')).not.toHaveAttribute('role', 'button')
