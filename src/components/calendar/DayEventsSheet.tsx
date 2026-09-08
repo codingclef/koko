@@ -3,7 +3,7 @@
 import { Plus, X } from 'lucide-react'
 import type { Calendar, CalendarEvent } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
-import { isEventOnDate } from '@/components/calendar/CalendarGrid'
+import { isEventOnDate } from '@/lib/calendar-grid'
 
 function formatHHMM(isoString: string): string {
   return new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
