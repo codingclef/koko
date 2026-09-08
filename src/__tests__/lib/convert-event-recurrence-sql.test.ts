@@ -1,11 +1,6 @@
-import fs from 'fs'
-import path from 'path'
+import { readLatestMigrationMatching } from '@/test-utils/migrations'
 
-const migrationPath = path.join(
-  process.cwd(),
-  'supabase/migrations/20260820000000_convert_event_to_recurring_series.sql'
-)
-const sql = fs.readFileSync(migrationPath, 'utf8')
+const sql = readLatestMigrationMatching(/create or replace function convert_event_to_recurring_series_authorized\(/i)
 
 describe('convert_event_to_recurring_series_authorized migration', () => {
   it('기존 event를 잠그고 이미 반복 전환된 요청을 거부한다', () => {
