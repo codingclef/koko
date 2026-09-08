@@ -8,9 +8,10 @@ type PushSub = { id: string; endpoint: string; p256dh: string; auth: string }
 export async function dispatchPushNotifications(
   subs: PushSub[],
   payload: string
-): Promise<{ sent: number; removed: number }> {
+): Promise<{ sent: number; removed: number; failed: number }> {
   const successIds: string[] = []
   const staleIds: string[] = []
+  let failed = 0
 
   await Promise.all(
     subs.map(async (sub) => {
@@ -29,6 +30,7 @@ export async function dispatchPushNotifications(
         }
         const status = error.statusCode
         if (status === 404 || status === 410) staleIds.push(sub.id)
+        else failed += 1
 
         console.error('[push-utils] sendNotification failed:', {
           subscriptionId: sub.id,
@@ -53,7 +55,7 @@ export async function dispatchPushNotifications(
       : Promise.resolve(),
   ])
 
-  return { sent: successIds.length, removed: staleIds.length }
+  return { sent: successIds.length, removed: staleIds.length, failed }
 }
 
 export interface EventNotificationParams {
