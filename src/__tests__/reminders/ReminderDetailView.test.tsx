@@ -361,6 +361,10 @@ describe('ReminderDetailView', () => {
 
   it('인라인 입력창에서 추가한 아이템을 편집한 아이템 바로 아래에 저장한다', async () => {
     const user = userEvent.setup()
+    let resolveFirstAdd: ((item: Awaited<ReturnType<typeof addReminderItem>>) => void) | null = null
+    const firstAddPromise = new Promise<Awaited<ReturnType<typeof addReminderItem>>>((resolve) => {
+      resolveFirstAdd = resolve
+    })
     mockGetReminderItems.mockResolvedValueOnce([
       {
         id: 'item-1',
@@ -385,7 +389,7 @@ describe('ReminderDetailView', () => {
         created_at: '2026-01-01T00:00:00Z',
       },
     ] as never)
-    mockAddReminderItem.mockResolvedValueOnce({
+    const firstCreatedItem = {
       id: 'item-new',
       list_id: 'list-1',
       created_by: 'user-1',
@@ -395,7 +399,8 @@ describe('ReminderDetailView', () => {
       checked_at: null,
       sort_order: 1,
       created_at: '2026-01-01T00:00:01Z',
-    } as never)
+    } as Awaited<ReturnType<typeof addReminderItem>>
+    mockAddReminderItem.mockReturnValueOnce(firstAddPromise)
     mockAddReminderItem.mockResolvedValueOnce({
       id: 'item-new-2',
       list_id: 'list-1',
@@ -424,13 +429,24 @@ describe('ReminderDetailView', () => {
     await user.keyboard('{Enter}')
 
     const inlineAddInput = await screen.findByTestId('inline-add-item-input')
-    await user.type(within(inlineAddInput).getByPlaceholderText('아이템 추가...'), '버터')
+    const focusedInput = within(inlineAddInput).getByPlaceholderText('아이템 추가...')
+    await user.type(focusedInput, '버터')
     await user.keyboard('{Enter}')
 
     expect(mockAddReminderItem).toHaveBeenCalledWith('list-1', 'user-1', '버터', 'item-1')
-    await waitFor(() => {
-      expect(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...')).toHaveFocus()
+    expect(screen.getByText('버터')).toBeInTheDocument()
+    expect(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...')).toBe(focusedInput)
+    expect(focusedInput).toHaveFocus()
+    expect(focusedInput).not.toHaveAttribute('readonly')
+    await act(async () => {
+      resolveFirstAdd?.(firstCreatedItem)
+      await firstAddPromise
     })
+    await waitFor(() => {
+      expect(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...')).toBe(focusedInput)
+      expect(focusedInput).toHaveFocus()
+    })
+    expect(screen.getByText('버터').compareDocumentPosition(focusedInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await user.type(within(screen.getByTestId('inline-add-item-input')).getByPlaceholderText('아이템 추가...'), '치즈')
     await user.keyboard('{Enter}')
 
@@ -837,7 +853,7 @@ describe('ReminderDetailView', () => {
 
     expect(screen.getByText('버터')).toBeInTheDocument()
     expect(input).toHaveValue('')
-    expect(input).toHaveAttribute('readonly')
+    expect(input).not.toHaveAttribute('readonly')
     expect(mockBroadcast).not.toHaveBeenCalled()
 
     await user.click(screen.getByTestId('reminder-detail-scroll'))

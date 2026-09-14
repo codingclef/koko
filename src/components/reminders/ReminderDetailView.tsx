@@ -101,7 +101,7 @@ export function ReminderDetailView({
 
   const closeAddSessionIfDraftEmpty = useCallback(() => {
     const input = addInputRef.current
-    if (input?.readOnly) return
+    if (input?.getAttribute('aria-busy') === 'true') return
     if (input?.value.trim()) return
     setAddSession(null)
   }, [])
@@ -243,11 +243,12 @@ export function ReminderDetailView({
 
   const handleAddItem = useCallback(async (
     name: string,
-    afterItemId?: string
+    afterItemId?: string,
+    optimisticId = crypto.randomUUID()
   ): Promise<ReminderItemType | null> => {
     setMutationError(null)
     const optimisticItem: ReminderItemType = {
-      id: crypto.randomUUID(),
+      id: optimisticId,
       list_id: listId,
       created_by: user.id,
       name,
@@ -306,14 +307,13 @@ export function ReminderDetailView({
   const handleInlineAdd = useCallback(
     (afterItemId: string) =>
       async (name: string): Promise<boolean> => {
-        const createdItem = await handleAddItem(name, afterItemId)
-        if (!createdItem) return false
-
-        setAddSession({ mode: 'inline', anchorItemId: createdItem.id })
-        requestAnimationFrame(() => {
-          addInputRef.current?.focus()
-        })
-        return true
+        const optimisticId = crypto.randomUUID()
+        setAddSession({ mode: 'inline', anchorItemId: optimisticId })
+        const createdItem = await handleAddItem(name, afterItemId, optimisticId)
+        setAddSession((session) => session?.mode === 'inline' && session.anchorItemId === optimisticId
+          ? { mode: 'inline', anchorItemId: createdItem?.id ?? afterItemId }
+          : session)
+        return createdItem !== null
       },
     [handleAddItem]
   )
@@ -662,34 +662,34 @@ export function ReminderDetailView({
                 items={uncheckedItems.map((item) => item.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {uncheckedItems.map((item) => (
-                  <div key={item.id}>
-                    <ReminderItem
-                      item={item}
-                      listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
-                      onCheck={handleCheck}
-                      onDelete={() => {
-                        setAddSession(null)
-                        setDeleteConfirmItem(item)
-                      }}
-                      onRename={handleRename}
-                      isEditing={editingItemId === item.id}
-                      onEditStart={handleEditStart}
-                      onEditEnd={handleEditEnd}
-                      onAdvanceEdit={handleAdvanceEdit}
-                      draggable
+                {uncheckedItems.flatMap((item) => [
+                  <ReminderItem
+                    key={item.id}
+                    item={item}
+                    listType={list?.type === 'delete' ? 'delete' : 'strikethrough'}
+                    onCheck={handleCheck}
+                    onDelete={() => {
+                      setAddSession(null)
+                      setDeleteConfirmItem(item)
+                    }}
+                    onRename={handleRename}
+                    isEditing={editingItemId === item.id}
+                    onEditStart={handleEditStart}
+                    onEditEnd={handleEditEnd}
+                    onAdvanceEdit={handleAdvanceEdit}
+                    draggable
+                  />,
+                  ...(addSession?.mode === 'inline' && addSession.anchorItemId === item.id ? [
+                    <AddItemInput
+                      key="inline-add"
+                      ref={addInputRef}
+                      onAdd={handleInlineAdd(item.id)}
+                      onCancelEmpty={closeAddSessionIfDraftEmpty}
+                      inline
+                      testId="inline-add-item-input"
                     />
-                    {addSession?.mode === 'inline' && addSession.anchorItemId === item.id && (
-                      <AddItemInput
-                        ref={addInputRef}
-                        onAdd={handleInlineAdd(item.id)}
-                        onCancelEmpty={closeAddSessionIfDraftEmpty}
-                        inline
-                        testId="inline-add-item-input"
-                      />
-                    )}
-                  </div>
-                ))}
+                  ] : []),
+                ])}
               </SortableContext>
             </DndContext>
 
