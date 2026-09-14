@@ -55,10 +55,11 @@ describe('AddItemInput', () => {
     expect(onAdd).toHaveBeenCalledWith('우유')
     expect(input).toHaveValue('')
     expect(input).toHaveAttribute('aria-busy', 'true')
-    expect(input).toHaveAttribute('readonly')
+    expect(input).not.toHaveAttribute('readonly')
 
     await user.keyboard('{Enter}')
     expect(onAdd).toHaveBeenCalledTimes(1)
+    expect(input).toHaveFocus()
 
     await act(async () => {
       resolveAdd?.(true)

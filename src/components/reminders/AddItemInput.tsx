@@ -46,6 +46,7 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
         setValue((currentValue) => currentValue || submittedValue)
       }
     } finally {
+      ignoreNextEmptyBlurRef.current = false
       setLoading(false)
     }
   }
@@ -63,9 +64,10 @@ export const AddItemInput = forwardRef<HTMLInputElement, Props>(function AddItem
         ref={setRefs}
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          if (!loading) setValue(e.target.value)
+        }}
         aria-busy={loading}
-        readOnly={loading}
         onBlur={() => {
           if (ignoreNextEmptyBlurRef.current) {
             ignoreNextEmptyBlurRef.current = false
