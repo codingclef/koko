@@ -37,6 +37,13 @@ describe('POST /api/cron/cleanup-reminders', () => {
     expect(res.status).toBe(401)
   })
 
+  it('CRON_SECRET이 없으면 Bearer undefined도 거부한다', async () => {
+    delete process.env.CRON_SECRET
+    const res = await POST(makeRequest('{}', 'undefined'))
+    expect(res.status).toBe(401)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
   it('기본 30일 보존 기간으로 cleanup RPC를 호출한다', async () => {
     mockRpcResult = { data: 12, error: null }
 

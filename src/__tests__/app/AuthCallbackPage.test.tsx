@@ -33,6 +33,7 @@ jest.mock('@/lib/supabase', () => ({
 const mockParseInviteCodeFromNext = jest.fn()
 
 jest.mock('@/lib/auth', () => ({
+  ...jest.requireActual('@/lib/auth'),
   parseInviteCodeFromNext: (...args: unknown[]) => mockParseInviteCodeFromNext(...args),
 }))
 
@@ -105,6 +106,17 @@ describe('AuthCallbackPage', () => {
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/onboarding')
+    })
+  })
+
+  it('위험한 next 경로로 이동하지 않는다', async () => {
+    mockNextParam = 'javascript:alert(1)'
+    render(<AuthCallbackPage />)
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/calendar'))
+    expect(mockPostJsonWithAuth).toHaveBeenCalledWith('/api/auth/check-allowed', {
+      inviteCode: null,
+      appInviteCode: undefined,
     })
   })
 })

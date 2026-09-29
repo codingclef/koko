@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { dispatchPushNotifications } from '@/lib/push-utils'
 import { REMINDER_TIME_ZONE } from '@/lib/reminders'
+import { isAuthorizedCronRequest } from '@/lib/cron-auth'
 
 export function formatReminderBody(eventStart: string, isAllDay: boolean): string {
   const d = new Date(eventStart)
@@ -23,7 +24,7 @@ export function formatReminderBody(eventStart: string, isAllDay: boolean): strin
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

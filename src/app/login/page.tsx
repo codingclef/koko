@@ -6,12 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { AppSplash } from '@/components/AppSplash'
+import { safeNextPath } from '@/lib/auth'
 
 function LoginInner() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? '/calendar'
+  const next = safeNextPath(searchParams.get('next'))
   const error = searchParams.get('error')
 
   useEffect(() => {

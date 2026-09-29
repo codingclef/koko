@@ -128,6 +128,13 @@ describe('POST /api/cron/daily-digest', () => {
     expect(res.status).toBe(401)
   })
 
+  it('CRON_SECRET이 없으면 Bearer undefined도 거부한다', async () => {
+    delete process.env.CRON_SECRET
+    const res = await POST(makeRequest('undefined'))
+    expect(res.status).toBe(401)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
   it('push 구독이 없으면 sentUsers=0을 반환한다', async () => {
     setupFromSequence([[]])
     const res = await POST(makeRequest())

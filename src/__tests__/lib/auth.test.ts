@@ -1,4 +1,16 @@
-import { parseInviteCodeFromNext } from '@/lib/auth'
+import { parseInviteCodeFromNext, safeNextPath } from '@/lib/auth'
+
+describe('safeNextPath', () => {
+  it('초대 경로와 쿼리를 유지한다', () => {
+    expect(safeNextPath('/join?code=ABC123')).toBe('/join?code=ABC123')
+    expect(safeNextPath('/join-app?code=APP123')).toBe('/join-app?code=APP123')
+  })
+
+  it.each([null, '', 'javascript:alert(1)', '//evil.example', '/\\evil.example', '/join\n?code=ABC123'])(
+    '외부 또는 잘못된 경로 %s를 기본 경로로 바꾼다',
+    (next) => expect(safeNextPath(next)).toBe('/calendar')
+  )
+})
 
 describe('parseInviteCodeFromNext', () => {
   it('초대 코드가 있으면 대문자로 반환', () => {
