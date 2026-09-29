@@ -54,6 +54,13 @@ describe('POST /api/cron/send-reminders', () => {
     expect(res.status).toBe(401)
   })
 
+  it('CRON_SECRET이 없으면 Bearer undefined도 거부한다', async () => {
+    delete process.env.CRON_SECRET
+    const res = await POST(makeRequest('undefined'))
+    expect(res.status).toBe(401)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
   it('발송 대상이 없으면 sent: 0을 반환한다', async () => {
     mockClaimResult = { data: [], error: null }
     const res = await POST(makeRequest())

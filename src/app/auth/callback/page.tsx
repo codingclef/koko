@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { parseInviteCodeFromNext } from '@/lib/auth'
+import { parseInviteCodeFromNext, safeNextPath } from '@/lib/auth'
 import { postJsonWithAuth } from '@/lib/api-client'
 
 function AuthCallbackInner() {
@@ -34,7 +34,7 @@ function AuthCallbackInner() {
         fallbackTimerRef.current = null
       }
 
-      const next = searchParams.get('next') ?? '/calendar'
+      const next = safeNextPath(searchParams.get('next'))
       const isAppInvite = next.startsWith('/join-app')
       const inviteCode = parseInviteCodeFromNext(next)
 

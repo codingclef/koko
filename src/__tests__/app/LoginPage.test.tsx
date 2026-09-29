@@ -5,12 +5,13 @@ const mockReplace = jest.fn()
 let mockAuthLoading = false
 let mockAuthUser: { id: string } | null = null
 let mockErrorParam: string | null = null
+let mockNextParam: string | null = null
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
   useSearchParams: () => ({
     get: (key: string) => {
-      if (key === 'next') return null
+      if (key === 'next') return mockNextParam
       if (key === 'error') return mockErrorParam
       return null
     },
@@ -39,6 +40,7 @@ describe('LoginPage', () => {
     mockAuthLoading = false
     mockAuthUser = null
     mockErrorParam = null
+    mockNextParam = null
   })
 
   it('인증 확인 중에는 스피너 대신 AppSplash를 표시한다', () => {
@@ -57,5 +59,14 @@ describe('LoginPage', () => {
 
     expect(screen.getByText('로그인 처리 중 문제가 발생했어요. 다시 시도해주세요.')).toBeInTheDocument()
     expect(mockReplace).not.toHaveBeenCalled()
+  })
+
+  it('인증된 사용자는 위험한 next 경로 대신 캘린더로 이동한다', () => {
+    mockAuthUser = { id: 'user-1' }
+    mockNextParam = 'javascript:alert(1)'
+
+    render(<LoginPage />)
+
+    expect(mockReplace).toHaveBeenCalledWith('/calendar')
   })
 })

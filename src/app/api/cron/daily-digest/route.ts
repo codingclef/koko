@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { dispatchPushNotifications } from '@/lib/push-utils'
+import { isAuthorizedCronRequest } from '@/lib/cron-auth'
 
 type EventRow = {
   id: string
@@ -76,7 +77,7 @@ async function queryTodayEvents(
 }
 
 async function handleDailyDigest(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
