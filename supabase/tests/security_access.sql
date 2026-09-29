@@ -26,6 +26,18 @@ begin
   end if;
 
   if exists (
+    select 1 from unnest(array[
+      'calendar_members', 'reminder_group_members', 'events', 'event_reminders'
+    ]) as protected(table_name)
+    where has_table_privilege('authenticated', format('public.%I', protected.table_name), 'INSERT, UPDATE, DELETE, TRUNCATE')
+      or has_table_privilege('anon', format('public.%I', protected.table_name), 'INSERT, UPDATE, DELETE, TRUNCATE')
+      or not has_table_privilege('authenticated', format('public.%I', protected.table_name), 'SELECT')
+      or not has_table_privilege('service_role', format('public.%I', protected.table_name), 'INSERT, UPDATE, DELETE')
+  ) then
+    raise exception 'member or event table grants do not match the authorized RPC flow';
+  end if;
+
+  if exists (
     select 1 from pg_proc
     where pronamespace = 'public'::regnamespace
       and proname in (
