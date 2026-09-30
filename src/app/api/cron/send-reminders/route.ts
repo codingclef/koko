@@ -4,7 +4,7 @@ import { dispatchPushNotifications } from '@/lib/push-utils'
 import { REMINDER_TIME_ZONE } from '@/lib/reminders'
 import { isAuthorizedCronRequest } from '@/lib/cron-auth'
 
-export function formatReminderBody(eventStart: string, isAllDay: boolean): string {
+function formatReminderBody(eventStart: string, isAllDay: boolean): string {
   const d = new Date(eventStart)
   const dateStr = d.toLocaleDateString('ko-KR', {
     month: 'long',
