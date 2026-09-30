@@ -1,6 +1,6 @@
 {
   "name": "koko",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "private": true,
   "scripts": {
     "assets:logo": "node scripts/generate-icons.mjs",
