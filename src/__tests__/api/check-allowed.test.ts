@@ -81,10 +81,11 @@ describe('POST /api/auth/check-allowed', () => {
 
     mockGetAuthenticatedSessionUser.mockResolvedValue({ id: 'user-1', email: 'new@example.com' })
 
-    const res = await POST(makeRequest({ inviteCode: 'ABC123' }))
+    const res = await POST(makeRequest({ inviteCode: 'abc123' }))
     const body = await res.json()
     expect(body.allowed).toBe(true)
     expect(body.needsOnboarding).toBe(false)
+    expect((mockFrom.mock.results[1].value.eq as jest.Mock)).toHaveBeenCalledWith('invite_code', 'ABC123')
     expect(insertChain.upsert as jest.Mock).toHaveBeenCalledWith(
       { email: 'new@example.com' },
       { onConflict: 'email', ignoreDuplicates: true }
@@ -129,6 +130,18 @@ describe('POST /api/auth/check-allowed', () => {
     const body = await res.json()
     expect(body.allowed).toBe(false)
   })
+
+  it.each(['%', 'ABC12%', 'ABC12_', 'ABC123\\', 123])(
+    '패턴 또는 잘못된 형식의 가족 초대 코드 %s를 조회하지 않는다',
+    async (inviteCode) => {
+      mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+
+      const res = await POST(makeRequest({ inviteCode }))
+
+      expect((await res.json()).allowed).toBe(false)
+      expect(mockFrom).toHaveBeenCalledTimes(1)
+    }
+  )
 
   it('유효한 appInviteCode로 요청 시 consume_app_invite RPC를 호출하고 needsOnboarding: true를 반환한다', async () => {
     mockFrom.mockReturnValue(makeChain({ data: null, error: null })) // allowed_emails select

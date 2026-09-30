@@ -49,11 +49,11 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. 가족 초대 코드로 진입한 경우 → allowed_emails에 추가 후 허용 (가족 합류는 /join 페이지에서)
-  if (inviteCode) {
+  if (typeof inviteCode === 'string' && /^[A-Z0-9]{6,24}$/i.test(inviteCode)) {
     const { data: family, error: familyError } = await supabaseAdmin
       .from('families')
       .select('id')
-      .ilike('invite_code', inviteCode)
+      .eq('invite_code', inviteCode.toUpperCase())
       .maybeSingle()
 
     if (familyError) {
