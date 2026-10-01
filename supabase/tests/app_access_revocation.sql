@@ -11,6 +11,8 @@ declare
   v_list public.shopping_lists;
   v_item public.shopping_items;
   v_call text;
+  v_rule uuid;
+  v_series uuid;
   v_state text;
   v_table text;
   v_count integer;
@@ -29,6 +31,9 @@ begin
   perform public.update_calendar_with_members_authorized(v_user, v_calendar.id, 'updated', '#3b82f6', array[]::uuid[]);
   perform public.update_reminder_group_with_members_authorized(v_user, v_group.id, 'updated', '#3b82f6', array[]::uuid[]);
   perform public.update_shopping_list_group_authorized(v_user, v_list.id, null);
+  insert into public.recurrence_rules (freq) values ('weekly') returning id into v_rule;
+  insert into public.recurrence_series (family_id, calendar_id, title, rule_id, created_by)
+  values (v_family, v_calendar.id, 'test', v_rule, v_user) returning id into v_series;
   insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
   values (v_user, 'https://example.invalid/' || v_user, 'test', 'test') returning id into v_subscription;
 
@@ -40,6 +45,10 @@ begin
   set local role authenticated;
   select count(*) into v_count from public.families where id = v_family;
   if v_count <> 1 then raise exception 'active family read blocked'; end if;
+  select count(*) into v_count from public.recurrence_series where id = v_series;
+  if v_count <> 1 then raise exception 'active recurring series read blocked'; end if;
+  select count(*) into v_count from public.recurrence_rules where id = v_rule;
+  if v_count <> 1 then raise exception 'active recurrence rule read blocked'; end if;
   reset role;
 
   foreach v_state in array array['allowlist-removed', 'banned', 'soft-deleted'] loop
@@ -90,6 +99,10 @@ begin
     if v_count <> 0 then raise exception 'revoked family read allowed: %', v_state; end if;
     select count(*) into v_count from public.push_subscriptions where id = v_subscription;
     if v_count <> 0 then raise exception 'revoked subscription read allowed: %', v_state; end if;
+    select count(*) into v_count from public.recurrence_series where id = v_series;
+    if v_count <> 0 then raise exception 'revoked recurring series read allowed: %', v_state; end if;
+    select count(*) into v_count from public.recurrence_rules where id = v_rule;
+    if v_count <> 0 then raise exception 'revoked recurrence rule read allowed: %', v_state; end if;
     update public.shopping_items set name = 'denied' where id = v_item.id;
     get diagnostics v_count = row_count;
     if v_count <> 0 then raise exception 'revoked item update allowed: %', v_state; end if;
