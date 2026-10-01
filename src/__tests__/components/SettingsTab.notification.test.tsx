@@ -292,6 +292,19 @@ describe('SettingsTab 가족 서브뷰 — 구성원', () => {
     expect(within(section).queryByRole('button')).not.toBeInTheDocument()
   })
 
+  it('24자리 가족 초대 코드를 표시하고 입력할 수 있다', async () => {
+    const code = 'ABCDEF0123456789ABCDEF01'
+    ;(getFamilyInfo as jest.Mock).mockResolvedValue({ name: '우리 가족', invite_code: code })
+    await navigateToFamily()
+
+    expect(screen.getByText(code)).toHaveClass('break-all', 'min-w-0')
+    const input = screen.getByRole('textbox', { name: '초대 코드' })
+    expect(input).toHaveAttribute('maxlength', '24')
+    fireEvent.change(input, { target: { value: code.toLowerCase() } })
+    expect(input).toHaveValue(code)
+    expect(screen.getByRole('button', { name: '합류' })).toBeEnabled()
+  })
+
   it('구성원 조회 실패 시 가족 화면을 유지하고 해당 영역만 다시 시도한다', async () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => {})
     ;(getFamilyMembers as jest.Mock)
