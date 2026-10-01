@@ -107,17 +107,22 @@ begin
   if v_count <> 0 then raise exception 'removed calendar member can read rule'; end if;
   reset role;
 
-  -- Switching families clears old memberships and family-wide reads.
+  -- Family-wide reads follow the current family. Joining does not revoke
+  -- explicit calendar membership; keep the existing event permission contract.
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
   perform public.update_calendar_with_members_authorized(v_owner, v_calendar.id, 'private', '#3b82f6', array[v_peer]);
   select invite_code into v_code from public.families where id = v_other_family;
   perform public.join_family_by_invite_code(v_peer, v_code, null);
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_peer, 'role', 'authenticated')::text, true);
   set local role authenticated;
-  select count(*) into v_count from public.recurrence_series where id in (v_private_series, v_family_series);
-  if v_count <> 0 then raise exception 'switched family member can read old series'; end if;
-  select count(*) into v_count from public.recurrence_rules where id in (v_private_rule, v_family_rule);
-  if v_count <> 0 then raise exception 'switched family member can read old rules'; end if;
+  select count(*) into v_count from public.recurrence_series where id = v_private_series;
+  if v_count <> 1 then raise exception 'family switch changed explicit calendar membership access'; end if;
+  select count(*) into v_count from public.recurrence_rules where id = v_private_rule;
+  if v_count <> 1 then raise exception 'family switch changed explicit calendar rule access'; end if;
+  select count(*) into v_count from public.recurrence_series where id = v_family_series;
+  if v_count <> 0 then raise exception 'switched family member can read old family-wide series'; end if;
+  select count(*) into v_count from public.recurrence_rules where id = v_family_rule;
+  if v_count <> 0 then raise exception 'switched family member can read old family-wide rule'; end if;
   reset role;
   select invite_code into v_code from public.families where id = v_family;
   perform public.join_family_by_invite_code(v_peer, v_code, null);
