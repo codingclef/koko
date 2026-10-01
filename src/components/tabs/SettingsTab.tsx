@@ -584,12 +584,12 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
         <div className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 p-4 mb-4">
           <p className="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-3">내 가족에 초대</p>
           <div className="flex items-center gap-3">
-            <span className="flex-1 text-2xl font-bold tracking-widest text-stone-800 dark:text-stone-100 font-mono">
+            <span className="min-w-0 flex-1 break-all text-sm font-bold text-stone-800 dark:text-stone-100 font-mono">
               {inviteCode ?? '------'}
             </span>
             <button
               onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 text-white text-sm font-semibold transition-colors shadow-sm"
+              className="flex shrink-0 items-center gap-1.5 px-3 py-2 rounded-xl bg-accent-400 hover:bg-accent-500 text-white text-sm font-semibold transition-colors shadow-sm"
             >
               {copied ? <Check size={14} /> : <Share2 size={14} />}
               {copied ? '복사됨' : '초대하기'}
@@ -668,8 +668,9 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="초대 코드 입력"
-                maxLength={6}
-                className="flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-accent-300"
+                aria-label="초대 코드"
+                maxLength={24}
+                className="min-w-0 flex-1 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent-300"
               />
               <button
                 onClick={handleJoin}

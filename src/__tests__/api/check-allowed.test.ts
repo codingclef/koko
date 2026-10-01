@@ -72,7 +72,7 @@ describe('POST /api/auth/check-allowed', () => {
     expect(body.allowed).toBe(false)
   })
 
-  it('유효한 inviteCode로 요청 시 allowed_emails에 추가하고 needsOnboarding: false를 반환한다', async () => {
+  it.each(['abc123', 'abcdef0123456789abcdef01'])('유효한 inviteCode %s로 접근을 허용한다', async (inviteCode) => {
     const insertChain = makeChain({ data: null, error: null })
     mockFrom
       .mockReturnValueOnce(makeChain({ data: null, error: null }))            // allowed_emails select
@@ -81,11 +81,11 @@ describe('POST /api/auth/check-allowed', () => {
 
     mockGetAuthenticatedSessionUser.mockResolvedValue({ id: 'user-1', email: 'new@example.com' })
 
-    const res = await POST(makeRequest({ inviteCode: 'abc123' }))
+    const res = await POST(makeRequest({ inviteCode }))
     const body = await res.json()
     expect(body.allowed).toBe(true)
     expect(body.needsOnboarding).toBe(false)
-    expect((mockFrom.mock.results[1].value.eq as jest.Mock)).toHaveBeenCalledWith('invite_code', 'ABC123')
+    expect((mockFrom.mock.results[1].value.eq as jest.Mock)).toHaveBeenCalledWith('invite_code', inviteCode.toUpperCase())
     expect(insertChain.upsert as jest.Mock).toHaveBeenCalledWith(
       { email: 'new@example.com' },
       { onConflict: 'email', ignoreDuplicates: true }

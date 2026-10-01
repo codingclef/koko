@@ -70,9 +70,10 @@ function JoinInner() {
           <input
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="ABC123"
-            maxLength={6}
-            className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono tracking-widest text-xl text-center focus:outline-none focus:ring-2 focus:ring-accent-300 mb-4"
+            placeholder="초대 코드 입력"
+            aria-label="초대 코드"
+            maxLength={24}
+            className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-100 font-mono text-sm text-center focus:outline-none focus:ring-2 focus:ring-accent-300 mb-4"
           />
           {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
           <button
