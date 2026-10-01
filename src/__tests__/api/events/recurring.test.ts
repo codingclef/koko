@@ -25,7 +25,9 @@ const mockFrom = jest.fn()
 jest.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: {
     auth: { getClaims: (token: unknown) => mockGetClaims(token) },
-    rpc: (fn: unknown, args: unknown) => mockRpc(fn, args),
+    rpc: (fn: unknown, args: unknown) => fn === 'get_app_access'
+      ? Promise.resolve({ data: { email: 'actor@test.com', app_role: 'member', family_id: 'fam-1' }, error: null })
+      : mockRpc(fn, args),
     from: (table: unknown) => mockFrom(table),
   },
 }))
@@ -34,16 +36,6 @@ const ACTOR_USER_ID = 'actor-user'
 const FAMILY_ID     = 'fam-1'
 const SERIES_ID     = 'series-1'
 const EVENT_ID      = 'evt-1'
-
-function makeAllowedEmailChain() {
-  const p = Promise.resolve({ data: { app_role: 'member' }, error: null })
-  const chain = {
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockReturnValue(p),
-  }
-  return chain
-}
 
 function makeFirstEventChain() {
   return {
@@ -80,9 +72,7 @@ beforeEach(() => {
     error: null,
   })
   mockSendEventNotification.mockResolvedValue(undefined)
-  mockFrom.mockImplementation((table: unknown) =>
-    table === 'allowed_emails' ? makeAllowedEmailChain() : makeFirstEventChain()
-  )
+  mockFrom.mockReturnValue(makeFirstEventChain())
 })
 
 // ── POST: recurring ──────────────────────────────────────────
@@ -100,9 +90,7 @@ describe('POST /api/events (recurring)', () => {
   }
 
   beforeEach(() => {
-    mockFrom.mockImplementation((table: unknown) =>
-      table === 'allowed_emails' ? makeAllowedEmailChain() : makeFirstEventChain()
-    )
+    mockFrom.mockReturnValue(makeFirstEventChain())
   })
 
   it('create_recurring_series_authorized RPC를 호출한다', async () => {

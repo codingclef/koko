@@ -20,13 +20,13 @@ jest.mock('@/lib/push-utils', () => ({
 
 const mockGetClaims = jest.fn()
 const mockRpc = jest.fn()
-const mockFrom = jest.fn()
 
 jest.mock('@/lib/supabase-admin', () => ({
   supabaseAdmin: {
     auth: { getClaims: (token: unknown) => mockGetClaims(token) },
-    rpc: (fn: unknown, args: unknown) => mockRpc(fn, args),
-    from: (table: unknown) => mockFrom(table),
+    rpc: (fn: unknown, args: unknown) => fn === 'get_app_access'
+      ? Promise.resolve({ data: { email: 'actor@test.com', app_role: 'member', family_id: 'fam-1' }, error: null })
+      : mockRpc(fn, args),
   },
 }))
 
@@ -34,16 +34,6 @@ const ACTOR_USER_ID = 'actor-user'
 const FAMILY_ID = 'fam-1'
 const CALENDAR_ID = 'cal-1'
 const CREATED_EVENT = { id: 'evt-1', title: '생일 파티', family_id: FAMILY_ID }
-
-function makeAllowedEmailChain() {
-  const p = Promise.resolve({ data: { app_role: 'member' }, error: null })
-  const chain = {
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockReturnValue(p),
-  }
-  return chain
-}
 
 function makeRequest(body: Record<string, unknown>, token = 'valid-token') {
   return new NextRequest('http://localhost/api/events', {
@@ -73,7 +63,6 @@ beforeEach(() => {
     error: null,
   })
   mockRpc.mockResolvedValue({ data: [CREATED_EVENT], error: null })
-  mockFrom.mockReturnValue(makeAllowedEmailChain())
 })
 
 describe('POST /api/events', () => {
