@@ -14,8 +14,10 @@ jest.mock('@/lib/webpush', () => ({
 let mockClaimResult: { data: unknown; error: unknown } = { data: [], error: null }
 let mockAckResult: { data: unknown; error: unknown } = { data: 0, error: null }
 
-const mockRpc: jest.Mock = jest.fn((name: string) =>
-  Promise.resolve(name === 'claim_due_reminders' ? mockClaimResult : mockAckResult)
+const mockRpc: jest.Mock = jest.fn((name: string, args?: { p_subscription_ids: string[] }) =>
+  Promise.resolve(name === 'get_active_push_subscription_ids'
+    ? { data: args?.p_subscription_ids ?? [], error: null }
+    : name === 'claim_due_reminders' ? mockClaimResult : mockAckResult)
 )
 const mockFrom: jest.Mock = jest.fn()
 

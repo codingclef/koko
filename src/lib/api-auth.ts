@@ -33,22 +33,33 @@ export async function isAppAdmin(email: string): Promise<boolean> {
 
 export async function getAuthenticatedSessionUser(
   req: NextRequest
-): Promise<{ id: string; email: string } | null> {
+): Promise<{ id: string; email: string; appRole: 'admin' | 'member' | null; familyId: string | null } | null> {
   const authorization = req.headers.get('authorization')
   if (!authorization?.startsWith('Bearer ')) return null
 
   const accessToken = authorization.slice('Bearer '.length).trim()
   if (!accessToken) return null
 
-  // getClaims()는 로컬 JWT 검증으로 Auth 서버 왕복을 생략한다.
-  // 삭제/비활성화 사용자 반영이 토큰 만료 시점까지 지연될 수 있으나,
-  // 이 앱의 위협 모델과 짧은 JWT 만료 주기를 고려해 허용된 트레이드오프다.
+  // Validate the JWT locally, then check live account/access state in one DB request.
   const { data, error } = await supabaseAdmin.auth.getClaims(accessToken)
 
   if (error || !data?.claims) return null
   const { sub: id, email } = data.claims as { sub?: string; email?: string }
   if (!id || !email) return null
-  return { id, email }
+  const { data: access, error: accessError } = await supabaseAdmin.rpc('get_app_access', { p_user_id: id })
+  if (accessError) {
+    console.error('[api-auth] live access lookup failed:', accessError)
+    throw new Error('Live access lookup failed')
+  }
+  if (!access) return null
+  const record = access as { email: string; app_role: string | null; family_id: string | null }
+  if (!record.email) return null
+  return {
+    id,
+    email: record.email,
+    appRole: record.app_role === 'admin' ? 'admin' : record.app_role === 'member' ? 'member' : null,
+    familyId: record.family_id,
+  }
 }
 
 export async function getAuthenticatedUser(
@@ -57,8 +68,5 @@ export async function getAuthenticatedUser(
   const user = await getAuthenticatedSessionUser(req)
   if (!user) return null
 
-  const appRole = await getAllowedAppRole(user.email)
-  if (!appRole) return null
-
-  return user
+  return user.appRole ? { id: user.id, email: user.email } : null
 }

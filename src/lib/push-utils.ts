@@ -9,12 +9,18 @@ export async function dispatchPushNotifications(
   subs: PushSub[],
   payload: string
 ): Promise<{ sent: number; removed: number; failed: number }> {
+  if (!subs.length) return { sent: 0, removed: 0, failed: 0 }
+  const { data: activeIds, error } = await supabaseAdmin.rpc('get_active_push_subscription_ids', {
+    p_subscription_ids: subs.map((sub) => sub.id),
+  })
+  if (error) throw new Error('Push recipient access lookup failed')
+  const active = new Set(activeIds ?? [])
   const successIds: string[] = []
   const staleIds: string[] = []
   let failed = 0
 
   await Promise.all(
-    subs.map(async (sub) => {
+    subs.filter((sub) => active.has(sub.id)).map(async (sub) => {
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

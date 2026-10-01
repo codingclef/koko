@@ -743,6 +743,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_app_access: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
+      get_active_push_subscription_ids: {
+        Args: { p_subscription_ids: string[] }
+        Returns: string[]
+      }
       create_calendar_with_members_authorized: {
         Args: {
           p_actor_user_id: string
