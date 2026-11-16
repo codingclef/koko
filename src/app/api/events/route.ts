@@ -3,6 +3,7 @@ import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEventNotification } from '@/lib/push-utils'
 import { ALLOWED_LABEL_COLORS } from '@/lib/label-colors'
+import { isAllowedReminderOffset, isReminderOffsetList } from '@/lib/event-reminder-options'
 
 interface RecurrenceInput {
   freq: 'daily' | 'weekly' | 'monthly' | 'yearly'
@@ -19,7 +20,8 @@ interface CreateEventRequest {
   startAt: string
   endAt: string | null
   isAllDay: boolean
-  reminderMinutes: number[]
+  reminderMinutes?: number[]
+  reminderOffsets?: number[]
   recurrence?: RecurrenceInput | null
   labelColor?: string | null
 }
@@ -31,11 +33,17 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json()) as CreateEventRequest
-  const { calendarId, title, description, startAt, endAt, isAllDay, reminderMinutes, recurrence, labelColor } = body
+  const { calendarId, title, description, startAt, endAt, isAllDay, recurrence, labelColor } = body
+  const offsets = 'reminderOffsets' in body ? body.reminderOffsets : body.reminderMinutes ?? []
 
   if (!title || !startAt) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+  if (typeof isAllDay !== 'boolean' || !isReminderOffsetList(offsets) ||
+      offsets.some((offset) => !isAllowedReminderOffset(offset, isAllDay))) {
+    return NextResponse.json({ error: 'Invalid reminder offsets' }, { status: 400 })
+  }
+  const reminderOffsets = [...new Set(offsets)]
 
   if (labelColor !== undefined && labelColor !== null && !ALLOWED_LABEL_COLORS.has(labelColor)) {
     return NextResponse.json({ error: 'Invalid label color' }, { status: 400 })
@@ -51,7 +59,7 @@ export async function POST(req: NextRequest) {
       p_start_at:         startAt,
       p_end_at:           endAt,
       p_is_all_day:       isAllDay,
-      p_reminder_minutes: reminderMinutes,
+      p_reminder_minutes: reminderOffsets,
       p_freq:             recurrence.freq,
       p_interval:         recurrence.interval,
       p_days_of_week:     recurrence.daysOfWeek ?? [],
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
     p_start_at:         startAt,
     p_end_at:           endAt,
     p_is_all_day:       isAllDay,
-    p_reminder_minutes: reminderMinutes,
+    p_reminder_minutes: reminderOffsets,
     p_label_color:      labelColor ?? null,
   })
 

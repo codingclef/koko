@@ -126,7 +126,9 @@ export type Database = {
       }
       event_reminders: {
         Row: {
+          claim_token: string | null
           claimed_at: string | null
+          eligible_from: string | null
           created_at: string
           event_id: string
           id: string
@@ -134,7 +136,9 @@ export type Database = {
           sent_at: string | null
         }
         Insert: {
+          claim_token?: string | null
           claimed_at?: string | null
+          eligible_from?: string | null
           created_at?: string
           event_id: string
           id?: string
@@ -142,7 +146,9 @@ export type Database = {
           sent_at?: string | null
         }
         Update: {
+          claim_token?: string | null
           claimed_at?: string | null
+          eligible_from?: string | null
           created_at?: string
           event_id?: string
           id?: string
@@ -887,10 +893,12 @@ export type Database = {
           event_start: string
           is_all_day: boolean
           family_id: string
+          calendar_id: string | null
+          claim_token: string
         }[]
       }
       acknowledge_reminders: {
-        Args: { p_reminder_ids: string[] }
+        Args: { p_reminder_ids: string[]; p_claim_tokens?: string[] }
         Returns: number
       }
       cleanup_sent_event_reminders: {
@@ -977,6 +985,7 @@ export type Database = {
           p_calendar_id: string | null
           p_has_calendar_id: boolean
           p_reminder_minutes: number[] | null
+          p_use_reminder_offsets?: boolean
           p_label_color?: string | null
           p_has_label_color?: boolean
         }
@@ -1020,6 +1029,7 @@ export type Database = {
           p_local_end_date: string
           p_is_all_day: boolean
           p_reminder_minutes: number[]
+          p_use_reminder_offsets?: boolean
           p_freq: string
           p_interval: number
           p_days_of_week: number[]
@@ -1055,6 +1065,7 @@ export type Database = {
           p_calendar_id: string | null
           p_has_calendar_id: boolean
           p_reminder_minutes: number[] | null
+          p_use_reminder_offsets?: boolean
           p_label_color?: string | null
           p_has_label_color?: boolean
           p_freq?: string | null
@@ -1084,6 +1095,7 @@ export type Database = {
           p_calendar_id: string | null
           p_has_calendar_id: boolean
           p_reminder_minutes: number[] | null
+          p_use_reminder_offsets?: boolean
           p_label_color?: string | null
           p_has_label_color?: boolean
         }

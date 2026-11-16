@@ -27,6 +27,14 @@ describe('usesFixedMorningAllDayReminder', () => {
 })
 
 describe('getReminderTriggerAt', () => {
+  it.each([
+    ['2027-03-31T00:30:00+09:00', false, '2027-02-28T00:30:00+09:00'],
+    ['2028-03-31T00:30:00+09:00', false, '2028-02-29T00:30:00+09:00'],
+    ['2027-03-31T00:00:00+09:00', true, '2027-02-28T08:00:00+09:00'],
+    ['2027-01-31T12:30:00+09:00', false, '2026-12-31T12:30:00+09:00'],
+  ])('Tokyo 시간의 달력 한 달 전을 계산한다 (%s)', (start, allDay, expected) => {
+    expect(getReminderTriggerAt(start, allDay, -1)).toBe(new Date(expected).toISOString())
+  })
   it('시간 지정 일정은 기존처럼 시작 시각 기준으로 분 단위 차감한다', () => {
     expect(getReminderTriggerAt('2026-04-25T09:30:00+09:00', false, 1440))
       .toBe('2026-04-24T00:30:00.000Z')

@@ -38,20 +38,30 @@ export async function POST(req: NextRequest) {
   }
   if (!reminders?.length) return NextResponse.json({ sent: 0 })
 
-  // 2. 해당 family 구성원 조회
-  const familyIds = [...new Set(reminders.map((r) => r.family_id))]
-  const { data: members, error: membersError } = await supabaseAdmin
-    .from('family_members')
-    .select('user_id, family_id')
-    .in('family_id', familyIds)
+  const familyIds = [...new Set(reminders.filter((r) => !r.calendar_id).map((r) => r.family_id))]
+  const calendarIds = [...new Set(reminders.flatMap((r) => r.calendar_id ? [r.calendar_id] : []))]
+  const [familyResult, calendarResult] = await Promise.all([
+    familyIds.length
+      ? supabaseAdmin.from('family_members').select('user_id, family_id').in('family_id', familyIds)
+      : { data: [], error: null },
+    calendarIds.length
+      ? supabaseAdmin.from('calendar_members').select('user_id, calendar_id').in('calendar_id', calendarIds)
+      : { data: [], error: null },
+  ])
 
-  if (membersError) {
-    console.error('[send-reminders] family members error:', membersError)
-    return NextResponse.json({ error: 'Family members failed' }, { status: 500 })
+  if (familyResult.error || calendarResult.error) {
+    console.error('[send-reminders] recipient lookup error:', familyResult.error ?? calendarResult.error)
+    return NextResponse.json({ error: familyResult.error ? 'Family members failed' : 'Calendar members failed' }, { status: 500 })
   }
 
-  // 3. 구성원의 push 구독 조회
-  const userIds = [...new Set((members ?? []).map((m) => m.user_id))]
+  const usersByScope = new Map<string, Set<string>>()
+  for (const member of [...(familyResult.data ?? []), ...(calendarResult.data ?? [])]) {
+    const key = 'calendar_id' in member ? `calendar:${member.calendar_id}` : `family:${member.family_id}`
+    const users = usersByScope.get(key) ?? new Set<string>()
+    users.add(member.user_id)
+    usersByScope.set(key, users)
+  }
+  const userIds = [...new Set([...usersByScope.values()].flatMap((users) => [...users]))]
   const { data: subs, error: subsError } = userIds.length
     ? await supabaseAdmin
         .from('push_subscriptions')
@@ -64,21 +74,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Push subscriptions failed' }, { status: 500 })
   }
 
-  // family_id → user_ids 매핑
-  const usersByFamily = new Map<string, string[]>()
-  for (const m of members ?? []) {
-    const arr = usersByFamily.get(m.family_id) ?? []
-    arr.push(m.user_id)
-    usersByFamily.set(m.family_id, arr)
+  // One claim token covers all rules due at the same time on one occurrence.
+  const claims = new Map<string, typeof reminders>()
+  for (const reminder of reminders) {
+    const key = reminder.claim_token ?? reminder.reminder_id
+    const group = claims.get(key) ?? []
+    group.push(reminder)
+    claims.set(key, group)
   }
 
-  // 4. 각 리마인더를 가족 구성원 전체에게 발송
   const results = await Promise.all(
-    reminders.map(async (reminder) => {
-      const memberUserIds = new Set(usersByFamily.get(reminder.family_id) ?? [])
-      const familySubs = (subs ?? []).filter((s) => s.user_id && memberUserIds.has(s.user_id))
-      if (familySubs.length === 0) {
-        return { reminderId: reminder.reminder_id, sent: 0, removed: 0, acknowledge: true }
+    [...claims.values()].map(async ([reminder, ...siblings]) => {
+      const key = reminder.calendar_id ? `calendar:${reminder.calendar_id}` : `family:${reminder.family_id}`
+      const memberUserIds = usersByScope.get(key)
+      const recipientSubs = (subs ?? []).filter((s) => s.user_id && memberUserIds?.has(s.user_id))
+      const ids = [reminder, ...siblings].map((row) => row.reminder_id)
+      const token = reminder.claim_token
+      if (recipientSubs.length === 0) {
+        return { ids, token, sent: 0, removed: 0, acknowledge: true }
       }
 
       const payload = JSON.stringify({
@@ -87,9 +100,10 @@ export async function POST(req: NextRequest) {
         url: '/',
       })
 
-      const { sent, removed, failed } = await dispatchPushNotifications(familySubs, payload)
+      const { sent, removed, failed } = await dispatchPushNotifications(recipientSubs, payload)
       return {
-        reminderId: reminder.reminder_id,
+        ids,
+        token,
         sent,
         removed,
         acknowledge: sent > 0 || failed === 0,
@@ -97,10 +111,13 @@ export async function POST(req: NextRequest) {
     })
   )
 
-  const acknowledgedIds = results.filter((result) => result.acknowledge).map((result) => result.reminderId)
+  const acknowledged = results.filter((result) => result.acknowledge)
+  const acknowledgedIds = acknowledged.flatMap((result) => result.ids)
+  const claimTokens = acknowledged.flatMap((result) => result.token ? [result.token] : [])
   if (acknowledgedIds.length > 0) {
     const { error: ackError } = await supabaseAdmin.rpc('acknowledge_reminders', {
       p_reminder_ids: acknowledgedIds,
+      ...(claimTokens.length ? { p_claim_tokens: claimTokens } : {}),
     })
     if (ackError) {
       console.error('[send-reminders] acknowledge error:', ackError)
@@ -111,6 +128,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     sent: results.reduce((sum, result) => sum + result.sent, 0),
     removed: results.reduce((sum, result) => sum + result.removed, 0),
-    retry: results.length - acknowledgedIds.length,
+    retry: results.length - acknowledged.length,
   })
 }

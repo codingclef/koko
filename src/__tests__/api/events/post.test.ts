@@ -105,6 +105,18 @@ describe('POST /api/events', () => {
     )
   })
 
+  it('종일 일정의 개월 알람은 저장하고 시간 알람은 거부한다', async () => {
+    const allowed = await POST(makeRequest({ ...baseBody, isAllDay: true, reminderOffsets: [-1, 1440] }))
+    expect(allowed.status).toBe(201)
+    expect(mockRpc).toHaveBeenCalledWith('create_event_authorized',
+      expect.objectContaining({ p_reminder_minutes: [-1, 1440] }))
+
+    mockRpc.mockClear()
+    const rejected = await POST(makeRequest({ ...baseBody, isAllDay: true, reminderOffsets: [60] }))
+    expect(rejected.status).toBe(400)
+    expect(mockRpc).not.toHaveBeenCalledWith('create_event_authorized', expect.anything())
+  })
+
   it('calendarId가 null이면 p_calendar_id를 null로 전달한다', async () => {
     mockSendEventNotification.mockResolvedValue(undefined)
     const res = await POST(makeRequest({ ...baseBody, calendarId: null }))

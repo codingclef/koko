@@ -6,6 +6,7 @@ import type { RecurrenceScope } from '@/types/recurrence'
 import { VALID_SCOPES } from '@/types/recurrence'
 import { ALLOWED_LABEL_COLORS } from '@/lib/label-colors'
 import { REMINDER_TIME_ZONE } from '@/lib/reminders'
+import { isReminderOffsetList } from '@/lib/event-reminder-options'
 
 interface RecurrenceInput {
   freq: 'daily' | 'weekly' | 'monthly' | 'yearly'
@@ -27,6 +28,7 @@ interface UpdateEventRequest {
   endTime?: string | null
   isAllDay?: boolean
   reminderMinutes?: number[]
+  reminderOffsets?: number[]
   labelColor?: string | null
   recurrence?: RecurrenceInput | null
   // series-only
@@ -86,11 +88,11 @@ function addYears(date: string, years: number): string {
   return value.toISOString().slice(0, 10)
 }
 
-function getRegularConversionError(body: UpdateEventRequest): string | null {
+function getRegularConversionError(body: UpdateEventRequest, offsets: number[] | undefined): string | null {
   const recurrence = body.recurrence
   if (!recurrence || !body.title?.trim() || !body.startAt || !body.endAt
       || !isDateString(body.localStartDate) || !isDateString(body.localEndDate)
-      || typeof body.isAllDay !== 'boolean' || !Array.isArray(body.reminderMinutes)) {
+      || typeof body.isAllDay !== 'boolean' || offsets === undefined) {
     return 'Invalid recurrence conversion request'
   }
   if (body.localStartDate < getTodayInReminderTimeZone()) {
@@ -152,9 +154,6 @@ function getRegularConversionError(body: UpdateEventRequest): string | null {
     return 'Invalid recurrence end date'
   }
 
-  if (body.reminderMinutes.some((minutes) => !Number.isInteger(minutes) || minutes <= 0)) {
-    return 'Invalid reminder minutes'
-  }
   return null
 }
 
@@ -166,6 +165,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id: eventId } = await params
   const body = (await req.json()) as UpdateEventRequest
+  const usesOffsets = 'reminderOffsets' in body
+  const rawOffsets = usesOffsets ? body.reminderOffsets : body.reminderMinutes
+  if (rawOffsets !== undefined && !isReminderOffsetList(rawOffsets)) {
+    return NextResponse.json({ error: 'Invalid reminder offsets' }, { status: 400 })
+  }
+  const offsets = rawOffsets === undefined ? undefined : [...new Set(rawOffsets)]
+  const reminderArgs = {
+    p_reminder_minutes: offsets ?? null,
+    ...(usesOffsets ? { p_use_reminder_offsets: true } : {}),
+  }
 
   const scope = body.scope
   if (scope !== undefined && !VALID_SCOPES.includes(scope)) {
@@ -202,7 +211,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // ── Regular event -> recurring series ─────────────────────
   if (!scope && body.recurrence) {
-    const validationError = getRegularConversionError(body)
+    const validationError = getRegularConversionError(body, offsets)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
@@ -220,7 +229,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         p_local_start_date: body.localStartDate!,
         p_local_end_date:   body.localEndDate!,
         p_is_all_day:       body.isAllDay!,
-        p_reminder_minutes: body.reminderMinutes!,
+        ...reminderArgs,
+        p_reminder_minutes: offsets!,
         p_freq:             body.recurrence.freq,
         p_interval:         body.recurrence.interval,
         p_days_of_week:     body.recurrence.daysOfWeek ?? [],
@@ -287,7 +297,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         p_is_all_day:             body.isAllDay ?? null,
         p_calendar_id:            body.calendarId ?? null,
         p_has_calendar_id:        'calendarId' in body,
-        p_reminder_minutes:       body.reminderMinutes ?? null,
+        ...reminderArgs,
         p_label_color:            body.labelColor ?? null,
         p_has_label_color:        'labelColor' in body,
         p_freq:                   body.recurrence?.freq ?? null,
@@ -299,6 +309,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
 
       if (error) {
+        if (error.message === 'invalid_reminder_offsets') return NextResponse.json({ error: 'Invalid reminder offsets' }, { status: 400 })
         if (error.message === 'not_found')        return NextResponse.json({ error: 'Event not found' }, { status: 404 })
         if (error.message === 'not_series_event') return NextResponse.json({ error: 'Not a series event' }, { status: 400 })
         if (error.message === 'anchor_required')  return NextResponse.json({ error: 'anchorOccurrenceDate required for following scope' }, { status: 400 })
@@ -344,12 +355,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       p_is_all_day:             body.isAllDay ?? null,
       p_calendar_id:            body.calendarId ?? null,
       p_has_calendar_id:        'calendarId' in body,
-      p_reminder_minutes:       body.reminderMinutes ?? null,
+      ...reminderArgs,
       p_label_color:            body.labelColor ?? null,
       p_has_label_color:        'labelColor' in body,
     })
 
     if (error) {
+      if (error.message === 'invalid_reminder_offsets') return NextResponse.json({ error: 'Invalid reminder offsets' }, { status: 400 })
       if (error.message === 'not_found')       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
       if (error.message === 'not_series_event') return NextResponse.json({ error: 'Not a series event' }, { status: 400 })
       if (error.message === 'forbidden')       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -385,12 +397,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     p_is_all_day:       body.isAllDay ?? null,
     p_calendar_id:      body.calendarId ?? null,
     p_has_calendar_id:  'calendarId' in body,
-    p_reminder_minutes: body.reminderMinutes ?? null,
+    ...reminderArgs,
     p_label_color:      body.labelColor ?? null,
     p_has_label_color:  'labelColor' in body,
   })
 
   if (error) {
+    if (error.message === 'invalid_reminder_offsets') return NextResponse.json({ error: 'Invalid reminder offsets' }, { status: 400 })
     if (error.message === 'not_found') return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     if (error.message === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     return NextResponse.json({ error: 'Failed to update event' }, { status: 500 })

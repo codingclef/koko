@@ -124,6 +124,14 @@ describe('PATCH /api/events/[id]', () => {
     )
   })
 
+  it('새 알람 목록을 명시하고 데이터베이스 범위 오류는 400으로 전달한다', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'invalid_reminder_offsets' } })
+    const res = await PATCH(makeRequest({ reminderOffsets: [7] }), makeParams())
+    expect(res.status).toBe(400)
+    expect(mockRpc).toHaveBeenCalledWith('update_event_authorized',
+      expect.objectContaining({ p_reminder_minutes: [7], p_use_reminder_offsets: true }))
+  })
+
   it('RPC 실패 시 500을 반환한다', async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: 'rpc error' } })
     const res = await PATCH(makeRequest({ title: '새 제목' }), makeParams())

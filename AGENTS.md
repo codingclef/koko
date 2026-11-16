@@ -22,6 +22,8 @@ Read this file first. Then read:
 
 ## Operating Principles
 
+Use the Elephant–Goldfish Model (EGM) for every task. Apply the installed `egm` skill that fits the current stage, and carry approved decisions and review findings into implementation and verification.
+
 ### Understand First
 
 Do not guess. Do not hide uncertainty.
