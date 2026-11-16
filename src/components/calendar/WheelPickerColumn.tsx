@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react'
 
 export const WHEEL_ITEM_H = 44
 const VISIBLE = 5
@@ -10,18 +10,31 @@ interface Props {
   selected: number
   onSelect: (idx: number) => void
   label?: string
+  selectionRef?: Ref<() => number>
 }
 
-export function WheelPickerColumn({ values, selected, onSelect, label }: Props) {
+export function WheelPickerColumn({ values, selected, onSelect, label, selectionRef }: Props) {
   const id = useId()
   const ref = useRef<HTMLDivElement>(null)
   const programmaticRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const mountedRef = useRef(false)
 
+  const readScrollIndex = () => {
+    const top = ref.current?.scrollTop ?? selected * WHEEL_ITEM_H
+    return Math.min(values.length - 1, Math.max(0, Math.round(top / WHEEL_ITEM_H)))
+  }
+
+  useImperativeHandle(selectionRef, () => readScrollIndex)
+
+  // Confirmation reads the visible position, so keyboard changes must be reflected before paint.
+  useLayoutEffect(() => {
+    if (selectionRef && ref.current) ref.current.scrollTop = selected * WHEEL_ITEM_H
+  }, [selected, selectionRef])
+
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el || selectionRef) return
     programmaticRef.current = true
     if (!mountedRef.current) {
       el.scrollTop = selected * WHEEL_ITEM_H
@@ -32,7 +45,7 @@ export function WheelPickerColumn({ values, selected, onSelect, label }: Props) 
       const t = setTimeout(() => { programmaticRef.current = false }, 350)
       return () => clearTimeout(t)
     }
-  }, [selected])
+  }, [selected, selectionRef])
 
   // timerRef cleanup on unmount
   useEffect(() => () => clearTimeout(timerRef.current), [])
@@ -41,14 +54,16 @@ export function WheelPickerColumn({ values, selected, onSelect, label }: Props) 
     if (programmaticRef.current) return
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
-      const el = ref.current
-      if (!el) return
-      const idx = Math.min(values.length - 1, Math.max(0, Math.round(el.scrollTop / WHEEL_ITEM_H)))
-      onSelect(idx)
+      timerRef.current = undefined
+      if (ref.current) onSelect(readScrollIndex())
     }, 100)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      clearTimeout(timerRef.current)
+      timerRef.current = undefined
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       onSelect(Math.min(values.length - 1, selected + 1))
@@ -75,7 +90,7 @@ export function WheelPickerColumn({ values, selected, onSelect, label }: Props) 
         tabIndex={0}
         onScroll={onScroll}
         onKeyDown={handleKeyDown}
-        className="no-scrollbar focus:outline-none"
+        className="no-scrollbar focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500"
         style={{
           height: WHEEL_ITEM_H * VISIBLE,
           overflowY: 'scroll',

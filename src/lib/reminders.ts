@@ -4,6 +4,9 @@ export const FIXED_ALL_DAY_ADVANCE_REMINDER_MINIMUM_MINUTES = 1440
 export const REMINDER_CRON_PERIOD_MINUTES = 5
 export const REMINDER_CRON_LOOKBACK_MINUTES = 6
 export const REMINDER_CRON_FORWARD_BUFFER_SECONDS = 5
+export const REMINDER_DATE_FORMAT = new Intl.DateTimeFormat('ko-KR', {
+  month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: REMINDER_TIME_ZONE,
+})
 
 export function usesFixedMorningAllDayReminder(isAllDay: boolean, remindMinutesBefore: number): boolean {
   return (
@@ -35,16 +38,26 @@ function getTokyoDateParts(value: string | Date) {
 export function getReminderTriggerAt(
   eventStart: string | Date,
   isAllDay: boolean,
-  remindMinutesBefore: number
+  offset: number
 ): string {
   const start = new Date(eventStart)
 
-  if (!usesFixedMorningAllDayReminder(isAllDay, remindMinutesBefore)) {
-    return new Date(start.getTime() - remindMinutesBefore * 60 * 1000).toISOString()
+  if (offset < 0) {
+    const tokyoOffsetMs = 9 * 60 * 60 * 1000
+    const local = new Date(start.getTime() + tokyoOffsetMs)
+    const targetMonth = local.getUTCMonth() + offset
+    const lastDay = new Date(Date.UTC(local.getUTCFullYear(), targetMonth + 1, 0)).getUTCDate()
+    local.setUTCMonth(targetMonth, Math.min(local.getUTCDate(), lastDay))
+    if (isAllDay) local.setUTCHours(FIXED_ALL_DAY_ADVANCE_REMINDER_HOUR, 0, 0, 0)
+    return new Date(local.getTime() - tokyoOffsetMs).toISOString()
+  }
+
+  if (!usesFixedMorningAllDayReminder(isAllDay, offset)) {
+    return new Date(start.getTime() - offset * 60 * 1000).toISOString()
   }
 
   const { year, month, day } = getTokyoDateParts(start)
-  const daysBefore = remindMinutesBefore / 1440
+  const daysBefore = offset / 1440
   const tokyoMidnight = new Date(`${year}-${month}-${day}T00:00:00+09:00`)
 
   return new Date(

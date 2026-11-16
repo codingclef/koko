@@ -18,7 +18,7 @@ describe('convert_event_to_recurring_series_authorized migration', () => {
   it('같은 transaction에서 rule, series, reminder, occurrence를 생성한다', () => {
     expect(sql).toContain('INSERT INTO recurrence_rules')
     expect(sql).toContain('INSERT INTO recurrence_series')
-    expect(sql).toContain('DELETE FROM event_reminders WHERE event_id = p_event_id')
+    expect(sql).toContain('PERFORM replace_event_reminder_offsets(p_event_id, v_offsets)')
     expect(sql).toContain('PERFORM insert_series_event_instance')
   })
 

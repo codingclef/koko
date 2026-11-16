@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { Bell, Pencil, Trash2, X, Calendar as CalendarIcon, Clock, RefreshCw } from 'lucide-react'
-import { getRecurrenceRule, getReminders, REMINDER_OPTIONS, type Calendar, type CalendarEvent, type EventReminder } from '@/lib/calendar'
+import { getRecurrenceRule, getReminders, type Calendar, type CalendarEvent, type EventReminder } from '@/lib/calendar'
+import { formatReminderOffset } from '@/lib/event-reminder-options'
+import { getReminderTriggerAt, REMINDER_DATE_FORMAT } from '@/lib/reminders'
 import { toDisplayColor } from '@/lib/label-colors'
 import { buildRecurrenceEndLabel, buildRecurrenceLabel, type RecurrenceRule } from '@/types/recurrence'
 
@@ -48,9 +50,6 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
       .then(setRecurrenceRule)
       .catch(() => setRecurrenceRule(null))
   }, [event.series_id])
-
-  const reminderLabel = (minutes: number) =>
-    REMINDER_OPTIONS.find((o) => o.minutes === minutes)?.label ?? `${minutes}분 전`
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -155,7 +154,12 @@ export function EventDetailSheet({ event, calendars, onClose, onEdit, onDelete }
                     key={r.id}
                     className="text-xs bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 px-2 py-1 rounded-full"
                   >
-                    {reminderLabel(r.remind_minutes_before)}
+                    {formatReminderOffset(r.remind_minutes_before)}
+                    {(event.is_all_day || r.remind_minutes_before < 0) && (
+                      <span className="ml-1">
+                        · {REMINDER_DATE_FORMAT.format(new Date(getReminderTriggerAt(event.start_at, event.is_all_day, r.remind_minutes_before)))}
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>

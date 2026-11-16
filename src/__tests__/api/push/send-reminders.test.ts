@@ -285,4 +285,44 @@ describe('POST /api/cron/send-reminders', () => {
       p_reminder_ids: ['r1'],
     })
   })
+
+  it('같은 시각의 전용 캘린더 알람은 해당 멤버에게 한 번 발송한다', async () => {
+    const claim = {
+      reminder_id: 'r1',
+      event_title: '개인 일정',
+      event_start: '2027-03-31T00:30:00+09:00',
+      is_all_day: false,
+      family_id: 'f1',
+      calendar_id: 'private',
+      claim_token: 'shared-claim',
+    }
+    mockClaimResult = { data: [claim, { ...claim, reminder_id: 'r2' }], error: null }
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockResolvedValue({ data: [{ user_id: 'u1', calendar_id: 'private' }] }),
+    }))
+    const subscriptionQuery = jest.fn().mockResolvedValue({
+      data: [
+        { id: 'member', endpoint: 'https://member', p256dh: 'k', auth: 'a', user_id: 'u1' },
+        { id: 'nonmember', endpoint: 'https://nonmember', p256dh: 'k', auth: 'a', user_id: 'u2' },
+      ],
+    })
+    mockFrom.mockImplementationOnce(() => ({ select: jest.fn().mockReturnThis(), in: subscriptionQuery }))
+    mockFrom.mockImplementationOnce(() => ({
+      update: jest.fn().mockReturnThis(), in: jest.fn().mockResolvedValue({ error: null }),
+    }))
+    mockSendNotification.mockResolvedValue({ statusCode: 201 })
+
+    const res = await POST(makeRequest())
+
+    expect(await res.json()).toEqual({ sent: 1, removed: 0, retry: 0 })
+    expect(mockFrom).not.toHaveBeenCalledWith('family_members')
+    expect(subscriptionQuery).toHaveBeenCalledWith('user_id', ['u1'])
+    expect(mockSendNotification).toHaveBeenCalledTimes(1)
+    expect(mockSendNotification.mock.calls[0][0].endpoint).toBe('https://member')
+    expect(mockRpc).toHaveBeenCalledWith('acknowledge_reminders', {
+      p_reminder_ids: ['r1', 'r2'],
+      p_claim_tokens: ['shared-claim'],
+    })
+  })
 })

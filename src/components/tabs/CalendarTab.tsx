@@ -148,10 +148,14 @@ function saveStoredFilter(familyId: string, ids: Set<string>) {
   } catch {}
 }
 
-function getLocalTimePart(isoString: string): string {
+function getLocalDatePart(isoString: string) {
   const date = new Date(isoString)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((part) => String(part).padStart(2, '0')).join('-')
+}
+
+function getUtcTimePart(isoString: string | null) {
+  return isoString ? new Date(isoString).toISOString().slice(11, 19) : null
 }
 
 export function CalendarTab({
@@ -897,6 +901,7 @@ export function CalendarTab({
     localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
+    remindersChanged?: boolean
     recurrence: import('@/types/recurrence').RecurrenceRule | null
     labelColor: string | null
     scope?: RecurrenceScope
@@ -943,8 +948,7 @@ export function CalendarTab({
         const isFollowingDateChange = Boolean(
           isScopedSeriesEdit &&
           scope === 'following' &&
-          editingEvent.event.series_occurrence_date &&
-          params.localStartDate !== editingEvent.event.series_occurrence_date
+          params.localStartDate !== getLocalDatePart(editingEvent.event.start_at)
         )
         const isFollowingRecurrenceChange = Boolean(
           isScopedSeriesEdit &&
@@ -962,17 +966,19 @@ export function CalendarTab({
             description: params.description,
             startAt: isScopedSeriesEdit && !shouldSplitFollowingSeries ? undefined : params.startAt,
             endAt: isScopedSeriesEdit && !shouldSplitFollowingSeries ? undefined : params.endAt,
-            localStartDate: params.localStartDate,
+            localStartDate: isScopedSeriesEdit && !shouldSplitFollowingSeries ? undefined : params.localStartDate,
             localEndDate: params.localEndDate,
             isAllDay: params.isAllDay,
-            reminderMinutes: params.reminderMinutes,
+            reminderOffsets: params.remindersChanged === false ? undefined : params.reminderMinutes,
             labelColor: params.labelColor,
             ...(isFollowingRecurrenceChange || isRegularRecurrenceConversion
               ? { recurrence: params.recurrence }
               : {}),
             ...(isScopedSeriesEdit && !params.isAllDay ? {
-              startTime: getLocalTimePart(params.startAt),
-              endTime: params.endAt ? getLocalTimePart(params.endAt) : null,
+              startTime: editingEvent.event.is_all_day || getUtcTimePart(params.startAt) !== getUtcTimePart(editingEvent.event.start_at)
+                ? getUtcTimePart(params.startAt) : undefined,
+              endTime: editingEvent.event.is_all_day || getUtcTimePart(params.endAt) !== getUtcTimePart(editingEvent.event.end_at)
+                ? getUtcTimePart(params.endAt) : undefined,
             } : {}),
             ...(editingEvent.event.series_id ? {
               scope,
@@ -994,7 +1000,7 @@ export function CalendarTab({
             startAt: params.startAt,
             endAt: params.endAt,
             isAllDay: params.isAllDay,
-            reminderMinutes: params.reminderMinutes,
+            reminderOffsets: params.reminderMinutes,
             labelColor: params.labelColor,
             ...(params.recurrence ? { recurrence: params.recurrence } : {}),
           }),
@@ -1471,12 +1477,15 @@ function EventFormModalWithReminders({
     localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
+    remindersChanged?: boolean
     recurrence: import('@/types/recurrence').RecurrenceRule | null
     labelColor: string | null
     scope?: RecurrenceScope
   }) => Promise<void>
 }) {
   const [reminderMinutes, setReminderMinutes] = useState<number[] | null>(event ? null : [])
+  const [reminderLoadFailed, setReminderLoadFailed] = useState(false)
+  const [reminderLoadAttempt, setReminderLoadAttempt] = useState(0)
   const recurrenceScope = (event as (CalendarEvent & { _seriesScope?: RecurrenceScope }) | undefined)?._seriesScope
   const shouldLoadRecurrence = Boolean(event?.series_id && recurrenceScope === 'following')
   const [initialRecurrence, setInitialRecurrence] = useState<RecurrenceRule | null | undefined>(
@@ -1485,10 +1494,12 @@ function EventFormModalWithReminders({
 
   useEffect(() => {
     if (!event) return
+    let active = true
     getReminders(event.id)
-      .then((r) => setReminderMinutes(r.map((x) => x.remind_minutes_before)))
-      .catch(() => setReminderMinutes([]))
-  }, [event])
+      .then((r) => { if (active) setReminderMinutes(r.map((x) => x.remind_minutes_before)) })
+      .catch(() => { if (active) setReminderLoadFailed(true) })
+    return () => { active = false }
+  }, [event, reminderLoadAttempt])
 
   useEffect(() => {
     if (!event?.series_id || recurrenceScope !== 'following') return
@@ -1498,6 +1509,22 @@ function EventFormModalWithReminders({
       .catch(() => setInitialRecurrence(null))
   }, [event?.series_id, recurrenceScope])
 
+  if (reminderLoadFailed) {
+    return (
+      <div className="fixed inset-0 z-[70] grid place-items-center bg-stone-950/50 p-4">
+        <div role="alert" className="rounded-2xl bg-stone-50 p-5 text-stone-900 dark:bg-stone-900 dark:text-stone-100">
+          <p>기존 알람을 불러오지 못했어요.</p>
+          <div className="mt-3 flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="min-h-11 px-3">닫기</button>
+            <button type="button" className="min-h-11 rounded-xl bg-accent-600 px-3 text-white" onClick={() => {
+              setReminderLoadFailed(false)
+              setReminderLoadAttempt((attempt) => attempt + 1)
+            }}>다시 시도</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (reminderMinutes === null || initialRecurrence === undefined) return null
 
   return (

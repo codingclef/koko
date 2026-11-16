@@ -1,6 +1,8 @@
 import { readLatestMigrationMatching } from '@/test-utils/migrations'
 
 const sql = readLatestMigrationMatching(/create or replace function update_event_authorized\(/i)
+const seriesStart = sql.indexOf('CREATE OR REPLACE FUNCTION update_series_authorized')
+const seriesFunction = sql.slice(seriesStart, sql.indexOf('$$;', seriesStart))
 
 describe('event update push-change migration', () => {
   it('단일 일정 변경 판정에서 labelColor와 reminderMinutes를 제외한다', () => {
@@ -16,8 +18,6 @@ describe('event update push-change migration', () => {
   })
 
   it('반복 일정 변경 판정에서 labelColor와 reminderMinutes를 제외한다', () => {
-    const seriesFunction = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION update_series_authorized'))
-
     expect(seriesFunction).toContain('v_is_changed boolean')
     expect(seriesFunction).toContain('v_new_start_at timestamptz')
     expect(seriesFunction).toContain("'is_changed',      v_is_changed")
@@ -30,8 +30,6 @@ describe('event update push-change migration', () => {
   })
 
   it('following/all 반복 일정은 대상 occurrence 전체에서 실제 변경 여부를 계산한다', () => {
-    const seriesFunction = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION update_series_authorized'))
-
     expect(seriesFunction).toContain('WITH candidate_events AS (')
     expect(seriesFunction).toContain('changed_events AS (')
     expect(seriesFunction).toContain('FROM events ev')
@@ -42,8 +40,6 @@ describe('event update push-change migration', () => {
   })
 
   it('following/all 반복 일정의 push startAt은 실제 변경되는 첫 occurrence의 변경 후 시작 시각으로 반환한다', () => {
-    const seriesFunction = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION update_series_authorized'))
-
     expect(seriesFunction).toContain('SELECT next_start_at')
     expect(seriesFunction).toContain('FROM changed_events')
     expect(seriesFunction).toContain('ORDER BY series_occurrence_date ASC, start_at ASC')

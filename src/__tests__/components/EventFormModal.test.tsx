@@ -1,14 +1,9 @@
-import { render, screen, fireEvent, act, createEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act, createEvent, within } from '@testing-library/react'
 import { EventFormModal } from '@/components/calendar/EventFormModal'
 import { getEventSuggestions, type Calendar } from '@/lib/calendar'
 
 jest.mock('@/lib/calendar', () => ({
   getEventSuggestions: jest.fn().mockResolvedValue([]),
-  REMINDER_OPTIONS: [
-    { minutes: 0, label: '정각' },
-    { minutes: 10, label: '10분 전' },
-    { minutes: 30, label: '30분 전' },
-  ],
   LABEL_COLORS: ['#f97316', '#3b82f6', '#10b981'],
   LABEL_COLOR_NAMES: {
     '#f97316': '주황색',
@@ -109,6 +104,46 @@ describe('EventFormModal', () => {
     // 시간 버튼(HH:MM 형태)이 나타나야 함
     expect(screen.getByText('09:00')).toBeInTheDocument()
     expect(screen.getByText('10:00')).toBeInTheDocument()
+  })
+
+  it('일정 유형에 맞는 프리셋과 단위만 표시하고 개월을 저장한다', async () => {
+    render(<EventFormModal {...defaultProps} initialDate={new Date(2028, 2, 31)} />)
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '종일 행사' } })
+    expect(screen.queryByRole('button', { name: '10분 전 추가' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1주 전 추가' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: '직접 설정' }))
+    const units = screen.getByRole('listbox', { name: '알람 단위' })
+    expect(within(units).getAllByRole('option').map((o) => o.textContent)).toEqual(['일 전', '주 전', '개월 전'])
+    Object.defineProperty(units, 'scrollTo', { value: jest.fn() })
+    fireEvent.keyDown(units, { key: 'ArrowDown' })
+    fireEvent.keyDown(units, { key: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('button', { name: '저장' }))
+    expect(defaultProps.onSave).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('설정 중인 알람')
+    fireEvent.click(screen.getByRole('button', { name: '추가' }))
+    expect(screen.getByRole('button', { name: '1개월 전 수정' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '저장' })) })
+    expect(defaultProps.onSave).toHaveBeenCalledWith(expect.objectContaining({ reminderMinutes: [-1] }))
+  })
+
+  it('분 휠이 스크롤을 반영하기 전에 추가해도 중앙값을 확정한다', async () => {
+    render(<EventFormModal {...defaultProps} />)
+    fireEvent.change(screen.getByPlaceholderText('제목'), { target: { value: '회의' } })
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
+    fireEvent.click(screen.getByRole('button', { name: '직접 설정' }))
+    const amount = screen.getByRole('listbox', { name: '알람 숫자' })
+    expect(within(amount).getAllByRole('option').map((o) => o.textContent))
+      .toEqual(['5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'])
+    amount.scrollTop = 10 * 44
+    fireEvent.scroll(amount)
+    fireEvent.click(screen.getByRole('button', { name: '추가' }))
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
+    expect(screen.getByText('변경 또는 삭제가 필요해요')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: '저장' }))
+    expect(defaultProps.onSave).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '종일' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '저장' })) })
+    expect(defaultProps.onSave).toHaveBeenCalledWith(expect.objectContaining({ reminderMinutes: [55] }))
   })
 
   it('제목 없으면 저장 버튼이 disabled다', () => {
@@ -563,7 +598,13 @@ describe('EventFormModal', () => {
       updated_at: '',
     }
 
-    render(<EventFormModal {...defaultProps} initial={initial} recurrenceScope="following" />)
+    render(<EventFormModal
+      {...defaultProps}
+      initial={initial}
+      recurrenceScope="following"
+      initialReminderMinutes={[-1]}
+      initialRecurrence={{ freq: 'daily', interval: 1 }}
+    />)
 
     const dateInputs = document.querySelectorAll('input[type="date"]')
     expect((dateInputs[0] as HTMLInputElement).disabled).toBe(false)
@@ -582,6 +623,7 @@ describe('EventFormModal', () => {
       expect.objectContaining({
         localStartDate: '2026-04-01',
         localEndDate: '2026-04-01',
+        remindersChanged: false,
       })
     )
   })

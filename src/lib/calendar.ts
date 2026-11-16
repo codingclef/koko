@@ -78,17 +78,6 @@ export function moveEventToDate(event: CalendarEvent, targetDate: Date): Calenda
   }
 }
 
-export const REMINDER_OPTIONS: { label: string; minutes: number }[] = [
-  { label: '5분 전', minutes: 5 },
-  { label: '10분 전', minutes: 10 },
-  { label: '30분 전', minutes: 30 },
-  { label: '1시간 전', minutes: 60 },
-  { label: '2시간 전', minutes: 120 },
-  { label: '1일 전', minutes: 1440 },
-  { label: '2일 전', minutes: 2880 },
-  { label: '1주 전', minutes: 10080 },
-]
-
 // ── Calendars ──────────────────────────────────────────────
 
 export async function getCalendars(familyId: string): Promise<Calendar[]> {

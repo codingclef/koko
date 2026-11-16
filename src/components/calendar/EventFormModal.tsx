@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useLayoutEffect, type MouseEvent } from 'react'
-import { X, Bell, RefreshCw, Check, Tag, CalendarDays, Clock3, ChevronRight, AlignLeft } from 'lucide-react'
+import { X, Bell, RefreshCw, Check, Tag, CalendarDays, Clock3, ChevronRight, AlignLeft, Trash2 } from 'lucide-react'
 import {
   getEventSuggestions,
-  REMINDER_OPTIONS,
   LABEL_COLORS,
   LABEL_COLOR_NAMES,
   type Calendar,
@@ -13,10 +12,12 @@ import {
 } from '@/lib/calendar'
 import { toDisplayColor } from '@/lib/label-colors'
 import { TimeWheelPicker } from './TimeWheelPicker'
+import { EventReminderPicker } from './EventReminderPicker'
 import { RecurrencePickerSheet } from './RecurrencePickerSheet'
 import { RecurrenceCustomModal } from './RecurrenceCustomModal'
 import { buildRecurrenceLabel, type RecurrenceRule, type RecurrenceScope } from '@/types/recurrence'
-import { REMINDER_TIME_ZONE } from '@/lib/reminders'
+import { getReminderTriggerAt, REMINDER_DATE_FORMAT, REMINDER_TIME_ZONE, usesFixedMorningAllDayReminder } from '@/lib/reminders'
+import { formatReminderOffset, isAllowedReminderOffset } from '@/lib/event-reminder-options'
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -111,6 +112,7 @@ interface Props {
     localEndDate: string
     isAllDay: boolean
     reminderMinutes: number[]
+    remindersChanged?: boolean
     recurrence: RecurrenceRule | null
     labelColor: string | null
   }) => Promise<void>
@@ -184,6 +186,10 @@ export function EventFormModal({
   const [reminderMinutes, setReminderMinutes] = useState<Set<number>>(
     new Set(initialReminderMinutes)
   )
+  const [editingReminder, setEditingReminder] = useState<number | null>()
+  const [reminderError, setReminderError] = useState<string | null>(null)
+  const [openedAt] = useState(Date.now)
+  const reminderSectionRef = useRef<HTMLDivElement>(null)
   const [labelColor, setLabelColor] = useState<string | null>(
     initial
       ? initial.label_color
@@ -304,10 +310,7 @@ export function EventFormModal({
 
   const toggleAllDay = (val: boolean) => {
     setIsAllDay(val)
-    if (!val) {
-      setStartTime('09:00')
-      setEndTime('10:00')
-    }
+    setReminderError(null)
     setActiveTimePicker(null)
   }
 
@@ -392,13 +395,33 @@ export function EventFormModal({
     }
   }
 
-  const toggleReminder = (minutes: number) => {
-    setReminderMinutes((prev) => {
-      const next = new Set(prev)
-      if (next.has(minutes)) next.delete(minutes)
-      else next.add(minutes)
-      return next
-    })
+  const incompatibleReminders = [...reminderMinutes].filter((offset) => {
+    if (isAllowedReminderOffset(offset, isAllDay)) return false
+    if (!initialReminderMinutes.includes(offset)) return true
+    return isAllDay && !initial?.is_all_day && !usesFixedMorningAllDayReminder(true, offset)
+  })
+
+  const addReminder = (offset: number) => {
+    if (reminderMinutes.has(offset) && editingReminder !== offset) {
+      setReminderError('같은 시각의 알람이 이미 있어요.')
+      return
+    }
+    const next = new Set(reminderMinutes)
+    if (typeof editingReminder === 'number') next.delete(editingReminder)
+    next.add(offset)
+    setReminderMinutes(next)
+    setEditingReminder(undefined)
+    setReminderError(null)
+  }
+
+  const checkRemindersBeforeSave = () => {
+    if (editingReminder === undefined && incompatibleReminders.length === 0) return true
+    setReminderError(editingReminder !== undefined
+      ? '설정 중인 알람을 추가하거나 취소해 주세요.'
+      : '현재 일정에 사용할 수 없는 알람을 변경하거나 삭제해 주세요.')
+    reminderSectionRef.current?.scrollIntoView?.({ block: 'nearest' })
+    reminderSectionRef.current?.querySelector<HTMLElement>('[role="listbox"]')?.focus({ preventScroll: true })
+    return false
   }
 
   const handleTitleChange = (value: string) => {
@@ -420,6 +443,8 @@ export function EventFormModal({
     setReminderMinutes(new Set(
       suggestion.event_reminders.map((reminder) => reminder.remind_minutes_before)
     ))
+    setEditingReminder(undefined)
+    setReminderError(null)
     setIsAllDay(suggestion.is_all_day)
     setActiveTimePicker(null)
     setDateError(null)
@@ -450,6 +475,7 @@ export function EventFormModal({
   const persistEvent = async () => {
     if (!title.trim() || !startDate) return
     if (dateError || regularConversionError) return
+    if (!checkRemindersBeforeSave()) return
     if (followingAnchorDate && startDate < followingAnchorDate) {
       setDateError('이후 일정은 선택한 일정 날짜 이후로만 이동할 수 있어요.')
       return
@@ -459,6 +485,11 @@ export function EventFormModal({
     const endAt = isAllDay ? buildAllDayISO(endDate) : buildISO(endDate, endTime)
 
     if (new Date(endAt) < new Date(startAt)) return
+    const recurrenceToSave = isNewEvent
+      || isRegularEventEdit
+      || (isFollowingSeriesEdit && !isSameRecurrenceRule(recurrence, initialRecurrence))
+      ? recurrence
+      : null
 
     setSaving(true)
     setSaveError(null)
@@ -473,11 +504,12 @@ export function EventFormModal({
         localEndDate: endDate,
         isAllDay,
         reminderMinutes: Array.from(reminderMinutes),
-        recurrence: isNewEvent
-          || isRegularEventEdit
-          || (isFollowingSeriesEdit && !isSameRecurrenceRule(recurrence, initialRecurrence))
-          ? recurrence
-          : null,
+        ...(initial && !(isRegularEventEdit && recurrenceToSave) && isAllDay === initial.is_all_day &&
+          reminderMinutes.size === new Set(initialReminderMinutes).size &&
+          initialReminderMinutes.every((offset) => reminderMinutes.has(offset))
+          ? { remindersChanged: false }
+          : {}),
+        recurrence: recurrenceToSave,
         labelColor,
       })
       onClose()
@@ -491,6 +523,7 @@ export function EventFormModal({
 
   const handleSave = async () => {
     if (dateError || regularConversionError) return
+    if (!checkRemindersBeforeSave()) return
     if (isRegularEventEdit && recurrence) {
       setShowConversionConfirm(true)
       return
@@ -506,12 +539,10 @@ export function EventFormModal({
     }`
 
   const dateBtnCls = 'relative overflow-hidden min-w-0 rounded-xl bg-stone-100 px-3 py-1.5 text-center text-sm font-semibold text-stone-700 dark:bg-stone-800/95 dark:text-stone-100 sm:rounded-2xl sm:px-4 sm:py-2.5'
-  const reminderLabel = reminderMinutes.size > 0
-    ? REMINDER_OPTIONS
-      .filter((opt) => reminderMinutes.has(opt.minutes))
-      .map((opt) => opt.label)
-      .join(', ')
-    : '없음'
+  const reminderPresets = isAllDay ? [1440, 2880, 10080] : [10, 60, 1440]
+  const reminderStartAt = startDate
+    ? (isAllDay ? buildAllDayISO(startDate) : buildISO(startDate, startTime))
+    : null
 
   return (
     <div className={`fixed inset-0 z-[70] bg-stone-950/40 dark:bg-black flex items-end sm:items-center justify-center sm:p-6 ${isClosing ? 'modal-slide-down' : 'modal-slide-up'}`}>
@@ -829,33 +860,92 @@ export function EventFormModal({
           )}
 
           {/* 알림 */}
-          <div className="grid grid-cols-[3.25rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
+          <div ref={reminderSectionRef} className="grid grid-cols-[3.25rem_1fr] border-b border-stone-200/70 dark:border-stone-900 sm:grid-cols-[4.5rem_1fr]">
             <div className="flex justify-center pt-4 text-accent-500 dark:text-accent-300 sm:pt-6">
               <Bell size={22} strokeWidth={1.8} />
             </div>
             <div className="py-3 pr-4 sm:py-5 sm:pr-5">
               <div className="mb-2 flex items-center justify-between gap-3 sm:mb-3">
                 <span className="text-base font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">알람</span>
-                <span className="max-w-[55%] truncate text-sm font-semibold text-stone-400">{reminderLabel}</span>
               </div>
               <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                {REMINDER_OPTIONS.map((opt) => {
-                  const active = reminderMinutes.has(opt.minutes)
-                  return (
-                    <button
-                      key={opt.minutes}
-                      onClick={() => toggleReminder(opt.minutes)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors sm:rounded-full sm:px-4 sm:py-2 sm:text-sm ${
-                        active
-                          ? 'bg-accent-400 text-white'
-                          : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  )
-                })}
+                {reminderPresets.map((offset) => (
+                  <button
+                    key={offset}
+                    type="button"
+                    aria-label={`${formatReminderOffset(offset)} 추가`}
+                    disabled={reminderMinutes.has(offset) || editingReminder !== undefined}
+                    onClick={() => addReminder(offset)}
+                    className="min-h-11 rounded-xl bg-stone-200 px-3 text-xs font-semibold text-stone-700 disabled:opacity-50 dark:bg-stone-800 dark:text-stone-200"
+                  >
+                    {formatReminderOffset(offset)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-expanded={editingReminder === null}
+                  disabled={editingReminder !== undefined}
+                  onClick={() => { setEditingReminder(null); setReminderError(null) }}
+                  className="min-h-11 rounded-xl bg-accent-50 px-3 text-xs font-semibold text-accent-700 disabled:opacity-50 dark:bg-accent-950 dark:text-accent-200"
+                >
+                  직접 설정
+                </button>
               </div>
+              {reminderMinutes.size > 0 && (
+                <ul className="mt-2 divide-y divide-stone-200 dark:divide-stone-800">
+                  {[...reminderMinutes].map((offset) => {
+                    const label = formatReminderOffset(offset)
+                    const incompatible = incompatibleReminders.includes(offset)
+                    const due = reminderStartAt && !incompatible
+                      ? new Date(getReminderTriggerAt(reminderStartAt, isAllDay, offset))
+                      : null
+                    const past = due !== null && due.getTime() < openedAt
+                    return (
+                      <li key={offset} className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          aria-label={`${label} 수정`}
+                          disabled={editingReminder !== undefined}
+                          onClick={() => { setEditingReminder(offset); setReminderError(null) }}
+                          className="min-h-11 flex-1 py-2 text-left text-sm font-semibold text-stone-800 dark:text-stone-100"
+                        >
+                          {label}
+                          {incompatible ? (
+                            <span className="block text-xs text-red-700 dark:text-red-300">변경 또는 삭제가 필요해요</span>
+                          ) : due && (isAllDay || offset < 0 || past) && (
+                            <span className="block text-xs font-normal text-stone-600 dark:text-stone-400">
+                              {REMINDER_DATE_FORMAT.format(due)}{past ? ' · 이미 지난 시각' : ' 예정'}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`${label} 삭제`}
+                          disabled={editingReminder !== undefined}
+                          onClick={() => {
+                            setReminderMinutes(new Set([...reminderMinutes].filter((value) => value !== offset)))
+                            setReminderError(null)
+                          }}
+                          className="grid size-11 shrink-0 place-items-center rounded-xl text-stone-600 hover:bg-stone-200 dark:text-stone-300 dark:hover:bg-stone-800"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {editingReminder !== undefined && (
+                <EventReminderPicker
+                  key={`${isAllDay}:${editingReminder}`}
+                  allDay={isAllDay}
+                  offset={editingReminder}
+                  startAt={reminderStartAt}
+                  onApply={addReminder}
+                  onCancel={() => { setEditingReminder(undefined); setReminderError(null) }}
+                />
+              )}
+              {reminderError && <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">{reminderError}</p>}
             </div>
           </div>
 
