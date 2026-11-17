@@ -37,7 +37,7 @@ const mockSetTheme = jest.fn()
 const mockUser = { id: 'user-1', email: 'test@example.com' } as User
 
 const defaultProps = {
-  onNavigateToTab: jest.fn(),
+  onFamilyJoined: jest.fn(),
   preferences: null,
   updatePreferences: jest.fn(),
   user: mockUser,

@@ -17,6 +17,8 @@ interface Props {
   onEditEnd?: (itemId: string) => void
   onAdvanceEdit?: (itemId: string) => void
   draggable?: boolean
+  dragDisabled?: boolean
+  pending?: boolean
 }
 
 export function ReminderItem({
@@ -30,6 +32,8 @@ export function ReminderItem({
   onEditEnd,
   onAdvanceEdit,
   draggable = false,
+  dragDisabled = false,
+  pending = false,
 }: Props) {
   const [internalEditing, setInternalEditing] = useState(false)
   const [editValue, setEditValue] = useState(item.name)
@@ -44,7 +48,7 @@ export function ReminderItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id, disabled: !draggable })
+  } = useSortable({ id: item.id, disabled: !draggable || dragDisabled || pending })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -127,6 +131,7 @@ export function ReminderItem({
     <div
       ref={setNodeRef}
       style={style}
+      aria-busy={pending || undefined}
       className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
         item.is_checked && listType === 'strikethrough'
           ? 'opacity-60'
@@ -137,7 +142,8 @@ export function ReminderItem({
         <button
           {...attributes}
           {...listeners}
-          className="flex-shrink-0 p-0.5 text-stone-300 dark:text-stone-600 touch-none cursor-grab active:cursor-grabbing"
+          disabled={dragDisabled || pending}
+          className="flex-shrink-0 p-0.5 text-stone-300 dark:text-stone-600 touch-none cursor-grab active:cursor-grabbing disabled:opacity-50 disabled:cursor-default"
           aria-label="드래그 핸들"
         >
           <GripVertical size={14} />
@@ -146,8 +152,9 @@ export function ReminderItem({
 
       <button
         onClick={handleCheck}
+        disabled={pending}
         aria-label={item.is_checked ? '체크 해제' : '체크'}
-        className="flex-shrink-0 p-2 -m-2 rounded-full"
+        className="flex-shrink-0 p-2 -m-2 rounded-full disabled:opacity-50"
       >
         <span
           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
@@ -182,8 +189,8 @@ export function ReminderItem({
         />
       ) : (
         <span
-          onClick={handleNameClick}
-          className={`flex-1 text-stone-800 dark:text-stone-100 transition-all cursor-text ${
+          onClick={pending ? undefined : handleNameClick}
+          className={`flex-1 text-stone-800 dark:text-stone-100 transition-all ${pending ? '' : 'cursor-text'} ${
             item.is_checked && listType === 'strikethrough'
               ? 'line-through text-stone-400 dark:text-stone-500'
               : ''
@@ -195,7 +202,8 @@ export function ReminderItem({
 
       <button
         onClick={() => onDelete(item.id)}
-        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
+        disabled={pending}
+        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg text-stone-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all disabled:opacity-30"
         aria-label="삭제"
       >
         <Trash2 size={14} />

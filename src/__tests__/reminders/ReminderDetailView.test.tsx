@@ -855,6 +855,10 @@ describe('ReminderDetailView', () => {
     expect(input).toHaveValue('')
     expect(input).not.toHaveAttribute('readonly')
     expect(mockBroadcast).not.toHaveBeenCalled()
+    const pendingCheck = screen.getByRole('button', { name: '체크' })
+    expect(pendingCheck).toBeDisabled()
+    await user.click(pendingCheck)
+    expect(mockCheckReminderItem).not.toHaveBeenCalled()
 
     await user.click(screen.getByTestId('reminder-detail-scroll'))
     expect(screen.getByTestId('bottom-add-item-input')).toBeInTheDocument()
@@ -877,6 +881,8 @@ describe('ReminderDetailView', () => {
     expect(screen.getByText('버터')).toBeInTheDocument()
     expect(input).not.toHaveAttribute('readonly')
     expect(mockBroadcast).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '체크' }))
+    expect(mockCheckReminderItem).toHaveBeenCalledWith('item-new', 'user-1', true)
   })
 
   it('추가 실패 롤백은 저장 중 수신한 다른 항목을 보존하고 입력 원문을 복원한다', async () => {
@@ -927,7 +933,8 @@ describe('ReminderDetailView', () => {
       ([channelName]) => channelName === 'list_items_list-1'
     )?.[1] as (() => void) | undefined
     act(() => refreshItems?.())
-    expect(await screen.findByText('가족이 추가한 항목')).toBeInTheDocument()
+    expect(screen.queryByText('가족이 추가한 항목')).not.toBeInTheDocument()
+    expect(screen.getByText('버터')).toBeInTheDocument()
 
     await act(async () => {
       rejectAdd?.(new Error('save failed'))
@@ -940,6 +947,32 @@ describe('ReminderDetailView', () => {
     expect(input).toHaveValue('버터')
     expect(input).not.toHaveAttribute('readonly')
     expect(screen.getByText('아이템을 저장하지 못했어요')).toBeInTheDocument()
+  })
+
+  it('체크가 실패해도 그 사이에 갱신된 다른 항목을 보존한다', async () => {
+    const item = {
+      id: 'item-1', list_id: 'list-1', created_by: 'user-1',
+      name: '우유', is_checked: false, checked_by: null, checked_at: null,
+      sort_order: 0, created_at: '2026-01-01T00:00:00Z',
+    }
+    const updatedItems = [item, { ...item, id: 'item-2', name: '가족이 추가한 달걀', sort_order: 1 }]
+    mockGetReminderItems.mockResolvedValueOnce([item]).mockResolvedValue(updatedItems)
+    let rejectCheck!: (error: Error) => void
+    mockCheckReminderItem.mockReturnValueOnce(new Promise((_, reject) => { rejectCheck = reject }))
+    const user = userEvent.setup()
+
+    render(<ReminderDetailView listId="list-1" user={mockUser} onClose={onClose} onPreviewItemsChange={onPreviewItemsChange} />)
+    await user.click(await screen.findByRole('button', { name: '체크' }))
+    expect(screen.getByRole('button', { name: '아이템 비우기' })).toBeDisabled()
+    const refreshItems = mockUseRealtimeSync.mock.calls.find(([topic]) => topic === 'list_items_list-1')?.[1] as () => void
+    await act(async () => { refreshItems() })
+    expect(screen.queryByText('가족이 추가한 달걀')).not.toBeInTheDocument()
+
+    await act(async () => { rejectCheck(new Error('check failed')) })
+    expect(screen.getByText('체크 상태를 저장하지 못했어요')).toBeInTheDocument()
+    expect(screen.getByText('가족이 추가한 달걀')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '체크 해제' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '아이템 비우기' })).toBeEnabled()
   })
 
   it('floating 추가 입력창 바깥 빈 공간을 누르면 연속 추가를 종료한다', async () => {
@@ -1448,10 +1481,11 @@ describe('ReminderDetailView', () => {
   })
 
   it('가족 목록 refresh에서 접근할 수 없으면 not found 상태로 전환하고 preview를 비운다', async () => {
-    render(
+    const { rerender } = render(
       <ReminderDetailView
         listId="list-1"
         user={mockUser}
+        listRefreshVersion={0}
         onClose={onClose}
         onPreviewItemsChange={onPreviewItemsChange}
       />
@@ -1459,14 +1493,18 @@ describe('ReminderDetailView', () => {
 
     expect(await screen.findByText('이마트')).toBeInTheDocument()
 
-    const calls = mockUseRealtimeSync.mock.calls as unknown as Array<[unknown, () => void, unknown]>
-    const familyRefresh = calls.find(([channelName]) => channelName === 'family_lists_fam-1')?.[1]
-    expect(familyRefresh).toBeDefined()
+    expect(mockUseRealtimeSync.mock.calls.map(([topic]) => topic)).not.toContain('family_lists_fam-1')
 
     mockGetReminderList.mockResolvedValueOnce(null)
-    await act(async () => {
-      familyRefresh?.()
-    })
+    rerender(
+      <ReminderDetailView
+        listId="list-1"
+        user={mockUser}
+        listRefreshVersion={1}
+        onClose={onClose}
+        onPreviewItemsChange={onPreviewItemsChange}
+      />
+    )
 
     expect(await screen.findByText('삭제되었거나 접근할 수 없는 리마인더예요.')).toBeInTheDocument()
     expect(onPreviewItemsChange).toHaveBeenLastCalledWith('list-1', [])
@@ -1512,4 +1550,155 @@ describe('ReminderDetailView', () => {
     expect(screen.getByTestId('floating-add-item-button')).toHaveClass('absolute')
     expect(screen.getByRole('button', { name: '목록으로 돌아가기' })).toHaveClass('h-11', 'w-11')
   })
+})
+
+describe('저장과 가족 기기의 실시간 갱신', () => {
+  const milk = {
+    id: 'milk', list_id: 'list-1', created_by: 'tester',
+    name: 'Milk', is_checked: false, checked_by: null, checked_at: null,
+    sort_order: 0, created_at: '2026-01-01T00:00:00Z',
+  }
+  const renderDetail = (onPreviewItemsChange = jest.fn(), onItemsSettledAfterClose = jest.fn()) =>
+    render(<ReminderDetailView listId="list-1" user={{ id: 'tester' } as User}
+      onClose={jest.fn()} onPreviewItemsChange={onPreviewItemsChange}
+      onItemsSettledAfterClose={onItemsSettledAfterClose} />)
+  const refresh = () => {
+    const callback = mockUseRealtimeSync.mock.calls.find(([topic]) => topic === 'list_items_list-1')?.[1] as () => void
+    callback()
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockGetReminderList.mockResolvedValue({
+      id: 'list-1', family_id: 'fam-1', name: 'Groceries', reminder_group_id: null, type: 'strikethrough',
+    } as never)
+    mockGetReminderItems.mockResolvedValue([milk])
+  })
+
+  it('keeps saved row drag controls in place while a new row saves', async () => {
+    mockAddReminderItem.mockReturnValueOnce(new Promise(() => {}))
+    const user = userEvent.setup()
+    renderDetail()
+    const savedRow = (await screen.findByText('Milk')).parentElement!
+    expect(within(savedRow).getByLabelText('드래그 핸들')).toBeInTheDocument()
+    await user.click(screen.getByTestId('floating-add-item-button'))
+    await user.type(screen.getByPlaceholderText('아이템 추가...'), 'Butter{Enter}')
+    expect(screen.getByText('Butter')).toBeInTheDocument()
+    expect(within(savedRow).getByLabelText('드래그 핸들')).toBeDisabled()
+  })
+
+  it('does not lose a family member update whose read returns after a local add acknowledgement', async () => {
+    const butter = { ...milk, id: 'butter', name: 'Butter', sort_order: 1 }
+    const renamed = { ...milk, name: 'Oat milk' }
+    let finishAdd!: (item: typeof milk) => void
+    let finishRead!: (items: Array<typeof milk>) => void
+    mockAddReminderItem.mockReturnValueOnce(new Promise(resolve => { finishAdd = resolve }))
+    const user = userEvent.setup()
+    renderDetail()
+    await user.click(await screen.findByTestId('floating-add-item-button'))
+    await user.type(screen.getByPlaceholderText('아이템 추가...'), 'Butter{Enter}')
+    mockGetReminderItems.mockReturnValueOnce(new Promise(resolve => { finishRead = resolve }))
+    act(refresh)
+    await act(async () => { finishAdd(butter) })
+    await act(async () => { finishRead([renamed, butter]) })
+    expect(screen.queryByText('Oat milk')).toBeInTheDocument()
+    expect(screen.getAllByText('Butter')).toHaveLength(1)
+  })
+
+  it('applies the successful peer refresh even if a later request failed', async () => {
+    renderDetail()
+    await screen.findByText('Milk')
+    let finishEarlierRead!: (items: Array<typeof milk>) => void
+    mockGetReminderItems
+      .mockReturnValueOnce(new Promise(resolve => { finishEarlierRead = resolve }))
+      .mockRejectedValueOnce(new Error('offline'))
+    act(refresh)
+    await act(async () => { refresh() })
+    await act(async () => { finishEarlierRead([{ ...milk, name: 'Oat milk' }]) })
+    expect(screen.getByText('Oat milk')).toBeInTheDocument()
+  })
+
+  it('restores the checkbox when both its save and the overlapping reads fail', async () => {
+    let rejectCheck!: (error: Error) => void
+    mockCheckReminderItem.mockReturnValueOnce(new Promise((_, reject) => { rejectCheck = reject }))
+    const user = userEvent.setup()
+    renderDetail()
+    await user.click(await screen.findByRole('button', { name: '체크' }))
+    expect(screen.getByRole('button', { name: '체크 해제' })).toBeInTheDocument()
+    mockGetReminderItems.mockRejectedValue(new Error('offline'))
+    await act(async () => { refresh() })
+    await act(async () => { rejectCheck(new Error('offline')) })
+    expect(screen.getByText('체크 상태를 저장하지 못했어요')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '체크' })).toBeInTheDocument()
+  })
+
+  it('keeps the last saved card preview when a pending check fails after closing', async () => {
+    let rejectCheck!: (error: Error) => void
+    mockCheckReminderItem.mockReturnValueOnce(new Promise((_, reject) => { rejectCheck = reject }))
+    const onPreview = jest.fn()
+    const onSettledAfterClose = jest.fn()
+    const user = userEvent.setup()
+    const { unmount } = renderDetail(onPreview, onSettledAfterClose)
+
+    await user.click(await screen.findByRole('button', { name: '체크' }))
+    expect(screen.getByRole('button', { name: '체크 해제' })).toBeInTheDocument()
+    expect(onPreview).toHaveBeenLastCalledWith('list-1', [milk])
+
+    unmount()
+    await act(async () => { rejectCheck(new Error('offline')) })
+    expect(onSettledAfterClose).toHaveBeenCalledWith('list-1')
+    expect(onPreview).toHaveBeenLastCalledWith('list-1', [milk])
+  })
+})
+
+it('shows a newly saved item once even when read beats write acknowledgement', async () => {
+  jest.clearAllMocks()
+  mockGetReminderList.mockResolvedValue({
+    id: 'list-1', family_id: 'fam-1', name: 'Groceries', reminder_group_id: null, type: 'strikethrough',
+  } as never)
+  mockGetReminderItems.mockResolvedValue([])
+  let finishAdd!: (item: Awaited<ReturnType<typeof addReminderItem>>) => void
+  mockAddReminderItem.mockReturnValueOnce(new Promise(resolve => { finishAdd = resolve }))
+  const user = userEvent.setup()
+  render(<ReminderDetailView listId="list-1" user={{ id: 'tester' } as User}
+    onClose={jest.fn()} onPreviewItemsChange={jest.fn()} />)
+  await user.click(await screen.findByTestId('floating-add-item-button'))
+  await user.type(screen.getByPlaceholderText('아이템 추가...'), 'Butter{Enter}')
+  const butter = {
+    id: 'butter', list_id: 'list-1', created_by: 'tester', name: 'Butter', is_checked: false,
+    checked_by: null, checked_at: null, sort_order: 0, created_at: '2026-01-01T00:00:00Z',
+  }
+  mockGetReminderItems.mockResolvedValueOnce([butter])
+  const callback = mockUseRealtimeSync.mock.calls.find(([topic]) => topic === 'list_items_list-1')?.[1] as () => void
+  await act(async () => { callback() })
+  const countWhileWaiting = screen.getAllByText('Butter').length
+  await act(async () => { finishAdd(butter) })
+  expect(screen.getAllByText('Butter')).toHaveLength(1)
+  expect(countWhileWaiting).toBe(1)
+})
+
+it('hands the active detail read over to the tab when closing', async () => {
+  jest.clearAllMocks()
+  mockGetReminderList.mockResolvedValue({
+    id: 'list-1', family_id: 'fam-1', name: 'Groceries', reminder_group_id: null, type: 'strikethrough',
+  } as never)
+  mockGetReminderItems.mockResolvedValue([])
+  const handOff = jest.fn()
+  const view = render(<ReminderDetailView listId="list-1" user={{ id: 'tester' } as User}
+    onClose={jest.fn()} onPreviewItemsChange={jest.fn()}
+    nextPreviewReadOrder={() => 7} onItemsSettledAfterClose={handOff} />)
+  await screen.findByText('Groceries')
+  type Item = Awaited<ReturnType<typeof addReminderItem>>
+  let finishRead!: (items: Item[]) => void
+  const read = new Promise<Item[]>(resolve => { finishRead = resolve })
+  mockGetReminderItems.mockReturnValueOnce(read)
+  const callback = mockUseRealtimeSync.mock.calls.find(([topic]) => topic === 'list_items_list-1')?.[1] as () => void
+  act(() => { callback() })
+  view.unmount()
+  const peerItem = {
+    id: 'pear', list_id: 'list-1', name: 'Pear', created_by: 'peer', is_checked: false,
+    checked_by: null, checked_at: null, sort_order: 0, created_at: '2026-01-01T00:00:00Z',
+  }
+  await act(async () => { finishRead([peerItem]) })
+  expect(handOff).toHaveBeenCalledWith('list-1', { items: read, order: 7 })
 })
