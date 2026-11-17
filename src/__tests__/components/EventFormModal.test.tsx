@@ -952,7 +952,7 @@ describe('일정 제목 추천', () => {
     )
 
     const titleInput = screen.getByPlaceholderText('제목')
-    fireEvent.focus(titleInput)
+    act(() => { titleInput.focus() })
     fireEvent.change(titleInput, { target: { value: '태' } })
     await act(async () => {
       jest.advanceTimersByTime(250)
@@ -960,7 +960,16 @@ describe('일정 제목 추천', () => {
     })
 
     expect(mockGetEventSuggestions).toHaveBeenCalledWith('fam-1', 'user-1', '태')
-    fireEvent.click(screen.getByRole('option', { name: /태하병원/ }))
+    const option = screen.getByRole('option', { name: /태하병원/ })
+    // WebKit blurs the title before click when the primary press is not canceled.
+    if (fireEvent.mouseDown(option, { button: 0 })) {
+      act(() => { titleInput.blur() })
+    }
+    expect(titleInput).toHaveValue('태')
+    fireEvent.click(option)
+    expect(titleInput).toHaveValue('태하병원')
+    expect(titleInput).not.toHaveFocus()
+    expect(screen.queryByRole('option', { name: /태하병원/ })).not.toBeInTheDocument()
     await act(async () => { fireEvent.click(screen.getByText('저장')) })
 
     const saved = defaultProps.onSave.mock.calls[0][0]

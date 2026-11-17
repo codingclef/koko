@@ -438,6 +438,7 @@ export function EventFormModal({
     setTitle(suggestion.title)
     setSuggestions([])
     setSuggestionsOpen(false)
+    titleInputRef.current?.blur()
     setLabelColor(suggestion.label_color)
     setLabelPickerOpen(false)
     setReminderMinutes(new Set(
@@ -616,6 +617,10 @@ export function EventFormModal({
                   type="button"
                   role="option"
                   aria-selected="false"
+                  onMouseDown={(event) => {
+                    // WebKit can blur the input and remove this button before click.
+                    if (event.button === 0) event.preventDefault()
+                  }}
                   onClick={() => applySuggestion(suggestion)}
                   className="flex w-full items-center justify-between gap-4 border-b border-stone-100 px-4 py-3 text-left last:border-b-0 hover:bg-stone-50 focus:bg-stone-50 focus:outline-none dark:border-stone-800 dark:hover:bg-stone-800 dark:focus:bg-stone-800"
                 >
