@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, ListChecks, AlertTriangle, ListFilter } from 'lucide-react'
 import {
@@ -19,6 +19,7 @@ import {
   updateReminderGroup,
   deleteReminderGroup,
   getReminderListsWithPreviews,
+  getReminderItems,
   createReminderList,
   deleteReminderList,
   renameReminderList,
@@ -26,7 +27,7 @@ import {
 } from '@/lib/reminder-lists'
 import { getFamilyMembers, type FamilyMember } from '@/lib/calendar'
 import { ReminderListCard } from '@/components/reminders/ReminderListCard'
-import { ReminderDetailView } from '@/components/reminders/ReminderDetailView'
+import { ReminderDetailView, type ReminderPreviewRead } from '@/components/reminders/ReminderDetailView'
 import { CreateReminderListModal } from '@/components/reminders/CreateReminderListModal'
 import { ReminderGroupListSheet } from '@/components/reminders/ReminderGroupListSheet'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
@@ -57,27 +58,39 @@ function matchesReminderGroupFilter(
   return list.reminder_group_id === activeGroupId
 }
 
-export function ReminderTab({ user, familyId, isInitializing }: Props) {
+export function ReminderTab({ user, familyId }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [lists, setLists] = useState<ReminderListWithPreview[]>(
     () => getCachedLists(familyId) ?? []
   )
   const [fetchError, setFetchError] = useState(false)
+  const [listsLoaded, setListsLoaded] = useState(() => getCachedLists(familyId) !== null)
   const [groups, setGroups] = useState<ReminderGroup[]>([])
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showGroupList, setShowGroupList] = useState(false)
   const [activeGroupId, setActiveGroupId] = useState<ReminderGroupFilter>('all')
+  const [listRefreshVersion, setListRefreshVersion] = useState(0)
+  const [itemRefreshVersion, setItemRefreshVersion] = useState(0)
+  const listRequestsRef = useRef({ latest: 0, applied: 0, firstValid: 1, active: false })
+  const previewEpochsRef = useRef(new Map<string, number>())
+  const appliedPreviewsRef = useRef(new Map<string, {
+    order: number
+    items: ReminderListWithPreview['previewItems']
+  }>())
+  const previewReadOrderRef = useRef(0)
+  const appliedListPreviewOrderRef = useRef(0)
+  const nextPreviewReadOrder = useCallback(() => ++previewReadOrderRef.current, [])
 
   const activeListId = useMemo(() => {
     const raw = searchParams.get('list')?.trim()
     return raw ? raw : null
   }, [searchParams])
+  const activeListIdRef = useRef(activeListId)
 
-  // 현재 family 기준 캐시가 없으면 첫 진입으로 간주한다.
-  const loading = isInitializing && getCachedLists(familyId) === null
+  const loading = Boolean(familyId) && !listsLoaded && !fetchError
   const groupMap = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups])
   const effectiveActiveGroupId =
     activeGroupId !== 'all' && activeGroupId !== 'family' && !groupMap.has(activeGroupId)
@@ -96,7 +109,7 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
     setLists((prev) => {
       const base = getCachedLists(familyId) ?? prev
       const next = typeof value === 'function' ? value(base) : value
-      if (familyId) {
+      if (familyId && (typeof value !== 'function' || next !== base)) {
         cachedListsByFamily.set(familyId, next)
       }
       return next
@@ -104,17 +117,35 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
   }, [familyId])
 
   const refresh = useCallback(() => {
-    if (!familyId) return
+    const requests = listRequestsRef.current
+    if (!familyId || !requests.active) return
+    const requestId = ++requests.latest
+    const previewOrder = nextPreviewReadOrder()
     getReminderListsWithPreviews(familyId)
       .then((nextLists) => {
-        updateLists(nextLists)
+        if (requestId < requests.firstValid || requestId <= requests.applied) return
+        requests.applied = requestId
+        appliedListPreviewOrderRef.current = previewOrder
+        const newerPreviews = new Map<string, ReminderListWithPreview['previewItems']>()
+        for (const [listId, preview] of appliedPreviewsRef.current) {
+          if (preview.order > previewOrder) newerPreviews.set(listId, preview.items)
+          else appliedPreviewsRef.current.delete(listId)
+        }
+        updateLists(nextLists.map((list) => {
+          const previewItems = newerPreviews.get(list.id)
+          return previewItems ? { ...list, previewItems } : list
+        }))
         setFetchError(false)
+        setListsLoaded(true)
       })
       .catch((e) => {
+        if (requestId < requests.firstValid || requestId !== requests.latest) return
         console.error('[ReminderTab] getReminderListsWithPreviews failed:', e)
-        setFetchError(true)
+        if (requests.applied < requests.firstValid) {
+          setFetchError(true)
+        }
       })
-  }, [familyId, updateLists])
+  }, [familyId, nextPreviewReadOrder, updateLists])
 
   const refreshGroups = useCallback(() => {
     if (!familyId) return Promise.resolve()
@@ -135,6 +166,7 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
   }, [familyId])
 
   const refreshReminderData = useCallback(() => {
+    setListRefreshVersion((version) => version + 1)
     refresh()
     void refreshGroups()
   }, [refresh, refreshGroups])
@@ -145,7 +177,17 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
   )
 
   useEffect(() => {
+    const requests = listRequestsRef.current
+    const previewEpochs = previewEpochsRef.current
+    const appliedPreviews = appliedPreviewsRef.current
+    requests.active = true
     refresh()
+    return () => {
+      requests.active = false
+      requests.firstValid = requests.latest + 1
+      previewEpochs.clear()
+      appliedPreviews.clear()
+    }
   }, [refresh])
 
   useEffect(() => {
@@ -218,11 +260,10 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
   }
 
   const handleListGroupChange = useCallback((listId: string, reminderGroupId: string | null) => {
-    updateLists((prev) =>
-      prev.map((list) =>
-        list.id === listId ? { ...list, reminder_group_id: reminderGroupId } : list
-      )
-    )
+    updateLists((prev) => {
+      if (!prev.some((list) => list.id === listId)) return prev
+      return prev.map((list) => list.id === listId ? { ...list, reminder_group_id: reminderGroupId } : list)
+    })
   }, [updateLists])
 
   const handleGroupCreate = async (
@@ -310,37 +351,49 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
     router.replace(buildReminderHref(), { scroll: false })
   }, [buildReminderHref, router])
 
-  const handlePreviewItemsChange = useCallback((listId: string, items: ReminderItem[]) => {
-    updateLists((prev) =>
-      prev.map((list) =>
-        list.id === listId
-          ? {
-              ...list,
-              previewItems: items
-                .map(({ id, name, is_checked, sort_order }) => ({
-                  id,
-                  name,
-                  is_checked,
-                  sort_order,
-                }))
-                .sort((a, b) => a.sort_order - b.sort_order),
-            }
-          : list
-      )
-    )
-  }, [updateLists])
+  const handlePreviewItemsChange = useCallback((listId: string, items: ReminderItem[], order = nextPreviewReadOrder()) => {
+    if (order <= appliedListPreviewOrderRef.current || order <= (appliedPreviewsRef.current.get(listId)?.order ?? 0)) return
+    const previewItems = items
+      .map(({ id, name, is_checked, sort_order }) => ({ id, name, is_checked, sort_order }))
+      .sort((a, b) => a.sort_order - b.sort_order)
+    appliedPreviewsRef.current.set(listId, { order, items: previewItems })
+    updateLists((prev) => {
+      if (!prev.some((list) => list.id === listId)) return prev
+      return prev.map((list) => list.id === listId ? { ...list, previewItems } : list)
+    })
+  }, [nextPreviewReadOrder, updateLists])
 
-  if (loading) {
-    return (
-      <div className="flex h-full min-h-0 items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
-      </div>
-    )
-  }
+  const refreshClosedPreview = useCallback((listId: string, pendingRead?: ReminderPreviewRead) => {
+    const requests = listRequestsRef.current
+    if (!requests.active) return
+    if (!pendingRead && activeListIdRef.current === listId) {
+      setItemRefreshVersion((version) => version + 1)
+      return
+    }
+    const firstValid = requests.firstValid
+    const epochs = previewEpochsRef.current
+    const epoch = epochs.get(listId)
+    const read = pendingRead ?? { order: nextPreviewReadOrder(), items: getReminderItems(listId) }
+    read.items
+      .then((items) => {
+        if (!requests.active || requests.firstValid !== firstValid || epochs.get(listId) !== epoch) return
+        handlePreviewItemsChange(listId, items, read.order)
+      })
+      .catch((error) => console.error('[ReminderTab] getReminderItems failed:', error))
+  }, [handlePreviewItemsChange, nextPreviewReadOrder])
+
+  useEffect(() => {
+    activeListIdRef.current = activeListId
+    if (activeListId) {
+      const epochs = previewEpochsRef.current
+      epochs.set(activeListId, (epochs.get(activeListId) ?? 0) + 1)
+    }
+  }, [activeListId])
 
   return (
     <div data-testid="reminder-tab-container" className="min-h-full px-4 pt-2 pb-24">
       <ReminderListView
+        loading={loading}
         lists={lists}
         visibleLists={visibleLists}
         fetchError={fetchError}
@@ -382,6 +435,11 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
           user={user}
           groups={groups}
           onClose={closeReminderDetail}
+          listRefreshVersion={listRefreshVersion}
+          itemRefreshVersion={itemRefreshVersion}
+          onListSaved={broadcast}
+          nextPreviewReadOrder={nextPreviewReadOrder}
+          onItemsSettledAfterClose={refreshClosedPreview}
           onListGroupChange={handleListGroupChange}
           onPreviewItemsChange={handlePreviewItemsChange}
         />
@@ -391,6 +449,7 @@ export function ReminderTab({ user, familyId, isInitializing }: Props) {
 }
 
 interface ReminderListViewProps {
+  loading: boolean
   lists: ReminderListWithPreview[]
   visibleLists: ReminderListWithPreview[]
   fetchError: boolean
@@ -410,6 +469,7 @@ interface ReminderListViewProps {
 }
 
 function ReminderListView({
+  loading,
   lists,
   visibleLists,
   fetchError,
@@ -433,7 +493,7 @@ function ReminderListView({
         <div>
           <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">리마인더</h1>
           <p className="text-sm text-stone-400 dark:text-stone-500 mt-0.5">
-            {lists.length > 0 ? `${lists.length}개의 목록` : '리마인더를 만들어보세요'}
+            {loading ? '목록을 불러오는 중이에요' : lists.length > 0 ? `${lists.length}개의 목록` : '리마인더를 만들어보세요'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -449,6 +509,7 @@ function ReminderListView({
           </button>
           <button
             onClick={onCreateClick}
+            disabled={loading}
             className="w-11 h-11 flex items-center justify-center rounded-full bg-accent-400 hover:bg-accent-500 text-white shadow-sm transition-colors"
             aria-label="새 리마인더 추가"
           >
@@ -515,7 +576,11 @@ function ReminderListView({
         </div>
       )}
 
-      {fetchError ? (
+      {loading ? (
+        <div className="flex justify-center py-24" role="status" aria-label="리마인더 불러오는 중">
+          <div className="w-8 h-8 rounded-full border-2 border-accent-300 border-t-accent-500 animate-spin" />
+        </div>
+      ) : fetchError ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <AlertTriangle size={40} className="text-stone-300 dark:text-stone-600 mb-4" />
           <p className="text-stone-500 dark:text-stone-400 font-medium">목록을 불러오지 못했어요</p>

@@ -30,20 +30,22 @@ import type { ReminderItem as ReminderItemType, ReminderList, ReminderGroup } fr
 import type { User } from '@supabase/supabase-js'
 
 type DetailStatus = 'loading' | 'ready' | 'not-found' | 'fetch-error'
+type DetailItem = ReminderItemType & { pending?: true }
+export type ReminderPreviewRead = { items: Promise<ReminderItemType[]>; order: number }
 type AddSession =
   | null
   | { mode: 'bottom' }
   | { mode: 'inline'; anchorItemId: string }
 
+const compareItems = (a: ReminderItemType, b: ReminderItemType) =>
+  a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+
 const withInsertedReminderItem = (
-  currentItems: ReminderItemType[],
-  itemToInsert: ReminderItemType,
+  currentItems: DetailItem[],
+  itemToInsert: DetailItem,
   afterItemId?: string
-): ReminderItemType[] => {
-  const orderedItems = [...currentItems].sort((a, b) => {
-    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order
-    return a.created_at.localeCompare(b.created_at)
-  })
+): DetailItem[] => {
+  const orderedItems = [...currentItems].sort(compareItems)
   const anchorIndex = afterItemId
     ? orderedItems.findIndex((item) => item.id === afterItemId)
     : -1
@@ -57,13 +59,23 @@ const withInsertedReminderItem = (
   return nextItems.map((item, index) => ({ ...item, sort_order: index }))
 }
 
+function restoreRemovedItems(current: DetailItem[], removed: DetailItem[]): DetailItem[] {
+  const currentIds = new Set(current.map((item) => item.id))
+  return [...current, ...removed.filter((item) => !currentIds.has(item.id))].sort(compareItems)
+}
+
 interface Props {
   listId: string
   user: User
   groups?: ReminderGroup[]
   onClose: () => void
+  listRefreshVersion?: number
+  itemRefreshVersion?: number
+  onListSaved?: () => void
+  nextPreviewReadOrder?: () => number
+  onItemsSettledAfterClose?: (listId: string, pendingRead?: ReminderPreviewRead) => void
   onListGroupChange?: (listId: string, reminderGroupId: string | null) => void
-  onPreviewItemsChange: (listId: string, items: ReminderItemType[]) => void
+  onPreviewItemsChange: (listId: string, items: ReminderItemType[], order?: number) => void
 }
 
 export function ReminderDetailView({
@@ -71,11 +83,16 @@ export function ReminderDetailView({
   user,
   groups = [],
   onClose,
+  listRefreshVersion = 0,
+  itemRefreshVersion = 0,
+  onListSaved,
+  nextPreviewReadOrder,
+  onItemsSettledAfterClose,
   onListGroupChange,
   onPreviewItemsChange,
 }: Props) {
   const [list, setList] = useState<ReminderList | null>(null)
-  const [items, setItems] = useState<ReminderItemType[]>([])
+  const [{ items, order: itemsReadOrder }, setItemSnapshot] = useState<{ items: DetailItem[]; order?: number }>({ items: [] })
   const [status, setStatus] = useState<DetailStatus>('loading')
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [groupSaving, setGroupSaving] = useState(false)
@@ -84,20 +101,41 @@ export function ReminderDetailView({
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<ReminderItemType | null>(null)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [clearingItems, setClearingItems] = useState(false)
+  const [itemWritePending, setItemWritePending] = useState(false)
   const addInputRef = useRef<HTMLInputElement>(null)
   const shellRef = useRef<HTMLDivElement>(null)
+  const mountedRef = useRef(false)
+  const itemSyncRef = useRef({
+    latest: 0,
+    applied: 0,
+    firstValid: 1,
+    pending: new Map<number, ReminderPreviewRead>(),
+    writes: 0,
+    refreshQueued: false,
+  })
+  const groupSavingRef = useRef(false)
+  const listRequestsRef = useRef({ latest: 0, applied: 0, firstValid: 1 })
+  const lastListRefreshVersionRef = useRef(listRefreshVersion)
+  const lastItemRefreshVersionRef = useRef(itemRefreshVersion)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   )
 
-  const syncPreview = useCallback(
-    (nextItems: ReminderItemType[]) => {
-      onPreviewItemsChange(listId, nextItems)
-    },
-    [listId, onPreviewItemsChange]
-  )
+  useEffect(() => {
+    if (status !== 'ready' && status !== 'not-found') return
+    if (status === 'ready' && itemWritePending) return
+    const previewItems = status === 'ready' ? items : []
+    if (itemsReadOrder === undefined) onPreviewItemsChange(listId, previewItems)
+    else onPreviewItemsChange(listId, previewItems, itemsReadOrder)
+  }, [itemWritePending, items, itemsReadOrder, listId, onPreviewItemsChange, status])
+
+  const setItems = useCallback((update: React.SetStateAction<DetailItem[]>) => {
+    setItemSnapshot((previous) => ({
+      items: typeof update === 'function' ? update(previous.items) : update,
+    }))
+  }, [])
 
   const closeAddSessionIfDraftEmpty = useCallback(() => {
     const input = addInputRef.current
@@ -107,35 +145,106 @@ export function ReminderDetailView({
   }, [])
 
   const refreshItems = useCallback(() => {
-    getReminderItems(listId)
+    if (!mountedRef.current) return
+    const sync = itemSyncRef.current
+    // 정합성 조회는 로컬 저장과 겹치지 않게 합친다.
+    if (sync.writes > 0) {
+      sync.refreshQueued = true
+      return
+    }
+
+    const requestId = ++sync.latest
+    const order = nextPreviewReadOrder?.() ?? requestId
+    const read = { items: getReminderItems(listId), order }
+    sync.pending.set(requestId, read)
+    read.items
       .then((nextItems) => {
-        setItems(nextItems)
-        syncPreview(nextItems)
+        if (requestId < sync.firstValid || requestId <= sync.applied) return
+        sync.applied = requestId
+        setItemSnapshot({ items: nextItems, order: nextPreviewReadOrder ? order : undefined })
       })
       .catch((e) => console.error('[ReminderDetailView] getReminderItems failed:', e))
-  }, [listId, syncPreview])
+      .finally(() => {
+        sync.pending.delete(requestId)
+      })
+  }, [listId, nextPreviewReadOrder])
+
+  const beginItemWrite = useCallback(() => {
+    const sync = itemSyncRef.current
+    if (sync.pending.size > 0 || sync.writes > 0) sync.refreshQueued = true
+    sync.firstValid = sync.latest + 1
+    sync.pending.clear()
+    sync.writes += 1
+    setItemWritePending(true)
+  }, [])
+
+  const finishItemWrite = useCallback(() => {
+    const sync = itemSyncRef.current
+    sync.writes -= 1
+    if (sync.writes > 0) return
+    if (!mountedRef.current) {
+      onItemsSettledAfterClose?.(listId)
+      return
+    }
+    setItemWritePending(false)
+    if (sync.refreshQueued) {
+      sync.refreshQueued = false
+      refreshItems()
+    }
+  }, [listId, onItemsSettledAfterClose, refreshItems])
 
   const refreshList = useCallback(() => {
+    if (!mountedRef.current || groupSavingRef.current) return
+    const requests = listRequestsRef.current
+    const requestId = ++requests.latest
+    const order = nextPreviewReadOrder?.()
     getReminderList(listId)
       .then((nextList) => {
+        if (requestId < requests.firstValid || requestId <= requests.applied) return
+        requests.applied = requestId
         if (nextList) {
           setList(nextList)
           onListGroupChange?.(listId, nextList.reminder_group_id)
         } else {
           setList(null)
-          setItems([])
+          const sync = itemSyncRef.current
+          sync.firstValid = sync.latest + 1
+          sync.pending.clear()
+          setItemSnapshot({ items: [], order })
           setStatus('not-found')
-          syncPreview([])
         }
       })
       .catch((e) => console.error('[ReminderDetailView] getReminderList failed:', e))
-  }, [listId, onListGroupChange, syncPreview])
+  }, [listId, nextPreviewReadOrder, onListGroupChange])
 
-  const broadcast = useRealtimeSync(`list_items_${listId}`, refreshItems)
-  const broadcastListChange = useRealtimeSync(
-    list ? `family_lists_${list.family_id}` : null,
-    refreshList
-  )
+  const broadcast = useRealtimeSync(status === 'ready' ? `list_items_${listId}` : null, refreshItems)
+
+  useEffect(() => {
+    if (status !== 'ready' || lastListRefreshVersionRef.current === listRefreshVersion) return
+    lastListRefreshVersionRef.current = listRefreshVersion
+    refreshList()
+  }, [listRefreshVersion, refreshList, status])
+
+  useEffect(() => {
+    if (status !== 'ready' || lastItemRefreshVersionRef.current === itemRefreshVersion) return
+    lastItemRefreshVersionRef.current = itemRefreshVersion
+    refreshItems()
+  }, [itemRefreshVersion, refreshItems, status])
+
+  useEffect(() => {
+    mountedRef.current = true
+    const sync = itemSyncRef.current
+    const listRequests = listRequestsRef.current
+    return () => {
+      mountedRef.current = false
+      for (const [requestId, read] of sync.pending) {
+        if (requestId > sync.applied) onItemsSettledAfterClose?.(listId, read)
+      }
+      sync.firstValid = sync.latest + 1
+      sync.pending.clear()
+      listRequests.firstValid = listRequests.latest + 1
+    }
+  }, [listId, onItemsSettledAfterClose])
 
   const fetchDetailData = useCallback(async () => {
     const reminderList = await getReminderList(listId)
@@ -143,34 +252,34 @@ export function ReminderDetailView({
       return { type: 'not-found' as const }
     }
 
+    const order = nextPreviewReadOrder?.()
     const fetchedItems = await getReminderItems(listId)
     return {
       type: 'ready' as const,
       reminderList,
       fetchedItems,
+      order,
     }
-  }, [listId])
+  }, [listId, nextPreviewReadOrder])
 
   const applyLoadResult = useCallback(
     (
       result:
         | { type: 'not-found' }
-        | { type: 'ready'; reminderList: ReminderList; fetchedItems: ReminderItemType[] }
+        | { type: 'ready'; reminderList: ReminderList; fetchedItems: ReminderItemType[]; order?: number }
     ) => {
       if (result.type === 'not-found') {
         setList(null)
-        setItems([])
+        setItemSnapshot({ items: [] })
         setStatus('not-found')
-        syncPreview([])
         return
       }
 
       setList(result.reminderList)
-      setItems(result.fetchedItems)
-      syncPreview(result.fetchedItems)
+      setItemSnapshot({ items: result.fetchedItems, order: result.order })
       setStatus('ready')
     },
-    [syncPreview]
+    []
   )
 
   useEffect(() => {
@@ -192,7 +301,7 @@ export function ReminderDetailView({
     return () => {
       cancelled = true
     }
-  }, [applyLoadResult, fetchDetailData])
+  }, [applyLoadResult, fetchDetailData, setItems])
 
   useEffect(() => {
     if (!addSession) return
@@ -230,24 +339,13 @@ export function ReminderDetailView({
       })
   }
 
-  const setItemsWithPreview = useCallback(
-    (updater: ReminderItemType[] | ((prev: ReminderItemType[]) => ReminderItemType[])) => {
-      setItems((prev) => {
-        const next = typeof updater === 'function' ? updater(prev) : updater
-        syncPreview(next)
-        return next
-      })
-    },
-    [syncPreview]
-  )
-
   const handleAddItem = useCallback(async (
     name: string,
     afterItemId?: string,
     optimisticId = crypto.randomUUID()
   ): Promise<ReminderItemType | null> => {
     setMutationError(null)
-    const optimisticItem: ReminderItemType = {
+    const optimisticItem: DetailItem = {
       id: optimisticId,
       list_id: listId,
       created_by: user.id,
@@ -257,14 +355,16 @@ export function ReminderDetailView({
       checked_at: null,
       sort_order: 0,
       created_at: new Date().toISOString(),
+      pending: true,
     }
-    setItemsWithPreview((currentItems) => (
+    beginItemWrite()
+    setItems((currentItems) => (
       withInsertedReminderItem(currentItems, optimisticItem, afterItemId)
     ))
 
     try {
       const realItem = await addReminderItem(listId, user.id, name, afterItemId ?? null)
-      setItemsWithPreview((currentItems) => {
+      setItems((currentItems) => {
         const itemsWithoutExistingReal = currentItems.filter((item) => item.id !== realItem.id)
         const optimisticIndex = itemsWithoutExistingReal.findIndex(
           (item) => item.id === optimisticItem.id
@@ -283,13 +383,15 @@ export function ReminderDetailView({
       return realItem
     } catch (e) {
       console.error('[ReminderDetailView] addReminderItem failed:', e)
-      setItemsWithPreview((currentItems) => (
+      setItems((currentItems) => (
         currentItems.filter((item) => item.id !== optimisticItem.id)
       ))
       setMutationError('아이템을 저장하지 못했어요')
       return null
+    } finally {
+      finishItemWrite()
     }
-  }, [broadcast, listId, setItemsWithPreview, user.id])
+  }, [beginItemWrite, broadcast, finishItemWrite, listId, setItems, user.id])
 
   const handleBottomAdd = useCallback(
     async (name: string): Promise<boolean> => {
@@ -305,8 +407,9 @@ export function ReminderDetailView({
   )
 
   const handleInlineAdd = useCallback(
-    (afterItemId: string) =>
+    (afterItemId: string, pendingAnchor = false) =>
       async (name: string): Promise<boolean> => {
+        if (pendingAnchor) return false
         const optimisticId = crypto.randomUUID()
         setAddSession({ mode: 'inline', anchorItemId: optimisticId })
         const createdItem = await handleAddItem(name, afterItemId, optimisticId)
@@ -319,29 +422,29 @@ export function ReminderDetailView({
   )
 
   const handleCheck = async (itemId: string, checked: boolean) => {
+    const previousItem = items.find((item) => item.id === itemId)
+    if (!previousItem || previousItem.pending) return
     setMutationError(null)
-    const previousItems = items
     setAddSession(null)
 
-    if (list?.type === 'delete' && checked) {
-      setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
+    const deleteOnCheck = list?.type === 'delete' && checked
+    const checkedBy = checked ? user.id : null
+    const checkedAt = checked ? new Date().toISOString() : null
+    beginItemWrite()
+    if (deleteOnCheck) {
+      setItems((prev) => prev.filter((item) => item.id !== itemId))
     } else {
-      setItemsWithPreview((prev) =>
+      setItems((prev) =>
         prev.map((item) =>
           item.id === itemId
-            ? {
-                ...item,
-                is_checked: checked,
-                checked_by: checked ? user.id : null,
-                checked_at: checked ? new Date().toISOString() : null,
-              }
+            ? { ...item, is_checked: checked, checked_by: checkedBy, checked_at: checkedAt }
             : item
         )
       )
     }
 
     try {
-      if (list?.type === 'delete' && checked) {
+      if (deleteOnCheck) {
         await deleteReminderItem(itemId)
       } else {
         await checkReminderItem(itemId, user.id, checked)
@@ -349,38 +452,48 @@ export function ReminderDetailView({
       broadcast()
     } catch (e) {
       console.error('[ReminderDetailView] checkReminderItem failed:', e)
-      setItemsWithPreview(previousItems)
-      setMutationError(
-        list?.type === 'delete' && checked
-          ? '아이템을 삭제하지 못했어요'
-          : '체크 상태를 저장하지 못했어요'
-      )
+      if (deleteOnCheck) {
+        setItems((prev) => restoreRemovedItems(prev, [previousItem]))
+      } else {
+        setItems((prev) => prev.map((item) =>
+          item.id === itemId && item.is_checked === checked && item.checked_at === checkedAt
+            ? { ...item, is_checked: previousItem.is_checked, checked_by: previousItem.checked_by, checked_at: previousItem.checked_at }
+            : item
+        ))
+      }
+      setMutationError(deleteOnCheck ? '아이템을 삭제하지 못했어요' : '체크 상태를 저장하지 못했어요')
+    } finally {
+      finishItemWrite()
     }
   }
 
   const handleDelete = async (itemId: string) => {
-    setMutationError(null)
     setDeleteConfirmItem(null)
-    const previousItems = items
+    const previousItem = items.find((item) => item.id === itemId)
+    if (!previousItem || previousItem.pending) return
+    setMutationError(null)
     setAddSession((currentSession) =>
       currentSession?.mode === 'inline' && currentSession.anchorItemId === itemId
         ? null
         : currentSession
     )
-    setItemsWithPreview((prev) => prev.filter((item) => item.id !== itemId))
+    beginItemWrite()
+    setItems((prev) => prev.filter((item) => item.id !== itemId))
 
     try {
       await deleteReminderItem(itemId)
       broadcast()
     } catch (e) {
       console.error('[ReminderDetailView] deleteReminderItem failed:', e)
-      setItemsWithPreview(previousItems)
+      setItems((prev) => restoreRemovedItems(prev, [previousItem]))
       setMutationError('아이템을 삭제하지 못했어요')
+    } finally {
+      finishItemWrite()
     }
   }
 
   const handleClearItems = async () => {
-    if (items.length === 0 || clearingItems) {
+    if (items.length === 0 || itemSyncRef.current.writes > 0) {
       setClearConfirmOpen(false)
       return
     }
@@ -392,24 +505,28 @@ export function ReminderDetailView({
     setAddSession(null)
     setClearingItems(true)
     const previousItems = items
-    setItemsWithPreview([])
+    beginItemWrite()
+    setItems([])
 
     try {
       await clearReminderItems(listId)
       broadcast()
     } catch (e) {
       console.error('[ReminderDetailView] clearReminderItems failed:', e)
-      setItemsWithPreview(previousItems)
+      setItems((prev) => restoreRemovedItems(prev, previousItems))
       setMutationError('아이템을 비우지 못했어요')
     } finally {
       setClearingItems(false)
+      finishItemWrite()
     }
   }
 
   const handleRename = async (itemId: string, name: string): Promise<boolean> => {
+    const previousItem = items.find((item) => item.id === itemId)
+    if (!previousItem || previousItem.pending) return false
     setMutationError(null)
-    const previousItems = items
-    setItemsWithPreview((prev) =>
+    beginItemWrite()
+    setItems((prev) =>
       prev.map((item) => (item.id === itemId ? { ...item, name } : item))
     )
 
@@ -419,28 +536,33 @@ export function ReminderDetailView({
       return true
     } catch (e) {
       console.error('[ReminderDetailView] renameReminderItem failed:', e)
-      setItemsWithPreview(previousItems)
+      setItems((prev) => prev.map((item) =>
+        item.id === itemId && item.name === name ? { ...item, name: previousItem.name } : item
+      ))
       setMutationError('아이템 이름을 저장하지 못했어요')
       return false
+    } finally {
+      finishItemWrite()
     }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id || hasPendingItems) return
 
     setMutationError(null)
-    const previousItems = items
     const uncheckedItems = items.filter((item) => !item.is_checked)
     const checkedItems = items.filter((item) => item.is_checked)
     const oldIndex = uncheckedItems.findIndex((item) => item.id === active.id)
     const newIndex = uncheckedItems.findIndex((item) => item.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
     const reorderedUnchecked = arrayMove(uncheckedItems, oldIndex, newIndex).map((item, idx) => ({
       ...item,
       sort_order: idx,
     }))
     const nextItems = [...reorderedUnchecked, ...checkedItems]
-    setItemsWithPreview(nextItems)
+    beginItemWrite()
+    setItems(nextItems)
 
     try {
       await reorderReminderItems(
@@ -449,19 +571,31 @@ export function ReminderDetailView({
       broadcast()
     } catch (e) {
       console.error('[ReminderDetailView] reorderReminderItems failed:', e)
-      setItemsWithPreview(previousItems)
+      const previousOrder = new Map(uncheckedItems.map((item) => [item.id, item.sort_order]))
+      const attemptedOrder = new Map(reorderedUnchecked.map((item) => [item.id, item.sort_order]))
+      setItems((prev) => prev.map((item) =>
+        item.sort_order === attemptedOrder.get(item.id)
+          ? { ...item, sort_order: previousOrder.get(item.id) ?? item.sort_order }
+          : item
+      ).sort(compareItems))
+      itemSyncRef.current.refreshQueued = true
       setMutationError('아이템 순서를 저장하지 못했어요')
+    } finally {
+      finishItemWrite()
     }
   }
 
   const handleGroupChange = async (nextValue: string) => {
-    if (!list || groupSaving) return
+    if (!list || groupSavingRef.current) return
 
     const nextGroupId = nextValue === '' ? null : nextValue
     if (nextGroupId === list.reminder_group_id) return
 
     setMutationError(null)
+    groupSavingRef.current = true
     setGroupSaving(true)
+    const requests = listRequestsRef.current
+    requests.firstValid = requests.latest + 1
     const previousList = list
     setList({ ...list, reminder_group_id: nextGroupId })
     onListGroupChange?.(list.id, nextGroupId)
@@ -470,17 +604,20 @@ export function ReminderDetailView({
       const updatedList = await updateReminderListGroup(list.id, user.id, nextGroupId)
       setList(updatedList)
       onListGroupChange?.(updatedList.id, updatedList.reminder_group_id)
-      broadcastListChange()
+      onListSaved?.()
     } catch (e) {
       console.error('[ReminderDetailView] updateReminderListGroup failed:', e)
       setList(previousList)
       onListGroupChange?.(previousList.id, previousList.reminder_group_id)
       setMutationError('그룹을 변경하지 못했어요')
     } finally {
+      groupSavingRef.current = false
       setGroupSaving(false)
+      refreshList()
     }
   }
 
+  const hasPendingItems = items.some((item) => item.pending)
   const uncheckedItems = useMemo(
     () => items.filter((item) => !item.is_checked),
     [items]
@@ -598,7 +735,7 @@ export function ReminderDetailView({
               <button
                 type="button"
                 onClick={handleOpenClearConfirm}
-                disabled={clearingItems}
+                disabled={itemWritePending}
                 className="h-10 shrink-0 rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:hover:bg-red-950/30"
                 aria-label="아이템 비우기"
               >
@@ -678,12 +815,14 @@ export function ReminderDetailView({
                     onEditEnd={handleEditEnd}
                     onAdvanceEdit={handleAdvanceEdit}
                     draggable
+                    dragDisabled={hasPendingItems}
+                    pending={item.pending}
                   />,
                   ...(addSession?.mode === 'inline' && addSession.anchorItemId === item.id ? [
                     <AddItemInput
                       key="inline-add"
                       ref={addInputRef}
-                      onAdd={handleInlineAdd(item.id)}
+                      onAdd={handleInlineAdd(item.id, item.pending)}
                       onCancelEmpty={closeAddSessionIfDraftEmpty}
                       inline
                       testId="inline-add-item-input"
@@ -745,6 +884,7 @@ export function ReminderDetailView({
             <button
               type="button"
               onClick={handleOpenBottomAdd}
+              disabled={clearingItems}
               className="absolute right-4 bottom-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-accent-400 text-white shadow-lg transition-colors hover:bg-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-300"
               aria-label="아이템 추가"
               data-testid="floating-add-item-button"
@@ -813,7 +953,7 @@ export function ReminderDetailView({
                   </button>
                   <button
                     onClick={handleConfirmClear}
-                    disabled={clearingItems}
+                    disabled={itemWritePending}
                     className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
                     aria-label="아이템 비우기 확인"
                   >
