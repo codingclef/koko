@@ -39,7 +39,8 @@ export function TabsShell() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { familyId, appRole, loading: familyLoading, error: familyError, reload: reloadFamily } = useFamily(user)
+  const { familyId, setFamilyId, appRole, loading: familyLoading, error: familyError, reload: reloadFamily } = useFamily(user)
+  const [joinedFamily, setJoinedFamily] = useState<{ userId: string; familyId: string } | null>(null)
   const {
     calendars,
     loading: calendarsLoading,
@@ -48,7 +49,8 @@ export function TabsShell() {
   } = useCalendars(familyId)
   const { preferences, updatePreferences } = useUserPreferences(user)
   const shouldLoadCalendars = Boolean(familyId) && !familyError
-  const isInitializing = authLoading || familyLoading || (shouldLoadCalendars && calendarsLoading)
+  const joinedFromShell = joinedFamily?.userId === user?.id && joinedFamily?.familyId === familyId
+  const isInitializing = authLoading || familyLoading || (shouldLoadCalendars && calendarsLoading && !joinedFromShell)
   const startupError = !isInitializing ? familyError : null
 
   // 인증됨 + 앱 접근권 있음 + 아직 가족 없음 → 온보딩 필요
@@ -192,6 +194,7 @@ export function TabsShell() {
       <div className="flex-1 min-h-0 relative">
         <div className={`absolute inset-0 flex flex-col min-h-0 overflow-hidden${activeTab !== 'calendar' ? ' hidden' : ''}`}>
           <CalendarTab
+            key={familyId}
             preferences={preferences}
             updatePreferences={updatePreferences}
             user={user}
@@ -216,7 +219,14 @@ export function TabsShell() {
         {mountedTabs.has('settings') && (
           <div className={`absolute inset-0 overflow-y-auto${activeTab !== 'settings' ? ' hidden' : ''}`}>
             <SettingsTab
-              onNavigateToTab={handleTabChange}
+              key={familyId}
+              onFamilyJoined={(nextFamilyId) => {
+                if (nextFamilyId !== familyId) {
+                  setJoinedFamily({ userId: user.id, familyId: nextFamilyId })
+                  setFamilyId(nextFamilyId)
+                }
+                handleTabChange('reminders')
+              }}
               preferences={preferences}
               updatePreferences={updatePreferences}
               user={user}

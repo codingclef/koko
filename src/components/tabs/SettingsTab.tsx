@@ -27,7 +27,7 @@ import {
 import { ApiClientError, postJsonWithAuth } from '@/lib/api-client'
 import { APP_THEMES, DEFAULT_THEME } from '@/lib/preferences'
 import type { UserPreferences } from '@/lib/preferences'
-import type { AuthState, Tab } from '@/types/tabs'
+import type { AuthState } from '@/types/tabs'
 import packageInfo from '../../../package.json'
 
 type SettingsView = 'main' | 'account' | 'family' | 'calendar' | 'app'
@@ -53,7 +53,7 @@ const DISPLAY_THEMES = [
 ] as const
 
 interface Props extends AuthState {
-  onNavigateToTab: (tab: Tab) => void
+  onFamilyJoined: (familyId: string) => void
   preferences: UserPreferences | null
   updatePreferences: (updates: Partial<Omit<UserPreferences, 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>
   appRole: 'admin' | 'member'
@@ -82,7 +82,7 @@ function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
   )
 }
 
-export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, user, familyId, appRole, isInitializing }: Props) {
+export function SettingsTab({ onFamilyJoined, preferences, updatePreferences, user, familyId, appRole, isInitializing }: Props) {
   const router = useRouter()
   const { theme = 'system', setTheme } = useTheme()
   const logoutTitleId = useId()
@@ -302,11 +302,11 @@ export function SettingsTab({ onNavigateToTab, preferences, updatePreferences, u
     setJoining(true)
     setJoinError(null)
     try {
-      await postJsonWithAuth('/api/family/join', {
+      const { familyId } = await postJsonWithAuth<{ familyId: string }>('/api/family/join', {
         inviteCode: joinCode.trim(),
         displayName: joinDisplayName.trim() || undefined,
       })
-      onNavigateToTab('reminders')
+      onFamilyJoined(familyId)
     } catch (e) {
       setJoinError(
         e instanceof ApiClientError && e.message === 'Invalid invite code'
